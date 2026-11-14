@@ -10,7 +10,14 @@ IMAGE=crown-rs:1
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 ensure_stage() {
-  docker run -d --name crown-stage -v crown-src:/work "$IMAGE" sleep infinity >/dev/null 2>&1 || true
+  docker rm -f crown-stage >/dev/null 2>&1 || true
+  # `docker cp` is additive - deleted sources would linger and still build.
+  # Reset the tree first (the run-time target cache is a separate volume,
+  # mounted OVER /work, so wiping here costs nothing). The proxy filters
+  # `docker exec` (attach hijack 403), so the wipe rides on `docker run`.
+  docker run --rm -v crown-src:/work "$IMAGE" \
+    sh -c 'cd /work && rm -rf ./* ./.[!.]* 2>/dev/null || true' >/dev/null
+  docker run -d --name crown-stage -v crown-src:/work "$IMAGE" sleep infinity >/dev/null
   docker cp "$ROOT/." crown-stage:/work
 }
 

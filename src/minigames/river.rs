@@ -458,7 +458,7 @@ impl River {
         // rocks ----------------------------------------------------------------------
         for r in self.rocks.iter() {
             let dy = r.p - self.s;
-            if dy < -30.0 || dy > 230.0 {
+            if !(-30.0..=230.0).contains(&dy) {
                 continue;
             }
             let y = CANOE_Y - dy as i32;
@@ -471,7 +471,7 @@ impl River {
         for i in 0..self.boats.len() {
             let b = &self.boats[i];
             let dy = b.p - self.s;
-            if dy < -30.0 || dy > 230.0 {
+            if !(-30.0..=230.0).contains(&dy) {
                 continue;
             }
             let y = CANOE_Y - dy as i32;

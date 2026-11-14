@@ -259,9 +259,9 @@ impl Maze {
     }
 
     fn run_torches(&mut self) {
-        for i in 0..2 {
+        for (i, t) in TORCHES.iter().enumerate() {
             if !self.torch_taken[i]
-                && (self.player.0 - TORCHES[i].0).hypot(self.player.1 - TORCHES[i].1) < GRAB_R
+                && (self.player.0 - t.0).hypot(self.player.1 - t.1) < GRAB_R
             {
                 self.torch_taken[i] = true;
                 self.fright = FRIGHT_TICKS;

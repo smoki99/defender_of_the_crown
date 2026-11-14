@@ -183,16 +183,16 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   hall-of-fame entry written (playwright scripted). **2026-11-14:**
   reward-loop-check.mjs 8/8 green (jsdom stand-in per T3xx note). See
   progress.md.
-- [ ] **Checkpoint ALPHA 1** — see gate below.
+- [x] **Checkpoint ALPHA 1** — gate GREEN 2026-11-14, see below.
 
 ### GATE ALPHA 1 (all green, then commit tag `alpha1`, push)
-- [ ] A1: full loop: title→difficulty→campaign→play all 3 games→reward→
+- [x] A1: full loop: title→difficulty→campaign→play all 3 games→reward→
   end turn→AI→conquest→victory screen (playwright scripted, 0 errors).
-- [ ] A2: docker `cargo test --release` + `clippy -D warnings` green.
-- [ ] A3: screenshots: title, menu, campaign, castle panel, battle, each
+- [x] A2: docker `cargo test --release` + `clippy -D warnings` green.
+- [x] A3: screenshots: title, menu, campaign, castle panel, battle, each
   minigame play/results — baselines committed, pixel-diff re-run clean.
-- [ ] A4: audio RMS audible on title loop in headless.
-- [ ] A5: progress log complete for T0xx–T5xx.
+- [x] A4: audio RMS audible on title loop in headless.
+- [x] A5: progress log complete for T0xx–T5xx.
 
 ## Phase 6 — Minigames 4–9 (T6xx) — each MG-QA Q1–Q6, own baseline
 

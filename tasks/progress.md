@@ -370,3 +370,23 @@ herald's cry is public knowledge.
   0.433-0.438 at +6 s, M + reload mute persistence. Screenshots: title/menu/
   how-to/fame/options/crawl set /tmp/crown-title + shots=10 per run,
   approved at T403-T405; committed baselines land with A3.
+- ALPHA 1 GATE (2026-11-14), all five green: A1 - the real-Chromium loop
+  (tools/alpha1-loop.ts, commit 4ba0c50) plays title -> difficulty ->
+  campaign -> sword+catapult+joust with gold rewards -> end turn -> AI dawn
+  -> conquest -> victory screen, 0 console errors, shots archived.
+  A2 - ./test.sh all green on a *freshly wiped* source volume (35 s cached):
+  full cargo test --release, clippy -D warnings 0 hits, wasm32 + release
+  build + wasm-bindgen web/pkg; test.sh ensure_stage() now RESETS the crown-src
+  volume before docker cp (cp is additive - a deleted source kept building,
+  and the proxy 403s `docker exec` [attach hijack], so the wipe rides on
+  `docker run --rm`). A3 - committed pixel baselines under shots/ (.rgba.zz
+  + human PNGs in shots/png/): tools/baseline-check.mjs 12 states (boot,
+  menu, options, howto x3, fame, difficulty, crawl, CASTLE PANEL, BATTLE
+  REPORT - forced by marching Buckingham on London, plate marker = LINEN at
+  (64,88), omen-safe -, turn-1 campaign) and tools/baseline-sports.sh 14
+  frames (PLAY spawn + result PLATE per shipped sport via ?scene=mg deep
+  link, one cold-boot process per capture); every state diffs 0 px except
+  report (144 - ticker/march text, tol 400) and plates (<=72 - blink ring,
+  tol 1300) across two consecutive runs. A4 - audio RMS audible in headless
+  (title loop 0.433-0.438, fanfare window 0.432-0.464, pre-gesture silent).
+  A5 - progress.md complete T0xx-T6xx. Tag `alpha1` cut on this commit.
