@@ -2,10 +2,10 @@
 //! tooltips and the SPORTS gate (season meet + entry fee), asserted on the
 //! framebuffer.
 use defender_of_the_crown::campaign::game::{Difficulty, PLAYER, SPORTS_FEE};
-use defender_of_the_crown::minigames::framework::pick as sport_pick;
 use defender_of_the_crown::engine::gfx::{
     Framebuffer, BLACK, DARKGRAY, DARKRED, EMBER, GRAY, LINEN, ORANGE, SILVER, TAN,
 };
+use defender_of_the_crown::minigames::framework::pick as sport_pick;
 use defender_of_the_crown::ui::{action_rects, end_turn_rect, kit, Btn, CampaignUi, SceneEvent};
 
 fn tap(x: i32, y: i32) -> SceneEvent {
@@ -129,6 +129,8 @@ fn garrison_roll_scroll_when_it_overflows() {
 fn sports_gate_is_the_meet_and_the_fee() {
     let mut ui = CampaignUi::new(7, Difficulty::Normal);
     select(&mut ui, "Buckingham");
+    // season whose posted meet (falconry) still has no shipped game
+    ui.g.turn = 11;
     let sports = btn(&action_rects(true), "sports").clone();
     let (cx, cy) = center(&sports);
     let mut fb = Framebuffer::new();

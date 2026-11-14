@@ -13,12 +13,10 @@ use super::super::minigames::framework::{Cheer, Minigame, SportSpec};
 use crate::campaign::game::Tier;
 use crate::engine::audio::Sfx;
 use crate::engine::fonts::draw_text_shadow;
-use crate::engine::gfx::{
-    BLACK, BLOOD, BROWN, DARKGRAY, GOLD, GRAY, NAVY, SILVER, WHITE,
-};
-use crate::engine::input::{Input, KEY_ENTER, KEY_ESC, Raw};
+use crate::engine::gfx::{BLACK, BLOOD, BROWN, DARKGRAY, GOLD, GRAY, NAVY, SILVER, WHITE};
+use crate::engine::input::{Input, Raw, KEY_ENTER, KEY_ESC};
 use crate::engine::scene::{AppCtx, Scene, SceneEvent};
-use crate::minigames::framework::{MgOutcome, MgState, resolve};
+use crate::minigames::framework::{resolve, MgOutcome, MgState};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -235,10 +233,11 @@ impl Scene for MgHost {
 }
 
 /// Registry factory: one arm per sport that has actually shipped
-/// (T502: joust, T503: catapult; T504+: sword/dragon). An id with no arm
+/// (T502: joust, T503: catapult, T504: sword; T505+: dragon). An id with no arm
 /// yet has no game, and the SPORTS button says so honestly.
 pub fn make_game(id: &str, seed: u64) -> Option<Box<dyn Minigame>> {
     match id {
+        "sword" => Some(Box::new(crate::minigames::sword::Sword::new(seed))),
         "joust" => Some(Box::new(crate::minigames::joust::Joust::new(seed))),
         "catapult" => Some(Box::new(crate::minigames::catapult::Catapult::new(seed))),
         _ => None,

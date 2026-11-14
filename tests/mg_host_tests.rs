@@ -6,7 +6,7 @@ use defender_of_the_crown::engine::gfx::Framebuffer;
 use defender_of_the_crown::engine::input::{Input, KEY_ENTER};
 use defender_of_the_crown::engine::scene::{AppCtx, Scene, SceneEvent};
 use defender_of_the_crown::minigames::framework::{
-    MgOutcome, Minigame, MgState, SportSpec, SPORTS,
+    MgOutcome, MgState, Minigame, SportSpec, SPORTS,
 };
 use defender_of_the_crown::ui::host::{MgHost, OutcomeCell, SportMode};
 use defender_of_the_crown::ui::{CampaignUi, PlayScene};
@@ -171,7 +171,10 @@ fn pause_freezes_the_core_until_resumed() {
     pump(&mut h, &mut fb, 3);
     assert!(h.game_score() > before, "resumed ticks advance the core");
     pump(&mut h, &mut fb, 61 * 60); // let the cheer resolve it
-    assert!(cell.borrow().is_some(), "cheer timer must resolve the round");
+    assert!(
+        cell.borrow().is_some(),
+        "cheer timer must resolve the round"
+    );
     assert!(!h.wants_leave(), "results screen first");
     key(&mut h, KEY_ENTER);
     pump(&mut h, &mut fb, 1);
@@ -196,8 +199,7 @@ fn autoplay_resolves_immediately_and_exits() {
 }
 
 fn owned_castle(ui: &CampaignUi) -> usize {
-    ui.g
-        .strongholds
+    ui.g.strongholds
         .iter()
         .position(|s: &Stronghold| s.owner == PLAYER)
         .unwrap()
@@ -251,6 +253,8 @@ fn sports_button_click_without_a_shipped_game_stays_honest() {
     let mut ui = CampaignUi::new(11, Difficulty::Easy);
     let sid = owned_castle(&ui);
     ui.sel = Some(sid);
+    // season whose posted meet (falconry) still has no shipped game
+    ui.g.turn = 11;
     ui.act("sports", sid);
     assert!(ui.launch_req.is_none(), "nothing to launch yet");
     assert!(
