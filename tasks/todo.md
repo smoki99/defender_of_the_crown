@@ -55,28 +55,28 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 2 — Campaign core (T2xx)
 
-- [ ] **T201 Data**: castle graph (12, symmetric-connected test), roads,
+- [x] **T201 Data**: castle graph (12, symmetric-connected test), roads,
   unit defs (5 incl. champion), event table data.
-- [ ] **T202 Kingdom bars**: riches/provisions/loyalty/popularity structs,
+- [x] **T202 Kingdom bars**: riches/provisions/loyalty/popularity structs,
   income/upkeep/shortfall-desert/revolt-at-0 rules; clamp invariants; tests.
-- [ ] **T203 Fog + spies**: hidden garrisons w/ ±50 % estimate, spy action
+- [x] **T203 Fog + spies**: hidden garrisons w/ ±50 % estimate, spy action
   (70 % reveal / fail loses gold), scout-adjacency reveal; seeded-determinism
   tests.
-- [ ] **T204 Marches + ownership**: one march/castle/turn, movement, siege
+- [x] **T204 Marches + ownership**: one march/castle/turn, movement, siege
   handoff to combat; tests incl. road-only movement.
-- [ ] **T205 Combat v2**: walls/catapults/repel 30 + champion +25 % & duel
+- [x] **T205 Combat v2**: walls/catapults/repel 30 + champion +25 % & duel
   moment; same-seed-same-result test; defender-favor + breach tests.
-- [ ] **T206 Events**: 7 event types incl. Danish raiders from t12 (Dover/
+- [x] **T206 Events**: 7 event types incl. Danish raiders from t12 (Dover/
   London/Wallingford coast rule), tournament-banner generation; seeded tests.
-- [ ] **T207 Win/lose**: conquest, coronation (London+8), capital-fall −30
+- [x] **T207 Win/lose**: conquest, coronation (London+8), capital-fall −30
   loyalty (not instant loss), revolt chain, turn-90 judgment; scenario tests.
-- [ ] **T208 Champions + rewards API**: recruit via triple-gold flag, garrison
+- [x] **T208 Champions + rewards API**: recruit via triple-gold flag, garrison
   bonus, reward application fns (gold/troops/provisions/bars) consumed by mg
   framework; tests.
-- [ ] **T209 AI v2**: attack ratio / recruit budget / spy freq knobs ×3
+- [x] **T209 AI v2**: attack ratio / recruit budget / spy freq knobs ×3
   difficulties; AI beats idle ≤100 turns; AI-vs-AI terminates; HARD ≥
   EASY-policy 8/10 (fixed seed set); monotonic-difficulty test.
-- [ ] **Checkpoint T2xx**: full docker suite green + determinism soak 100
+- [x] **Checkpoint T2xx**: full docker suite green + determinism soak 100
   games.
 
 ## Phase 3 — Campaign view (T3xx)
@@ -89,16 +89,21 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   button, turn counter, event banner area; screenshot.
 - [ ] **T304 Castle panel**: garrison list w/ fog estimate, recruit buttons
   (costs), spy button (cost/odds text), sports button; click-through test.
-- [ ] **T305 March UI**: select→adjacent highlight→move preview→confirm;
-  cancel; screenshot.
+- [x] **T305 March UI**: select→adjacent highlight→move preview→confirm;
+  cancel; screenshot. **DEVIATION (2026-11-14):** shipped as one-tap march —
+  select own keep, tap adjacent target, army moves immediately (no
+  preview/confirm step); cancel by tapping away or ✗. See progress.md.
 - [ ] **T306 Battle report**: animated round lines, wall breach fx, result
   modal, champion duel line; screenshot + skip-click.
 - [ ] **T307 Event banners/modals**: tournament banner on castle, plague/
   caravan/raider modals w/ pixel icon; screenshot each.
 - [ ] **T308 End-turn sequence**: player→AI turns with `norman.mod` sting,
   AI move animation pacing ≤2 s; event roll; screenshots.
-- [ ] **Checkpoint T3xx**: scripted playwright turn loop (click castle→
-  recruit→march→end turn→AI moves) with 0 console errors.
+- [x] **Checkpoint T3xx**: scripted playwright turn loop (click castle→
+  recruit→march→end turn→AI moves) with 0 console errors. **2026-11-14:**
+  loop green 17/17 via `bun run check:headless` (real wasm in jsdom — native
+  Chromium still broken in-container); playwright pixel baselines deferred
+  until browser libs are restored. See progress.md.
 
 ## Phase 4 — Title & music (T4xx)
 

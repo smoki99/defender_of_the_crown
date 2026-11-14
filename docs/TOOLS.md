@@ -31,6 +31,18 @@ patterns below account for that).
   (tools/soundcheck.ts sets this itself). Launch args:
   `--no-sandbox --disable-gpu --autoplay-policy=no-user-gesture-required`.
 
+**Status 2026-11-14:** container recreate wiped `~/pw-libs` + the cached
+playwright shell; until they are restored, browser QA runs through
+`bun run check:headless` — `tools/headless-check.mjs` boots the real wasm
+bundle in **jsdom** (patched perf/canvas/audio globals, synthetic pointer
+events, framebuffer readback via `putImageData`, PNGs to `SHOTS_DIR`,
+default `/tmp/crown-shots`). Scripted loop: title -> difficulty -> campaign
+-> levy -> march -> 5x END TURN, HUD turn counter decoded from the 8x8 font
+glyphs (`cargo run --example coords` emits tap coords + digit bitmaps).
+Green = 17 assertions + 0 console errors. Caveats: jsdom rAF throttles
+(liveness = decoded pixels, not frame counts); no pixel-diff baselines yet
+— deferred until native Chromium returns.
+
 ## Music: `bun tools/compose.ts <out.mod> [tone]`
 
 ProTracker writer: sample synthesis (single-cycle pulse/square/tri + kick/noise

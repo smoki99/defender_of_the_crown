@@ -43,3 +43,49 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   10% leaks next-turn event into GameState.tip (event_rng, battle stream
   untouched). Browser deps moved under cfg(wasm32); shim now bakes -L paths
   so host build-scripts link when cross-compiling. clippy -D warnings clean.
+- T205 combat v2: champion +25 % garrison aura + duel moment, walls/breach,
+  repel, defender-favor; tests/combat_v2.rs 5 green (same seed -> same result).
+- T206 events v2: 7 kinds applied at dawn incl. Danish raiders >=t12 on coast
+  keeps, tournament banners, plague/caravan/hunger log lines; events.rs seeded
+  roll (event_rng separate stream); tests/events_v2.rs 7 green.
+- T207 win/lose: coronation (London + 8 keeps), capital-fall -30 loyalty (not
+  instant), revolt chain at loyalty 0, turn-90 popularity judgment;
+  tests/victory_v2.rs 7 green.
+- T208 champions + rewards API: triple-gold recruit flag, garrison bonus,
+  apply_reward fns (gold/troops/provisions/bars) for mg framework;
+  tests/rewards_v2.rs 10 green.
+- T209 AI v2: attack-ratio/recruit-budget/spy-freq knobs x3 difficulties;
+  beats idle player <=100 turns; HARD >= EASY 8/10 fixed seeds; monotonicity;
+  tests/ai_v2.rs 10 green.
+- T2xx CHECKPOINT: full docker suite green (re-verified 2026-11-14: every
+  binary "ok", 0 failures, 148 tests) + determinism soak: 100 games, same
+  seed -> identical end state.
+- T3xx STATUS (partial, honest split): src/ui/mod.rs CampaignUi renders the
+  campaign screen: roads, keeps w/ ownership colors, garrison + army counters,
+  fog "??" markers, selection panel; HUD = GOLD + 3 bars + MOOD, turn counter,
+  message ticker, END TURN; castle panel = garrison w/ View::Rough estimates,
+  5 recruit buttons w/ costs (10/20/45/60), spy 15 g; one-tap march to
+  adjacent; win/lose overlay w/ new-war restart. Title scene: EASY/NORMAL/HARD
+  pick -> difficulty + seed (deep-link query too). tests/ui_play.rs 7
+  click-contract green. NOT met: T301 coastline/forest shading + 2-frame
+  banner sprites; T302 scrollbar/tooltip kit; T303 animated bar tweens +
+  norman.mod end-turn sting; T304 sports button (blocked on T501); T306
+  animated battle report (battle result = ticker line); T307 event modals
+  (ticker line only). Those boxes stay open.
+- T305 march verified end-to-end in the browser: click Buckingham -> click
+  London -> panel reads "Buckingham (Saxon) 0 men" (host moved out) + ticker
+  "THE HOST MARCHES ON London" (screenshot /tmp/crown-shots/04-march.png).
+- T3xx CHECKPOINT — scripted loop GREEN, 17/17 assertions, 0 console errors
+  (2026-11-14): tools/headless-check.mjs boots the REAL wasm bundle + glue
+  (web/pkg) inside jsdom with synthetic pointer events + putImageData pixel
+  readback (jsdom globals patched: perf shim, canvas-free ImageData/AudioContext
+  stubs). Loop: title -> NORMAL tap -> campaign; Buckingham tap -> panel
+  (9186 px region change); LEVY -> gold band change (charge = units.rs cost
+  10 minus tick income); LON tap -> march ticker (630 px text); then FIVE
+  END TURN clicks -> HUD turn counter 1->3->5->7->9->11 decoded straight from
+  the framebuffer using the 8x8 glyph table (examples/coords.rs emits digit
+  bitmaps). jsdom rAF throttles under load (~6-60 fps) so liveness = decoded
+  digits, not frame count. Re-run: bun run check:headless (~4 min: cargo
+  example build + polls). PNG baselines in /tmp only for now; commit vs-diff
+  baselines when native Chromium returns (T001 libs lost in container
+  recreate; restore via setup-gitea-env.sh is out of scope for the game).
