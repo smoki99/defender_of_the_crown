@@ -2,7 +2,7 @@ use crate::campaign::ai;
 use crate::campaign::combat::{self, BattleOutcome, FULL_WALLS};
 use crate::campaign::map;
 use crate::campaign::rng::Xor;
-use crate::campaign::units::{Unit, UnitKind, MAX_GARRISON};
+use crate::campaign::units::{KindCounts, Unit, UnitKind, MAX_GARRISON};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Faction {
@@ -40,6 +40,8 @@ pub struct Stronghold {
     pub owner: Faction,
     pub capital: bool,
     pub income: u32,
+    pub coast: bool,
+    pub port: bool,
     pub x: f32,
     pub y: f32,
     pub adj: Vec<usize>,
@@ -78,6 +80,8 @@ impl GameState {
                 income: d.income,
                 x: d.x,
                 y: d.y,
+                coast: d.coast,
+                port: d.port,
                 adj: d.adj.to_vec(),
                 garrison: if d.capital {
                     starting_capital()
@@ -123,7 +127,7 @@ impl GameState {
         self.strongholds[sid].adj.clone()
     }
 
-    pub fn counts(&self, sid: usize) -> [u32; 4] {
+    pub fn counts(&self, sid: usize) -> KindCounts {
         combat::counts(&self.strongholds[sid].garrison)
     }
 
@@ -155,6 +159,9 @@ impl GameState {
         let s = &self.strongholds[sid];
         if s.owner != f {
             return Err("NOT YOUR STRONGHOLD.".into());
+        }
+        if kind.special() {
+            return Err("CHAMPIONS ARE EARNED, NOT BOUGHT.".into());
         }
         if s.size() >= MAX_GARRISON {
             return Err("GARRISON FULL (40).".into());

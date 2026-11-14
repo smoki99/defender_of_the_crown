@@ -2,6 +2,7 @@
 
 pub mod ai;
 pub mod combat;
+pub mod events;
 pub mod game;
 pub mod map;
 pub mod rng;

@@ -4,13 +4,19 @@ pub enum UnitKind {
     Bowman,
     Knight,
     Siege,
+    /// Earned via minigame triple-gold (SPEC 5.5); never bought with gold.
+    Champion,
 }
 
-pub const ALL_KINDS: [UnitKind; 4] = [
+pub const N_KINDS: usize = 5;
+pub type KindCounts = [u32; N_KINDS];
+
+pub const ALL_KINDS: [UnitKind; N_KINDS] = [
     UnitKind::Levy,
     UnitKind::Bowman,
     UnitKind::Knight,
     UnitKind::Siege,
+    UnitKind::Champion,
 ];
 
 impl UnitKind {
@@ -20,7 +26,13 @@ impl UnitKind {
             UnitKind::Bowman => "Bowmen",
             UnitKind::Knight => "Knights",
             UnitKind::Siege => "Catapults",
+            UnitKind::Champion => "Champions",
         }
+    }
+
+    /// Cannot be recruited with gold; granted by tournament glory only.
+    pub fn special(self) -> bool {
+        matches!(self, UnitKind::Champion)
     }
 
     pub fn icon(self) -> &'static str {
@@ -29,6 +41,7 @@ impl UnitKind {
             UnitKind::Bowman => "\u{1F3F9}", // bow-ish banner
             UnitKind::Knight => "\u{1F40E}", // horse
             UnitKind::Siege => "\u{1F680}",  // trebuchet stand-in
+            UnitKind::Champion => "\u{265B}", // crown
         }
     }
 
@@ -38,6 +51,7 @@ impl UnitKind {
             UnitKind::Bowman => 20,
             UnitKind::Knight => 45,
             UnitKind::Siege => 60,
+            UnitKind::Champion => 0,
         }
     }
 
@@ -47,6 +61,7 @@ impl UnitKind {
             UnitKind::Bowman => 8,
             UnitKind::Knight => 18,
             UnitKind::Siege => 12,
+            UnitKind::Champion => 20,
         }
     }
 
@@ -56,6 +71,7 @@ impl UnitKind {
             UnitKind::Bowman => 5,
             UnitKind::Knight => 9,
             UnitKind::Siege => 7,
+            UnitKind::Champion => 10,
         }
     }
 
@@ -65,6 +81,7 @@ impl UnitKind {
             UnitKind::Bowman => 1,
             UnitKind::Knight => 2,
             UnitKind::Siege => 3,
+            UnitKind::Champion => 4,
         }
     }
 

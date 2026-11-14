@@ -1,5 +1,5 @@
 use crate::campaign::rng::Xor;
-use crate::campaign::units::{Unit, UnitKind, ALL_KINDS};
+use crate::campaign::units::{KindCounts, Unit, UnitKind, ALL_KINDS, N_KINDS};
 
 pub const MAX_ROUNDS: usize = 30;
 pub const FULL_WALLS: u32 = 60;
@@ -12,8 +12,8 @@ pub struct BattleOutcome {
     pub rounds: usize,
     pub walls_broken_round: Option<usize>,
     /// Losses and survivors indexed by `UnitKind::index()`.
-    pub atk_loss: [u32; 4],
-    pub def_loss: [u32; 4],
+    pub atk_loss: KindCounts,
+    pub def_loss: KindCounts,
     pub atk_survivors: Vec<Unit>,
     pub def_survivors: Vec<Unit>,
 }
@@ -119,8 +119,8 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
 
     let atk_end = counts(&atk_survivors);
     let def_end = counts(&def_survivors);
-    let atk_loss = [0, 1, 2, 3].map(|i| atk_start[i] - atk_end[i]);
-    let def_loss = [0, 1, 2, 3].map(|i| def_start[i] - def_end[i]);
+    let atk_loss = std::array::from_fn(|i| atk_start[i] - atk_end[i]);
+    let def_loss = std::array::from_fn(|i| def_start[i] - def_end[i]);
 
     BattleOutcome {
         attacker_won,
@@ -134,8 +134,8 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
     }
 }
 
-pub fn counts(units: &[Unit]) -> [u32; 4] {
-    let mut c = [0u32; 4];
+pub fn counts(units: &[Unit]) -> KindCounts {
+    let mut c = [0u32; N_KINDS];
     for u in units {
         c[u.kind.index()] += 1;
     }
@@ -143,7 +143,7 @@ pub fn counts(units: &[Unit]) -> [u32; 4] {
 }
 
 /// "2 Knights, 1 Levies" — compact loss/garrison phrasing.
-pub fn fmt_counts(c: &[u32; 4]) -> String {
+pub fn fmt_counts(c: &KindCounts) -> String {
     let parts: Vec<String> = ALL_KINDS
         .iter()
         .filter(|k| c[k.index()] > 0)
