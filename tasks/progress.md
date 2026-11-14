@@ -32,3 +32,7 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   with cap 10/castle + market (2g/u) + hunger (biggest army -20%, levies first,
   loyalty -3), loyalty==0 -> lowest non-capital castle revolts to Neutral/turn,
   battle mood swings. tests/kingdom_bars.rs 10 green; suite 76 green.
+- T203 fog: Intel{counts,walls,seen} per [castle][faction]; can_see = own or
+  adjacent-to-own gives live truth, else last spy report, else None;
+  spy(f,sid) SPY_COST=8 keeps stamped report; battle snapshot persists even
+  after the staging ring is lost. tests/fog_spies.rs 7 green; suite 83.

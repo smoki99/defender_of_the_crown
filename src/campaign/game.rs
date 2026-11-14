@@ -82,6 +82,17 @@ impl Stronghold {
     }
 }
 
+/// What one faction last learned about a stronghold (SPEC 5.3 fog).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Intel {
+    pub counts: crate::campaign::units::KindCounts,
+    pub walls: u32,
+    /// Turn the observation was made; stale reports keep their stamp.
+    pub seen: u32,
+}
+
+pub const SPY_COST: u32 = 8;
+
 #[derive(Clone, Debug)]
 pub struct GameState {
     pub turn: u32,
@@ -91,13 +102,15 @@ pub struct GameState {
     /// Indexed like `gold`; Neutral never holds bars.
     pub bars: [Bars; 3],
     pub strongholds: Vec<Stronghold>,
+    /// Per castle: [Saxon, Norman] last spy report (fog of war).
+    pub known: Vec<[Option<Intel>; 2]>,
     pub log: Vec<String>,
     pub over: Option<Faction>,
 }
 
 impl GameState {
     pub fn new(seed: u64) -> Self {
-        let strongholds = map::defs()
+        let strongholds: Vec<Stronghold> = map::defs()
             .into_iter()
             .enumerate()
             .map(|(id, d)| Stronghold {
@@ -120,12 +133,14 @@ impl GameState {
                 moved: false,
             })
             .collect();
+        let n = strongholds.len();
         let mut g = GameState {
             turn: 1,
             rng: Xor::new(seed),
             gold: [70, 70, 0],
             bars: [starting_bars(); 3],
             strongholds,
+            known: vec![[None, None]; n],
             log: Vec::new(),
             over: None,
         };
@@ -140,6 +155,48 @@ impl GameState {
 
     pub fn bars_of(&self, f: Faction) -> Bars {
         self.bars[f.index()]
+    }
+
+    /// True own eyes / adjacent scouts (SPEC 5.3).
+    pub fn can_see(&self, f: Faction, sid: usize) -> bool {
+        let s = &self.strongholds[sid];
+        s.owner == f || s.adj.iter().any(|&a| self.strongholds[a].owner == f)
+    }
+
+    fn snapshot(&self, sid: usize) -> Intel {
+        Intel {
+            counts: self.counts(sid),
+            walls: self.strongholds[sid].walls,
+            seen: self.turn,
+        }
+    }
+
+    /// What `f` knows: live truth for seen castles, stamped stale report
+    /// for spied ones, nothing in the dark.
+    pub fn intel(&self, f: Faction, sid: usize) -> Option<Intel> {
+        if self.can_see(f, sid) {
+            Some(self.snapshot(sid))
+        } else {
+            self.known[sid][f.index().min(1)]
+        }
+    }
+
+    /// Spend gold to light one fogged stronghold; report is returned and kept.
+    pub fn spy(&mut self, f: Faction, sid: usize) -> Result<Intel, String> {
+        if self.over.is_some() {
+            return Err("THE GAME IS OVER.".into());
+        }
+        if self.strongholds[sid].owner == f {
+            return Err("NO NEED TO SPY ON YOUR OWN.".into());
+        }
+        if self.gi(f) < SPY_COST {
+            return Err("NOT ENOUGH GOLD.".into());
+        }
+        self.gold[f.index()] -= SPY_COST;
+        let snap = self.snapshot(sid);
+        self.known[sid][f.index().min(1)] = Some(snap);
+        self.push_log(format!("SPIES REPORT FROM {}.", self.strongholds[sid].name));
+        Ok(snap)
     }
 
     fn add_bar(&mut self, f: Faction, which: u8, delta: i32) {
@@ -390,6 +447,8 @@ impl GameState {
                     self.add_popularity(def_f, 1);
                 }
             }
+            // a battle you fought is a battle you saw: fog lifts here
+            self.known[to][f.index().min(1)] = Some(self.snapshot(to));
             self.check_over();
         }
         Ok(())
