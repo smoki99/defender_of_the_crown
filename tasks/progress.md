@@ -27,3 +27,8 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   (Wallingford/London/Dover coast, Dover port) + roads() edge list, events.rs
   EventKind table (7 types, weights, Danish gate >= turn 12, deterministic roll).
   tests/campaign_core.rs 8 green; full suite 66 green.
+- T202 bars: Bars{provisions,loyalty,popularity} per faction (Neutral slot 2),
+  income x(50+loy)/100, recruit price x(200-pop)/200, provisions upkeep 1/troop
+  with cap 10/castle + market (2g/u) + hunger (biggest army -20%, levies first,
+  loyalty -3), loyalty==0 -> lowest non-capital castle revolts to Neutral/turn,
+  battle mood swings. tests/kingdom_bars.rs 10 green; suite 76 green.
