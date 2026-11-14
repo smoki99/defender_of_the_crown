@@ -22,6 +22,10 @@ function rivalLeft(lane) {
   }
   return null;
 }
+// the results screen's gold border frame - the ONLY proof we are looking at
+// the plate; a rival galloping down the top rail crosses the white-sampling
+// band and would fake the crown tableau.
+const goldFrame = () => { const p = px(40, 56); return p[0] === 204 && p[1] === 170 && p[2] === 0; };
 let lane = 1; // the horse starts on the middle rail
 function steerTo(target) {
   while (lane !== target) {
@@ -57,17 +61,17 @@ async function dismissQuick() {
   else if (linAt(74, 70)) { tap(160, 128); await Bun.sleep(120); }
 }
 
-// the deterministic draw offers the joust at TURN 5
+// the deterministic draw offers the joust at TURN 22 (splitmix-scrambled)
 let want = decodeTurn(snap());
-while (want < 5) {
+while (want < 22) {
   await dismissOverlay();
   tap(...coords.END);
   want += 1;
   if (!(await waitTurn(want))) break;
 }
 const turn = decodeTurn(snap());
-ok(turn === 5, `reached turn 5 for the joust draw (got ${turn})`);
-await dismissOverlay(); // a levy/omen modal may have landed with turn 5
+ok(turn === 22, `reached turn 22 for the joust draw (got ${turn})`);
+await dismissOverlay(); // a levy/omen modal may have landed with turn 22
 tap(...coords.BUCK);   // own-castle roll
 await Bun.sleep(150);
 tap(...coords.SPORTS); // the tilt opens
@@ -94,7 +98,7 @@ while (Date.now() - t0 < 60000 && !home) {
     const i = (y * 320 + x) * 4;
     if (f[i] > 200 && f[i + 1] > 200 && f[i + 2] > 200) white++;
   }
-  if (white > 8) crownSeen++;
+  if (white > 8 && goldFrame()) crownSeen++;
   const pl = pipLane();
   if (pl !== null) {
     pipsSeen++;
@@ -114,8 +118,8 @@ while (Date.now() - t0 < 60000 && !home) {
     }
   }
   if (crownSeen > 2) key("Enter"); // results screen: ride home
-  // home: campaign HUD back (no GOLD "TOURNAMENT" word top-left) on turn 5
-  if (lanced >= 2 && crownSeen > 2 && decodeTurn(f) === 5) {
+  // home: campaign HUD back (no GOLD "TOURNAMENT" word top-left) on turn 22
+  if (lanced >= 2 && crownSeen > 2 && decodeTurn(f) === 22) {
     let gpix = 0;
     for (let y = 2; y < 11; y++) for (let x = 4; x < 90; x++) {
       const i = (y * 320 + x) * 4;

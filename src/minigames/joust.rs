@@ -217,6 +217,13 @@ impl Minigame for Joust {
                 }
             }
             Phase::Return => {
+                // the lists are chosen on the way back; slide is live
+                if input.key_pressed(KEY_LEFT) {
+                    self.want = self.want.saturating_sub(1);
+                }
+                if input.key_pressed(KEY_RIGHT) {
+                    self.want = (self.want + 1).min(2);
+                }
                 if self.phase_t >= TURN {
                     self.phase = Phase::Ride;
                     self.phase_t = 0;

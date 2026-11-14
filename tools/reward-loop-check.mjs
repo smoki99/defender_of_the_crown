@@ -1,5 +1,5 @@
 // T505 reward-loop integration: campaign -> joust -> GOLD applied to the
-// purse -> hall-of-fame entry written to localStorage. Plays the TURN 5
+// purse -> hall-of-fame entry written to localStorage. Plays the TURN 22
 // joust draw for real (pixel solver from T502), then checks the three
 // links of the loop the player never sees joined: HUD purse, engine gold,
 // and the doc.hof chronicle the title screen's HALL OF FAME reads.
@@ -23,6 +23,10 @@ function rivalLeft(lane) {
   }
   return null;
 }
+// the results screen's gold border frame - the ONLY proof we are looking at
+// the plate; during a ride a rival galloping down the top rail crosses the
+// white-sampling band and would fake the crown tableau.
+const goldFrame = () => { const p = px(40, 56); return p[0] === 204 && p[1] === 170 && p[2] === 0; };
 function laurelHead() {
   // results plate head line: GOLD glyph pixels only on a gold laurel
   let n = 0;
@@ -35,6 +39,13 @@ function steerTo(target) {
     if (lane < target) { key("ArrowRight"); lane++; } else { key("ArrowLeft"); lane--; }
   }
 }
+const creamRow = (pl) => {
+  const y = LANE_Y[pl] + 7;
+  let n = 0;
+  for (let x = 96; x < 150; x++) { const p = px(x, y); if (p[0] === 255 && p[1] === 244 && p[2] === 204) n++; }
+  return n;
+};
+const lanceHud = () => { let n = 0; for (let y = 2; y < 10; y++) for (let x = 210; x < 280; x++) { const p = px(x, y); if (p[0] > 200 && p[1] > 200 && p[2] > 200) n++; } return n; };
 
 await Bun.sleep(700);
 key(" "); await Bun.sleep(120);        // boot herald
@@ -63,16 +74,16 @@ async function waitTurn(target, budgetMs = 25000) {
   return false;
 }
 
-// the deterministic draw offers the joust at TURN 5
+// the deterministic draw offers the joust at TURN 22 (splitmix-scrambled)
 let want = decodeTurn(snap());
-while (want < 5) {
+while (want < 22) {
   await dismissOverlay();
   tap(...coords.END);
   want += 1;
   if (!(await waitTurn(want))) break;
 }
 const turn = decodeTurn(snap());
-ok(turn === 5, `reached turn 5 for the joust draw (got ${turn})`);
+ok(turn === 22, `reached turn 22 for the joust draw (got ${turn})`);
 await dismissOverlay();
 
 ok(localStorage.getItem("doc.hof") === null || localStorage.getItem("doc.hof") === "",
@@ -92,6 +103,8 @@ let steerOk = 0;
 let crownSeen = 0;
 let gold = false;
 let home = false;
+let firedWin = false;
+let posted = false;
 const t0 = Date.now();
 while (Date.now() - t0 < 60000 && !home) {
   await Bun.sleep(20);
@@ -101,29 +114,37 @@ while (Date.now() - t0 < 60000 && !home) {
     const i = (y * 320 + x) * 4;
     if (f[i] > 200 && f[i + 1] > 200 && f[i + 2] > 200) white++;
   }
-  if (white > 8) crownSeen++;
+  if (white > 8 && goldFrame()) crownSeen++;
   const pl = pipLane();
-  if (pl !== null) {
-    pipsSeen++;
-    if (pl !== lane && Date.now() > steerOk) {
-      steerTo(pl);
-      steerOk = Date.now() + 150;
+  if (pl !== null) pipsSeen++;
+  const rl = pl !== null ? rivalLeft(pl) : null;
+  // a fresh ride opens when the rival re-enters at full gallop; the
+  // lance and the rails only bite while one is running
+  if (rl !== null && rl > 200) { armed = true; firedWin = false; }
+  if (pl !== null && pl !== lane && armed && Date.now() > steerOk) {
+    console.log(`steer ${lane}->${pl}`);
+    steerTo(pl);
+    steerOk = Date.now() + 60;
+  }
+  if (rl !== null) {
+    if (armed && rl >= 94 && rl <= 101 && pl === lane) {
+      key(" "); // the queue can swallow a single edge: hold the window
+      if (!firedWin && lanced < 2) {
+        firedWin = true;
+        armed = false; // re-arm only at rl>200: arrows bite on a live ride
+        lanced++;
+      }
     }
   }
-  const rl = pl !== null ? rivalLeft(pl) : null;
-  if (rl !== null) {
-    if (rl > 200) armed = true;
-    if (armed && rl >= 92 && rl <= 103 && lanced < 2) {
-      key(" ");
-      lanced++;
-      armed = false;
-    }
+  if (lanced === 2 && !posted && white > 8 && goldFrame()) {
+    posted = true;
+    shot("at-results");
   }
   // the plate scrolls in over ~1 s: ride home once the head line is
   // painted gold, or once any banner has sat painted long enough.
   if (crownSeen > 2 && laurelHead()) gold = true;
   if (crownSeen > 2 && (gold || crownSeen > 40)) key("Enter"); // results -> map
-  if (lanced >= 2 && crownSeen > 2 && decodeTurn(f) === 5) {
+  if (lanced >= 2 && crownSeen > 2 && decodeTurn(f) === 22) {
     await Bun.sleep(200); // a calm repainted map frame
     home = true;
   }
@@ -139,5 +160,6 @@ ok(regionDiff(purseBefore, purse, 4, 204, 90, 212) > 0, "the purse line moved wi
 
 const hof = localStorage.getItem("doc.hof") ?? "";
 ok(hof.startsWith("TOURNAMENT GOLD - SCORE "), `hall of fame chronicles the meet ("${hof}")`);
+console.log("LS:", JSON.stringify(Object.keys(localStorage)), "mg.joust=", localStorage.getItem("doc.mg.joust"));
 ok(problems.length === 0, `no errors (${problems.slice(0, 3).join(" | ") || "clean"})`);
 await finish();
