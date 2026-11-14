@@ -167,7 +167,7 @@ impl Player {
         if self.frame_acc <= 0.0 {
             self.frame_acc = self.spt; // fire the first tick at frame 0
         }
-        for frame in out.chunks_exact_mut(2) {
+        for frame in out.as_chunks_mut::<2>().0 {
             if self.frame_acc >= self.spt {
                 self.frame_acc -= self.spt;
                 self.do_tick();

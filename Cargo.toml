@@ -8,7 +8,7 @@ description = "A Defender of the Crown style strategy game for the web, in Rust 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[dependencies]
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "=0.2.130"
 js-sys = "0.3"
 console-error-panic-hook = { package = "console_error_panic_hook", version = "0.1" }

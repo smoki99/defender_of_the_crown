@@ -312,7 +312,7 @@ impl Framebuffer {
     /// Convert to RGBA bytes for ImageData (len must be W*H*4).
     pub fn to_rgba(&self, out: &mut [u8]) {
         debug_assert_eq!(out.len(), (W * H * 4) as usize);
-        for (p, px) in out.chunks_exact_mut(4).zip(self.data.iter()) {
+        for (p, px) in out.as_chunks_mut::<4>().0.iter_mut().zip(self.data.iter()) {
             let c = rgb(*px);
             p[0] = c[0];
             p[1] = c[1];

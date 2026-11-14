@@ -3,6 +3,7 @@ use crate::campaign::combat::{self, BattleOutcome, FULL_WALLS};
 use crate::campaign::map;
 use crate::campaign::rng::Xor;
 use crate::campaign::units::{KindCounts, Unit, UnitKind, MAX_GARRISON};
+use crate::campaign::events::EventKind;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Faction {
@@ -91,12 +92,29 @@ pub struct Intel {
     pub seen: u32,
 }
 
-pub const SPY_COST: u32 = 8;
+/// What a faction knows about one stronghold (SPEC 5.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum View {
+    Own(Intel),
+    /// Scouts eyeball "SEEN: ~N": within ±50% of the truth.
+    Rough { total: u32 },
+    /// Exact but stamped spy report.
+    Spied(Intel),
+    /// No eyes, no report.
+    Dark,
+}
+
+pub const SPY_COST: u32 = 15;
 
 #[derive(Clone, Debug)]
 pub struct GameState {
     pub turn: u32,
     pub rng: Xor,
+    /// Events and spy whispers draw here, never off the battle stream.
+    pub event_rng: Xor,
+    salt: u64,
+    /// Next-turn event leaked by spies; consumed when events land (T206).
+    pub tip: Option<EventKind>,
     /// [Saxon, Norman, Neutral-unused]
     pub gold: [u32; 3],
     /// Indexed like `gold`; Neutral never holds bars.
@@ -137,6 +155,9 @@ impl GameState {
         let mut g = GameState {
             turn: 1,
             rng: Xor::new(seed),
+            event_rng: Xor::new(seed ^ 0xE6E71),
+            salt: seed ^ 0x5A175,
+            tip: None,
             gold: [70, 70, 0],
             bars: [starting_bars(); 3],
             strongholds,
@@ -171,18 +192,38 @@ impl GameState {
         }
     }
 
-    /// What `f` knows: live truth for seen castles, stamped stale report
-    /// for spied ones, nothing in the dark.
-    pub fn intel(&self, f: Faction, sid: usize) -> Option<Intel> {
-        if self.can_see(f, sid) {
-            Some(self.snapshot(sid))
+    /// What `f` can act on (SPEC 5.3 fog).
+    pub fn view(&self, f: Faction, sid: usize) -> View {
+        let slot = f.index().min(1);
+        if self.strongholds[sid].owner == f {
+            View::Own(self.snapshot(sid))
+        } else if let Some(rep) = self.known[sid][slot] {
+            View::Spied(rep)
+        } else if self.can_see(f, sid) {
+            View::Rough {
+                total: self.estimate(sid),
+            }
         } else {
-            self.known[sid][f.index().min(1)]
+            View::Dark
         }
     }
 
-    /// Spend gold to light one fogged stronghold; report is returned and kept.
-    pub fn spy(&mut self, f: Faction, sid: usize) -> Result<Intel, String> {
+    /// Stable "SEEN: ~N" guess inside ±50% of truth; same inputs, same lie.
+    fn estimate(&self, sid: usize) -> u32 {
+        let total = self.strongholds[sid].garrison.len() as u64;
+        let mut z = self
+            .salt
+            .wrapping_mul(sid as u64 + 0x9E3779B97F4A7C15)
+            .wrapping_add(total.wrapping_mul(0xBF58476D1CE4E5B9));
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+        z ^= z >> 31;
+        (total / 2 + z % (total + 1)) as u32
+    }
+
+    /// SPEC 5.3: 70% to reveal castle + neighbours, failure still costs the
+    /// gold (repeatable); one time in ten a servant leaks tomorrow's event.
+    pub fn spy(&mut self, f: Faction, sid: usize) -> Result<bool, String> {
         if self.over.is_some() {
             return Err("THE GAME IS OVER.".into());
         }
@@ -193,10 +234,26 @@ impl GameState {
             return Err("NOT ENOUGH GOLD.".into());
         }
         self.gold[f.index()] -= SPY_COST;
-        let snap = self.snapshot(sid);
-        self.known[sid][f.index().min(1)] = Some(snap);
-        self.push_log(format!("SPIES REPORT FROM {}.", self.strongholds[sid].name));
-        Ok(snap)
+        let name = self.strongholds[sid].name;
+        let slot = f.index().min(1);
+        if self.rng.below(100) < 70 {
+            let ring = self.strongholds[sid].adj.clone();
+            let snap = self.snapshot(sid);
+            self.known[sid][slot] = Some(snap);
+            for a in ring {
+                let s = self.snapshot(a);
+                self.known[a][slot] = Some(s);
+            }
+            self.push_log(format!("SPIES REPORT FROM {name}."));
+            if self.rng.below(100) < 10 {
+                self.tip = Some(EventKind::roll(&mut self.event_rng, self.turn + 1));
+                self.push_log("A SERVANT MURMURS OF TOMORROW.");
+            }
+            Ok(true)
+        } else {
+            self.push_log(format!("OUR SPY WAS CAUGHT AT {name}."));
+            Ok(false)
+        }
     }
 
     fn add_bar(&mut self, f: Faction, which: u8, delta: i32) {
@@ -286,7 +343,7 @@ impl GameState {
             .max_by_key(|s| (s.garrison.len(), std::cmp::Reverse(s.id)))
             .map(|s| s.id);
         let Some(id) = target else { return };
-        let n = (self.strongholds[id].garrison.len() + 4) / 5;
+        let n = self.strongholds[id].garrison.len().div_ceil(5);
         if n == 0 {
             return;
         }
@@ -415,12 +472,14 @@ impl GameState {
 
     pub fn march(&mut self, f: Faction, from: usize, to: usize) -> Result<(), String> {
         self.can_march(f, from, to)?;
-        let army = self.strongholds[from].garrison.drain(..).collect::<Vec<_>>();
+        let army = std::mem::take(&mut self.strongholds[from].garrison);
         self.strongholds[from].moved = true;
 
         if self.strongholds[to].owner == f {
             let n = army.len();
             self.strongholds[to].garrison.extend(army);
+            // no two-leg day: the reinforced castle also spent its march
+            self.strongholds[to].moved = true;
             let name = self.strongholds[to].name;
             self.push_log(format!("{n} TROOPS MARCH TO {name}."));
         } else {
@@ -435,6 +494,8 @@ impl GameState {
                 self.strongholds[to].owner = f;
                 self.strongholds[to].garrison = out.atk_survivors.clone();
                 self.strongholds[to].walls = FULL_WALLS;
+                // the victorious army has spent its day's march
+                self.strongholds[to].moved = true;
                 self.push_log(format!("{} IS YOURS!", def_name));
                 self.add_popularity(f, 2);
                 if def_f != Faction::Neutral {

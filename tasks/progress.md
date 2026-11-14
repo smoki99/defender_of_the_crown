@@ -36,3 +36,10 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   adjacent-to-own gives live truth, else last spy report, else None;
   spy(f,sid) SPY_COST=8 keeps stamped report; battle snapshot persists even
   after the staging ring is lost. tests/fog_spies.rs 7 green; suite 83.
+- T204 marches: whole-garrison moves spend the day for BOTH endpoints (no
+  two-leg days), captured castles count as marched, dawn resets; gates tested.
+  Fog realigned to SPEC 5.3: View::{Own,Rough(±50% stable "SEEN: ~N"),Spied,
+  Dark}; spy 15g/70% reveals castle+ring, caught = gold only (repeatable),
+  10% leaks next-turn event into GameState.tip (event_rng, battle stream
+  untouched). Browser deps moved under cfg(wasm32); shim now bakes -L paths
+  so host build-scripts link when cross-compiling. clippy -D warnings clean.
