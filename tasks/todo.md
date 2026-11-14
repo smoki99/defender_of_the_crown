@@ -213,8 +213,9 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [x] **T606 mg-forge**: 3-tempo rhythm hammering, sword-quality tiers.
   **2026-11-14:** GOLD 95 scripted (all-perfect clean chain); live Chromium
   play smoke. See progress.md.
-- [ ] **Checkpoint P6**: 9 games in registry; batch soak: autoplay each ×3;
+- [x] **Checkpoint P6**: 9 games in registry; batch soak: autoplay each ×3;
   suite + clippy green.
+  **2026-11-14:** soak 3x18 captures, 0 FAIL; suite + clippy + wasm green.
 
 ## Phase 7 — Minigames 10–13 + meta (T7xx)
 

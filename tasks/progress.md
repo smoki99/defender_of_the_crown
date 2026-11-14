@@ -397,6 +397,15 @@ herald's cry is public knowledge.
   baselines diff-clean (PLAY frames 0 px, plates within blink tol), clippy
   0 warnings, wasm32 check green, 511 KB bundle rebuilt; title regression
   1010 frames green. (2026-11-14)
+
+- P6 CHECKPOINT (2026-11-14): all nine phase-6 sports live in the registry
+  (sword, joust, catapult, archery, rampart, maze, river, cloak, forge) -
+  each with its module, make_game arm, mg_<id> tests and two committed
+  baselines. BATCH SOAK: three full baseline passes (18 captures each:
+  PLAY spawn 0 px, autoplay PLATE within blink tol) - 54 captures, 0 FAIL;
+  every sport's deep link boots, resolves and plates deterministically.
+  Full cargo suite green, clippy 0 warnings, wasm32 check green, title
+  regression 1010 frames clean. (2026-11-14)
 - T4xx CHECKPOINT (2026-11-14): entry sequence = THREE inputs from load -
   boot key (audio unlock), BEGIN CAMPAIGN, difficulty; the intro crawl now
   AUTO-ROLLS (CRAWL_DWELL 300 ticks = 5 s per leaf, dwell resets on NEXT /
