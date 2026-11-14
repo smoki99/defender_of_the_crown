@@ -15,6 +15,7 @@ use crate::engine::input::{Dir, Gesture, Input};
 pub trait AppCtx {
     fn mute(&self) -> bool;
     fn play_music(&mut self, track: Option<&'static str>);
+    fn sfx(&mut self, kind: crate::engine::audio::Sfx);
 }
 
 /// Semantic events scenes receive (raw input already transformed).

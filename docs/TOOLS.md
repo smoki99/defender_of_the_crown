@@ -48,6 +48,15 @@ timing = `bpm/5` ticks/s.
 Headless Chromium + WebAudio oscillator→AnalyserNode; exits non-zero unless
 RMS > 0.05 and console-error count is 0. Reused by in-browser game checks.
 
+## Game audio proof: `bun tools/audio-check.ts`
+
+T108 gate: boots `?scene=test`, proxies `window.AudioWorkletNode` before the
+first gesture, then asserts — silent pre-gesture, worklet sink actually
+attached (not the ScriptProcessor fallback), music RMS > 0.002 after the tap,
+`M` silences + persists `doc.mute` to localStorage across reload, unmute
+restores. `window.__rms` (set by the render callbacks) is the probe channel.
+Needs a login shell for docker/chromium env: `sh -lc 'bun tools/audio-check.ts'`.
+
 ## IDE
 
 `​.omp/lsp.json` → standalone `rust-analyzer` (`~/.local/bin/rust-analyzer`,

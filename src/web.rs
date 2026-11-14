@@ -8,13 +8,20 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::Clamped;
 
-use crate::engine::audio::{Mod, Player};
+#[wasm_bindgen(module = "/src/promise_hook.js")]
+extern "C" {
+    fn crown_hook(promise: &JsValue, on_ok: &JsValue, on_err: &JsValue);
+}
+
+use crate::engine::audio::{Mod, Music, Player, Sfx};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
     Framebuffer, BLACK, BLOOD, DARKGRAY, GOLD, GRAY, GREEN, LIGHTBLUE, NAVY, SAXON_BLUE, TAN,
     WHITE, YELLOW, H, W,
 };
-use crate::engine::input::{Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP};
+use crate::engine::input::{
+    Gesture, Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP,
+};
 use crate::engine::scene::{AppCtx, Scene, SceneEvent, SceneStack, Transition};
 use crate::engine::sprite::{blit_anim, Sprite, TRANS};
 
@@ -63,22 +70,107 @@ struct App {
 
 struct Ctx {
     muted: Rc<Cell<bool>>,
+    music: Rc<RefCell<Music>>,
     audio: AudioState,
 }
 impl AppCtx for Ctx {
     fn mute(&self) -> bool {
         self.muted.get()
     }
-    fn play_music(&mut self, _track: Option<&'static str>) {}
+    fn play_music(&mut self, track: Option<&'static str>) {
+        let p = track
+            .and_then(|_| Mod::parse(include_bytes!("../assets/music/test.mod")).ok())
+            .map(Player::new);
+        self.music.borrow_mut().set_track(p);
+    }
+    fn sfx(&mut self, kind: Sfx) {
+        self.music.borrow_mut().sfx(kind);
+    }
+}
+
+/// T108: pull-based audio sink. The worklet asks for N samples whenever its
+/// ring runs low; the main thread renders the full mix (track + SFX voices)
+/// and posts it back. ScriptProcessor fallback for engines without
+/// AudioWorklet. `window.__rms` exposes output level for the browser gate.
+const WORKLET_JS: &str = r#"
+class DocSink extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.ring = new Float32Array(16384);
+    this.w = 0; this.r = 0;
+    this.port.onmessage = (e) => {
+      const c = e.data;
+      for (let i = 0; i < c.length; i++) { this.ring[this.w] = c[i]; this.w = (this.w + 1) & 16383; }
+    };
+    this.port.postMessage(8192);
+  }
+  process(_ins, outs) {
+    const o = outs[0]; const n = o[0].length;
+    for (let i = 0; i < n; i += 2) {
+      if (((this.w - this.r) & 16383) >= 2) {
+        o[0][i] = this.ring[this.r]; o[1][i] = this.ring[(this.r + 1) & 16383];
+        this.r = (this.r + 2) & 16383;
+      } else { o[0][i] = 0; o[1][i] = 0; }
+    }
+    if (((this.w - this.r) & 16383) < 4096) this.port.postMessage(8192);
+    return true;
+  }
+}
+registerProcessor('doc-sink', DocSink);
+"#;
+
+fn set_rms(buf: &[f32]) {
+    if buf.is_empty() {
+        return;
+    }
+    let ssq: f64 = buf.iter().map(|s| (*s as f64) * (*s as f64)).sum();
+    let rms = (ssq / buf.len() as f64).sqrt();
+    let _ = js_sys::Reflect::set(
+        &w().into(),
+        &JsValue::from_str("__rms"),
+        &JsValue::from(rms),
+    );
+}
+
+fn attach_script(ctx: &web_sys::AudioContext, music: Rc<RefCell<Music>>, muted: Rc<Cell<bool>>) {
+    let Ok(sp) = ctx
+        .create_script_processor_with_buffer_size_and_number_of_input_channels_and_number_of_output_channels(
+            4096, 0, 2,
+        )
+    else {
+        return;
+    };
+    let cb = Closure::wrap(Box::new(move |ev: web_sys::AudioProcessingEvent| {
+        let Ok(buf) = ev.output_buffer() else { return };
+        let n = buf.length() as usize;
+        let mut out = vec![0.0f32; n * 2];
+        if !muted.get() {
+            music.borrow_mut().render(&mut out, buf.sample_rate() as u32);
+        }
+        let mut l = vec![0.0f32; n];
+        let mut r = vec![0.0f32; n];
+        for i in 0..n {
+            l[i] = out[2 * i];
+            r[i] = out[2 * i + 1];
+        }
+        let _ = buf.copy_to_channel(&l, 0);
+        let _ = buf.copy_to_channel(&r, 1);
+        set_rms(&out);
+    }) as Box<dyn FnMut(web_sys::AudioProcessingEvent)>);
+    sp.set_onaudioprocess(Some(cb.as_ref().unchecked_ref()));
+    cb.forget();
+    let node: web_sys::AudioNode = sp.unchecked_into();
+    let dest: web_sys::AudioNode = ctx.destination().unchecked_into();
+    let _ = node.connect_with_audio_node(&dest);
 }
 
 struct AudioState {
     ctx: Option<web_sys::AudioContext>,
-    player: Rc<RefCell<Option<Player>>>,
+    music: Rc<RefCell<Music>>,
 }
 
 impl AudioState {
-    /// First user gesture: build AudioContext + ScriptProcessor sink.
+    /// First user gesture: AudioContext + worklet sink (fallback: ScriptProcessor).
     fn unlock(&mut self, muted: &Rc<Cell<bool>>) {
         if self.ctx.is_some() {
             return;
@@ -86,36 +178,91 @@ impl AudioState {
         let Ok(ctx) = web_sys::AudioContext::new() else {
             return;
         };
-        let player = self.player.clone();
+        let _ = ctx.resume();
+        let music = self.music.clone();
         let muted = muted.clone();
-        if let Ok(sp) = ctx
-            .create_script_processor_with_buffer_size_and_number_of_input_channels_and_number_of_output_channels(
-                4096, 0, 2,
-            )
-        {
-            let cb = Closure::wrap(Box::new(move |ev: web_sys::AudioProcessingEvent| {
-                let Ok(buf) = ev.output_buffer() else { return };
-                let n = buf.length() as usize;
-                let mut out = vec![0.0f32; n * 2];
-                if !muted.get() {
-                    if let Some(p) = player.borrow_mut().as_mut() {
-                        p.render(&mut out, buf.sample_rate() as u32);
+        let url = format!(
+            "data:text/javascript,{}",
+            WORKLET_JS.replace('%', "%25").replace('#', "%23")
+        );
+        let attached = match ctx.audio_worklet().ok() {
+            Some(aw) => {
+                let c2 = ctx.clone();
+                let m2 = music.clone();
+                let mu2 = muted.clone();
+                let mk = Closure::once(move |_v: JsValue| {
+                    let made = (|| -> Option<web_sys::MessagePort> {
+                        let ctor = js_sys::Reflect::get(
+                            &w().into(),
+                            &JsValue::from_str("AudioWorkletNode"),
+                        )
+                        .ok()?;
+                        let opts = js_sys::Object::new();
+                        js_sys::Reflect::set(
+                            &opts,
+                            &JsValue::from_str("outputChannelCount"),
+                            &JsValue::from(js_sys::Array::of1(&JsValue::from(2))),
+                        )
+                        .ok()?;
+                        let args = js_sys::Array::of3(
+                            &c2.clone().into(),
+                            &JsValue::from_str("doc-sink"),
+                            &opts.into(),
+                        );
+                        let node = js_sys::Reflect::construct(
+                            ctor.unchecked_ref::<js_sys::Function>(),
+                            &args,
+                        )
+                        .ok()?;
+                        let an: web_sys::AudioNode = node.clone().unchecked_into();
+                        let _ = an.connect_with_audio_node(&c2.destination().unchecked_into());
+                        js_sys::Reflect::get(&node, &JsValue::from_str("port"))
+                            .ok()
+                            .map(|p| p.unchecked_into::<web_sys::MessagePort>())
+                    })();
+                    let Some(port) = made else {
+                        attach_script(&c2, m2, mu2);
+                        return;
+                    };
+                    let sr = c2.sample_rate() as u32;
+                    let feed_port = port.clone();
+                    let feed = Closure::wrap(Box::new(move |ev: web_sys::MessageEvent| {
+                        let samples = (ev.data().as_f64().unwrap_or(0.0) as usize).min(16384);
+                        if samples == 0 {
+                            return;
+                        }
+                        let mut buf = vec![0.0f32; samples];
+                        if !mu2.get() {
+                            m2.borrow_mut().render(&mut buf, sr);
+                        }
+                        let arr = js_sys::Float32Array::new_with_length(samples as u32);
+                        arr.copy_from(&buf);
+                        let _ = feed_port.post_message(&arr);
+                        set_rms(&buf);
+                    }) as Box<dyn FnMut(web_sys::MessageEvent)>);
+                    port.set_onmessage(Some(feed.as_ref().unchecked_ref()));
+                    feed.forget();
+                });
+                let c3 = ctx.clone();
+                let m3 = music.clone();
+                let mu3 = muted.clone();
+                let fb = Closure::once(move |_e: JsValue| attach_script(&c3, m3, mu3));
+                let res = match aw.add_module(&url) {
+                    Ok(p) => {
+                        crown_hook(&p, mk.as_ref(), fb.as_ref());
+                        true
                     }
-                }
-                let mut l = vec![0.0f32; n];
-                let mut r = vec![0.0f32; n];
-                for i in 0..n {
-                    l[i] = out[2 * i];
-                    r[i] = out[2 * i + 1];
-                }
-                let _ = buf.copy_to_channel(&l, 0);
-                let _ = buf.copy_to_channel(&r, 1);
-            }) as Box<dyn FnMut(web_sys::AudioProcessingEvent)>);
-            sp.set_onaudioprocess(Some(cb.as_ref().unchecked_ref()));
-            cb.forget();
-            let node: web_sys::AudioNode = sp.unchecked_into();
-            let dest: web_sys::AudioNode = ctx.destination().unchecked_into();
-            let _ = node.connect_with_audio_node(&dest);
+                    Err(_) => false,
+                };
+                mk.forget();
+                fb.forget();
+                res
+            }
+            None => false,
+        };
+        if !attached {
+            let c4 = ctx.clone();
+            attach_script(&c4, music, muted);
         }
         self.ctx = Some(ctx);
     }
@@ -331,14 +478,17 @@ pub fn main() -> Result<(), JsValue> {
         .dyn_into::<web_sys::CanvasRenderingContext2d>()?;
     let rgba = vec![0u8; (W * H * 4) as usize];
 
-    let muted = Rc::new(Cell::new(query_has("mute=1")));
-    let audio = AudioState {
-        ctx: None,
-        player: Rc::new(RefCell::new(None)),
-    };
+    let persisted = ls_get("doc.mute");
+    let muted = Rc::new(Cell::new(match persisted.as_deref() {
+        Some("1") => true,
+        Some("0") => false,
+        _ => query_has("mute=1"),
+    }));
+    let music = Rc::new(RefCell::new(Music::new()));
     if let Ok(m) = Mod::parse(include_bytes!("../assets/music/test.mod")) {
-        *audio.player.borrow_mut() = Some(Player::new(m));
+        music.borrow_mut().set_track(Some(Player::new(m)));
     }
+    let audio = AudioState { ctx: None, music: music.clone() };
     let want_test = query_has("scene=test");
     let shot_at: u64 = query_get("shot").and_then(|v| v.parse().ok()).unwrap_or(0);
 
@@ -368,7 +518,7 @@ pub fn main() -> Result<(), JsValue> {
         shot_done: false,
     };
     let state = Rc::new(RefCell::new(app));
-    let ctxrc = Rc::new(RefCell::new(Ctx { muted, audio }));
+    let ctxrc = Rc::new(RefCell::new(Ctx { muted, music, audio }));
 
     wire_input(&state, &ctxrc);
     {
@@ -404,10 +554,18 @@ pub fn main() -> Result<(), JsValue> {
                     let m = ctx.muted.clone();
                     ctx.audio.unlock(&m);
                 }
-                // mute toggle
+                // T108: gestures fire SFX through the mix
+                if st.input.gestures().iter().any(|g| matches!(g, Gesture::Tap { .. })) {
+                    ctx.music.borrow_mut().sfx(Sfx::Blip);
+                }
+                if st.input.key_pressed(crate::engine::input::KEY_SPACE) {
+                    ctx.music.borrow_mut().sfx(Sfx::Coin);
+                }
+                // mute toggle (persisted)
                 if st.input.key_pressed(crate::engine::input::KEY_M) {
                     let v = !ctx.muted.get();
                     ctx.muted.set(v);
+                    ls_set("doc.mute", if v { "1" } else { "0" });
                 }
                 if st.stack.top_wants_leave() {
                     let next = match st.mode {
@@ -578,4 +736,14 @@ fn wire_input(state: &Rc<RefCell<App>>, ctx: &Rc<RefCell<Ctx>>) {
         cb.forget();
     }
     let _ = ctx; // ctx reached only through the RAF driver
+}
+
+fn ls_get(k: &str) -> Option<String> {
+    w().local_storage().ok().flatten()?.get_item(k).ok().flatten()
+}
+
+fn ls_set(k: &str, v: &str) {
+    if let Some(s) = w().local_storage().ok().flatten() {
+        let _ = s.set_item(k, v);
+    }
 }

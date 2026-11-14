@@ -296,6 +296,7 @@ impl Player {
             let s = smp.data[i0] as f32 * (1.0 - frac) + smp.data[i1] as f32 * frac;
             acc += s * (ch.vol as f32 / 64.0) * (smp.volume as f32 / 64.0) / 128.0;
         }
-        acc.clamp(-1.0, 1.0)
+        // master headroom: full-vol channels must not slam into the clamp
+        (acc * 0.5).clamp(-1.0, 1.0)
     }
 }

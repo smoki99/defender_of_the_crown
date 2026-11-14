@@ -39,8 +39,8 @@ fn tone_renders_audible_pcm() {
     let out = render(TONE, 1.0, 44100);
     let peak = out.iter().fold(0.0f32, |a, &v| a.max(v.abs()));
     let rms = (out.iter().map(|v| v * v).sum::<f32>() / out.len() as f32).sqrt();
-    assert!(peak > 0.3 && peak < 1.05, "peak {peak}");
-    assert!(rms > 0.15 && rms < 0.6, "rms {rms}");
+    assert!(peak > 0.15 && peak < 0.55, "peak {peak}");
+    assert!(rms > 0.07 && rms < 0.3, "rms {rms}");
 }
 
 #[test]

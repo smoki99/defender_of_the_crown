@@ -2,6 +2,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use defender_of_the_crown::engine::audio::Sfx;
 use defender_of_the_crown::engine::gfx::{bayer, Framebuffer, BLACK, BLOOD, WHITE, W};
 use defender_of_the_crown::engine::input::{Input, Raw, KEY_ENTER};
 use defender_of_the_crown::engine::scene::{
@@ -16,6 +17,7 @@ impl AppCtx for Ctx {
         true
     }
     fn play_music(&mut self, _t: Option<&'static str>) {}
+    fn sfx(&mut self, _kind: Sfx) {}
 }
 
 #[derive(Default)]
