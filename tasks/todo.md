@@ -101,8 +101,13 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   cancel; screenshot. **DEVIATION (2026-11-14):** shipped as one-tap march —
   select own keep, tap adjacent target, army moves immediately (no
   preview/confirm step); cancel by tapping away or ✗. See progress.md.
-- [ ] **T306 Battle report**: animated round lines, wall breach fx, result
-  modal, champion duel line; screenshot + skip-click.
+- [x] **T306 Battle report**: scroll-in report (one log line / 4 ticks) on a
+  TAN/LINEN plate — result line GREEN win / NORMAN_RED repulse, wall-breach
+  round line, champion-duel line; first tap skips, second closes; map deaf
+  while open. tests/battle_report.rs (3) + headless (report shot, skip+close
+  by clicks). **DEVIATION (2026-11-14):** log lines replace per-round animated
+  lines - combat core resolves in one step; per-round fx deferred. See
+  progress.md.
 - [ ] **T307 Event banners/modals**: tournament banner on castle, plague/
   caravan/raider modals w/ pixel icon; screenshot each.
 - [ ] **T308 End-turn sequence**: player→AI turns with `norman.mod` sting,

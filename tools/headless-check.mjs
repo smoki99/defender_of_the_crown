@@ -191,14 +191,30 @@ async function waitTurn(target, budgetMs = 20000) {
   }
   return false;
 }
+// Battle report overlay (T306): LINEN plate at a text-free probe point.
+const linAt = (x, y) => { const i = (y * W + x) * 4; return frame && frame[i] === 204 && frame[i + 1] === 204 && frame[i + 2] === 153; };
+let reportSeen = false;
+async function dismissReport() {
+  for (let i = 0; i < 30 && !linAt(64, 100); i++) await Bun.sleep(100);
+  if (!linAt(64, 100)) return false;
+  if (!reportSeen) { reportSeen = true; shot("report"); }
+  tap(10, 10);
+  await Bun.sleep(150);
+  tap(10, 10);
+  await Bun.sleep(150);
+  ok(!linAt(64, 100), "report dismissed by two taps");
+  return true;
+}
 const before = frameCount;
 const turn0 = decodeTurn(frame);
 ok(turn0 !== null, `HUD turn counter decodes from pixels (turn ${turn0})`);
 for (let cyc = 1; cyc <= 5; cyc++) {
+  await dismissReport(); // battle report blocks the map until skipped+closed
   tap(...coords.END);
   ok(await waitTurn(turn0 + 2 * cyc), `click ${cyc}/5: HUD reaches TURN ${turn0 + 2 * cyc}`);
   if (cyc === 1 || cyc === 5) shot(`turn-${turn0 + 2 * cyc}`);
 }
+ok(reportSeen, "a battle report appeared and was skipped+closed by clicks");
 // jsdom's rAF throttles under polling load (~6-60fps observed); the decoded
 // TURN digits are the real liveness proof, this only catches a dead loop.
 ok(frameCount - before > 10, `frame loop alive through five cycles (${frameCount - before} frames)`);

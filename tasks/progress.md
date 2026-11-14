@@ -135,8 +135,8 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   instead of hanging in jsdom rAF until killed.
 ```
 
-2026-11-14 — T303 kingdom bars HUD (Phase 3)
-```
+## T303 kingdom bars HUD - done 2026-11-14
+
 WEALTH/FOOD/LOYAL/MOOD in a 2x2 grid under the GOLD readout (gold bar
 scaled 200=full, spec-adjacent: DoC shows a gold number plus three bars;
 the fourth makes the gold visible as a meter too). Fills tween: bars_disp
@@ -157,3 +157,28 @@ that does not exist (browser has no mod decoder), deferred.
 Verified: cargo test host green; docker gate green (22 suites, exit 0);
 headless 17/17 clean; shot 01-campaign pixels confirmed for all four bar
 colors + ticker text.
+
+## T306 battle report - done 2026-11-14
+
+A fight (march combat or an AI dawn raid) opens a TAN-rim LINEN-plate
+window over the map; the battle's log lines scroll in one per 4 ticks,
+the result line paints GREEN ("WON") or NORMAN_RED ("REPULSED"/champion
+turn), breach and duel lines ride along, and the whole map is deaf until
+the report dies: first tap skips the scroll, second closes it.
+- combat: log_battle adds "THE WALLS BREACHED IN ROUND n." whenever
+  walls_broken_round is Some (was silently dropped).
+- ui: CampaignUi{report,report_shown,report_open}; capture_report(before
+  log len) fires from BOTH march and end_turn; tap intercept sits above
+  every other hit-test in event(); tick reveals at anim.is_multiple_of(4);
+  draw_report is the topmost layer.
+- tests/battle_report.rs 3 tests: seeded Buckingham-vs-levy fight opens
+  the overlay, line 1 waits for its 4-tick slot, WON row is GREEN ink,
+  blank rows stay LINEN; skip-then-close and a stray tap after close
+  burns no turn; a battleless tap opens nothing.
+- headless: march combat now opens the report mid-run, so the click loop
+  calls dismissReport() before each END tap (plate probe at text-free
+  (64,100)); shot 05/06-report; run asserts a report DID appear.
+  19/19 pass, clean console.
+- Deviation: "animated round lines" -> one scroll-in block per battle;
+  the core resolves combat in a single step, per-round simulation fx are
+  not in the data. Duel + breach lines cover the named content.

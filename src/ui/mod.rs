@@ -10,8 +10,8 @@ use crate::campaign::game::{
 };
 use crate::campaign::units::UnitKind;
 use crate::engine::gfx::{
-    BLACK, BLOOD, CREAM, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, GOLD, GRASS, GRAY, GREEN, NAVY,
-    SAXON_BLUE, SILVER, SKY, STONE, TEAL, W, WHITE, YELLOW,
+    BLACK, BLOOD, CREAM, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, GOLD, GRASS, GRAY, GREEN, LINEN,
+    NAVY, SAXON_BLUE, SILVER, SKY, STONE, TEAL, W, WHITE, YELLOW,
 };
 pub use crate::engine::scene::SceneEvent;
 
@@ -229,6 +229,11 @@ pub struct CampaignUi {
     /// Animated (tweened toward the real meters) bar fills:
     /// [wealth, provisions, loyalty, mood] (T303).
     pub bars_disp: [u32; 4],
+    /// Battle report overlay: lines captured from the log, revealed count,
+    /// open flag (T306).
+    pub report: Vec<String>,
+    pub report_shown: usize,
+    pub report_open: bool,
 }
 
 impl CampaignUi {
@@ -247,6 +252,9 @@ impl CampaignUi {
             hover_xy: (0, 0),
             list_top: 0,
             bars_disp,
+            report: Vec::new(),
+            report_shown: 0,
+            report_open: false,
         }
     }
 
@@ -262,6 +270,9 @@ impl CampaignUi {
             } else if *d > t {
                 *d = (*d - (*d - t).div_ceil(8)).max(t);
             }
+        }
+        if self.report_open && self.report_shown < self.report.len() && self.anim.is_multiple_of(4) {
+            self.report_shown += 1;
         }
     }
 
@@ -315,6 +326,15 @@ impl CampaignUi {
         }
         let SceneEvent::Tap { x, y } = ev else { return };
         let (x, y) = (*x, *y);
+        if self.report_open {
+            // any tap: first reveals all lines (skip), next closes (T306)
+            if self.report_shown < self.report.len() {
+                self.report_shown = self.report.len();
+            } else {
+                self.report_open = false;
+            }
+            return;
+        }
         if let Some(sel) = self.sel {
             if self.g.strongholds[sel].owner == PLAYER {
                 if let Some(d) = self.scrollbar(sel).hit(x, y) {
@@ -351,10 +371,12 @@ impl CampaignUi {
                     self.list_top = 0;
                 } else if let Some(sel) = self.sel {
                     if self.g.adj(sel).contains(&id) {
+                        let before = self.g.log.len();
                         let msg = match self.g.march(PLAYER, sel, id) {
                             Ok(()) => format!("THE HOST MARCHES ON {name}"),
                             Err(e) => e,
                         };
+                        self.capture_report(before);
                         self.say(&msg);
                     } else {
                         self.say("NO ROAD FROM YOUR HOST TO YONDER KEEP");
@@ -370,6 +392,20 @@ impl CampaignUi {
                 self.msg.clear();
                 self.msg_ticks = 0;
             }
+        }
+    }
+
+    /// Any battle log lines spawned by the action that began at log index
+    /// `before` open the animated report overlay (T306).
+    fn capture_report(&mut self, before: usize) {
+        if self.g.over.is_some() {
+            return;
+        }
+        let fresh = &self.g.log[before..];
+        if fresh.iter().any(|l| l.contains("ROUNDS.")) {
+            self.report = fresh.to_vec();
+            self.report_shown = 0;
+            self.report_open = true;
         }
     }
 
@@ -460,11 +496,13 @@ impl CampaignUi {
 
     fn end_turn(&mut self) {
         self.sel = None;
+        let before = self.g.log.len();
         self.g.end_player_turn();
         if self.g.over.is_none() {
             crate::campaign::ai::take_turn(&mut self.g, PLAYER.other());
         }
         self.g.end_player_turn();
+        self.capture_report(before);
         let tail = self.g.log.last().cloned().unwrap_or_default();
         self.say(&tail);
     }
@@ -570,6 +608,7 @@ impl CampaignUi {
         if let Some(winner) = self.g.over {
             self.draw_over(fb, winner);
         }
+        self.draw_report(fb);
     }
 
     fn draw_hud(&mut self, fb: &mut crate::engine::gfx::Framebuffer) {
@@ -670,6 +709,36 @@ impl CampaignUi {
                 SILVER,
                 BLACK,
             );
+        }
+    }
+
+    /// Amiga-style scroll-in battle report: LINEN plate, one log line every
+    /// 4 ticks, GREEN win / NORMAN_RED loss, tap skips or closes (T306).
+    fn draw_report(&self, fb: &mut crate::engine::gfx::Framebuffer) {
+        if !self.report_open {
+            return;
+        }
+        use crate::engine::fonts::draw_text_shadow;
+        let n = self.report.len().min(6);
+        let (bx, by) = (60i32, 82i32);
+        kit::panel(fb, bx, by, 200, 16 + (n as u32) * 10);
+        fb.fill_rect(bx + 2, by + 2, 196, 12 + (n as u32) * 10, LINEN);
+        draw_text_shadow(fb, bx + 8, by + 4, "BATTLE REPORT", NAVY, LINEN);
+        for (i, line) in self
+            .report
+            .iter()
+            .take(n)
+            .take(self.report_shown)
+            .enumerate()
+        {
+            let c = if line.contains("WON") {
+                GREEN
+            } else if line.contains("REPULSED") || line.contains("CHAMPION") {
+                NORMAN_KEEP
+            } else {
+                BLACK
+            };
+            draw_text_shadow(fb, bx + 8, by + 16 + (i as i32) * 10, line, c, LINEN);
         }
     }
 }

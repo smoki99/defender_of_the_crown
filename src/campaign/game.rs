@@ -719,6 +719,9 @@ impl GameState {
         if out.duel_won {
             self.push_log(format!("BUT {def}'S CHAMPION TURNED THE DAY!"));
         }
+        if let Some(r) = out.walls_broken_round {
+            self.push_log(format!("THE WALLS BREACHED IN ROUND {r}."));
+        }
         self.push_log(format!(
             "LOST {} | ENEMY LOST {}",
             combat::fmt_counts(&out.atk_loss),
