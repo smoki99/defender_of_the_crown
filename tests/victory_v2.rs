@@ -148,3 +148,36 @@ fn an_even_tale_at_turn_ninety_spareth_the_war() {
         "the chronicle speaketh only at turn ninety"
     );
 }
+#[test]
+fn an_even_tale_rejudgeth_when_a_later_decade_tipeth() {
+    let mut g = GameState::new(3);
+    g.turn = 89;
+    give(&mut g, &["Oxford"], Faction::Norman);
+    give(&mut g, &["Dover"], PLAYER); // 6 Saxon / 6 Norman
+    fortify(&mut g);
+    g.end_player_turn(); // turn 90: even tale, the war is spared
+    assert_eq!(g.over, None);
+    g.turn = 99;
+    give(&mut g, &["York"], PLAYER); // the scales tip: 7 / 5
+    fortify(&mut g);
+    g.end_player_turn(); // turn 100: re-judged
+    assert_eq!(g.over, Some(PLAYER), "a tipped decade must write the ending");
+    assert!(g
+        .log
+        .iter()
+        .any(|l| l.contains("THE CHRONICLE DECIDETH") && !l.contains("TURN XC.")),
+        "only the ninetieth verdict weareth the TURN XC prefix");
+}
+#[test]
+fn an_unbroken_even_tale_falleth_to_london() {
+    let mut g = GameState::new(3);
+    g.turn = 99; // the ninety was already spoken; reach the hundred
+    fortify(&mut g);
+    assert_eq!(count(&g, PLAYER), count(&g, Faction::Norman), "the tale is even");
+    g.end_player_turn(); // turn 100: still even - London decideth
+    assert_eq!(g.over, Some(Faction::Norman), "London breaketh the second even tale");
+    assert!(g
+        .log
+        .iter()
+        .any(|l| l.contains("LONDON IS HIS") && l.contains("DEFEAT")));
+}

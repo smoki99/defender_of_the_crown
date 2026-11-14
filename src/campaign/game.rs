@@ -782,10 +782,34 @@ impl GameState {
         if self.over.is_some() {
             return;
         }
+        // Re-judged each decade past ninety: an even tale at XC must not
+        // leave the war endless when the scales tip in X+.
+        let even = self.turn == 90;
         let s = self.ids_of(Faction::Saxon).len();
         let n = self.ids_of(Faction::Norman).len();
         if s == n {
-            self.push_log("TURN XC. THE CHRONICLE RECORDS AN EVEN TALE - THE WAR DRAGGETH ON.");
+            if even {
+                self.push_log("TURN XC. THE CHRONICLE RECORDS AN EVEN TALE - THE WAR DRAGGETH ON.".to_string());
+                return;
+            }
+            // Two even tales must not leave a war without an ending: from
+            // turn X onward London, the prize of the crown, breaketh the
+            // tie (an unclaimed London falls to the Crown by defence).
+            let london = self
+                .strongholds
+                .iter()
+                .find(|s| s.name == "London")
+                .map(|s| s.owner)
+                .unwrap_or(Faction::Saxon);
+            self.over = Some(london);
+            self.push_log(
+                if london == PLAYER {
+                    "THE CHRONICLE BREAKETH THE EVEN TALE: LONDON HOLDETH THE LINE. VICTORY!"
+                } else {
+                    "THE CHRONICLE BREAKETH THE EVEN TALE: LONDON IS HIS. DEFEAT."
+                }
+                .to_string(),
+            );
             return;
         }
         let w = if s > n {
@@ -795,11 +819,19 @@ impl GameState {
         };
         self.over = Some(w);
         let c = s.max(n);
-        self.push_log(if w == PLAYER {
-            format!("TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES THINE. VICTORY!")
-        } else {
-            format!("TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES HIS. DEFEAT.")
-        });
+        self.push_log(
+            if even {
+                if w == PLAYER {
+                    "TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES THINE. VICTORY!".to_string()
+                } else {
+                    "TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES HIS. DEFEAT.".to_string()
+                }
+            } else if w == PLAYER {
+                format!("THE CHRONICLE DECIDETH: {c} CASTLES THINE. VICTORY!")
+            } else {
+                format!("THE CHRONICLE DECIDETH: {c} CASTLES HIS. DEFEAT!")
+            }
+        );
     }
 
     /// Coronation (SPEC 5.6): London's lord with eight shires bows all.
@@ -855,7 +887,7 @@ impl GameState {
         self.capital_watch();
         self.coronation_check();
         self.check_over();
-        if self.turn == 90 {
+        if self.turn >= 90 && (self.turn - 90) % 10 == 0 {
             self.chronicle_judgment();
         }
         for s in self.strongholds.iter_mut() {

@@ -111,4 +111,5 @@ shot("sword-home");
 ok(regionDiff(mapA, mapB, 4, 204, 90, 212) > 0, "the purse line moved with the fee and prize");
 ok(purseText() > 0, "the purse still reads on the HUD");
 ok(problems.length === 0, `no errors (${problems.slice(0, 3).join(" | ") || "clean"})`);
+console.log("LS:", JSON.stringify(Object.keys(localStorage)), "hof=", localStorage.getItem("doc.hof"), "mg=", localStorage.getItem("doc.mg.sword"));
 await finish();

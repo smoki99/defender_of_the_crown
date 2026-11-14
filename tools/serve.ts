@@ -21,7 +21,7 @@ serve({
     const f = file(new URL(`../web/${rel}`, import.meta.url).pathname);
     if (!(await f.exists())) return new Response("not found", { status: 404 });
     const ext = rel.slice(rel.lastIndexOf("."));
-    return new Response(f.body, { headers: { "content-type": MIME[ext] ?? "application/octet-stream", "cache-control": "no-cache" } });
+    return new Response(await f.bytes(), { headers: { "content-type": MIME[ext] ?? "application/octet-stream", "cache-control": "no-cache" } });
   },
 });
 console.log(`serving web/ on http://127.0.0.1:${port}`);

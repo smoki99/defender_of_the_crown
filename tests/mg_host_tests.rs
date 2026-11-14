@@ -193,7 +193,10 @@ fn autoplay_resolves_immediately_and_exits() {
     );
     let mut fb = Framebuffer::new();
     pump(&mut h, &mut fb, 1);
-    assert!(cell.borrow().is_some(), "autoplay resolves at once");
+    let b = cell.borrow();
+    let o = b.as_ref().expect("autoplay resolves at once");
+    assert_eq!(o.score, spec_win().gold_at, "outcome must carry the gold line score, not the unplayed core's 0");
+    assert_eq!(o.tier, Some(Tier::Gold), "resolving at the gold line is a gold tier");
     pump(&mut h, &mut fb, 95);
     assert!(h.wants_leave(), "autoplay leaves the results screen itself");
 }
@@ -262,4 +265,33 @@ fn sports_button_click_without_a_shipped_game_stays_honest() {
         "message explains the closed gate: {}",
         ui.msg
     );
+}
+
+/// Regression: the web driver dispatches `event()` before `draw()`.
+/// MgHost used to `begin_frame` AFTER draining its stash, wiping the fresh
+/// key_pressed the same frame - the plate never saw ENTER and the host
+/// stayed open forever over the campaign.
+#[test]
+fn driver_enter_key_closes_results_plate() {
+    use defender_of_the_crown::ui::host::make_game;
+    let cell: OutcomeCell = Rc::new(RefCell::new(None));
+    let spec = SPORTS.iter().find(|s| s.id == "sword").unwrap();
+    let mut host = MgHost::new(
+        spec,
+        SportMode::Sports { sid: 2 },
+        make_game("sword", 7).unwrap(),
+        cell.clone(),
+        true,
+    );
+    let mut fb = Framebuffer::new();
+    for _ in 0..90 {
+        host.draw(&mut fb);
+    }
+    assert!(!host.wants_leave(), "plate waits for an explicit ack");
+    host.event(&SceneEvent::Key {
+        code: KEY_ENTER,
+        pressed: true,
+    });
+    host.draw(&mut fb);
+    assert!(host.wants_leave(), "ENTER on the plate must close the host");
 }

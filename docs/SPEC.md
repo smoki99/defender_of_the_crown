@@ -157,7 +157,10 @@ repelled.
   roll (coronation sequence).
 - **DEFEAT:** zero castles. Losing Buckingham is not instant loss — it costs
   −30 loyalty and a despair event (modern mercy, keeps games alive).
-- Chronicle judgment at turn 90: more castles wins ("THE CHRONICLE DECIDES").
+- Chronicle judgment at turn 90 and every tenth turn after: more castles
+  wins ("THE CHRONICLE DECIDES"). An even tale at 90 spares the war; a
+  later even tale is broken by London — the prize of the crown decideth,
+  so no war draggeth on without an ending.
 - Difficulty (title pick): AI attack-ratio, recruit budget, spy frequency.
 
 ## 6. Minigame catalogue (13 — each 45–90 s, original art, 3 reward tiers)

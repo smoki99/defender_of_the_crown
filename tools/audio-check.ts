@@ -90,6 +90,9 @@ try {
   // coin SFX through the mix, then mute via M
   await page.keyboard.press("Space");
   await page.keyboard.press("KeyM");
+  // the worklet picks the flag up on its next quantum; the coin SFX tail
+  // must be out of the sampled window before we call M "silent".
+  await page.waitForTimeout(350);
   const muted = await sampleRms();
   ok(
     muted.every((x) => x < 0.002),

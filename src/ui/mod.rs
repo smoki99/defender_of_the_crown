@@ -282,6 +282,11 @@ pub struct CampaignUi {
     pub sport_out: OutcomeCell,
     /// Run in flight: mode + spec, set on push, applied on return.
     pub sport_ctx: Option<(SportMode, &'static SportSpec)>,
+    /// Harness hook (`?autoplay=1`): the Saxons act through the same AI
+    /// the Normans use, so a scripted loop can prove the full war -
+    /// conquests, chronicle verdict and the crowned end screen - without
+    /// a per-turn bot (T501 hook family).
+    pub autoplay_player: bool,
 }
 
 impl CampaignUi {
@@ -313,6 +318,7 @@ impl CampaignUi {
             launch_req: None,
             sport_out: Rc::default(),
             sport_ctx: None,
+            autoplay_player: false,
         }
     }
 
@@ -604,6 +610,11 @@ impl CampaignUi {
         // One click = one round: end_player_turn already lets the Normans
         // act, rolls the omen, and pays both sides (T308 found the old
         // double-call skipping a whole round per click).
+        if self.autoplay_player {
+            // the harness drives BOTH hosts: the Saxons move first, then
+            // the round closes with the Norman answer as ever.
+            crate::campaign::ai::take_turn(&mut self.g, PLAYER);
+        }
         self.g.begin_ai_recording();
         self.g.end_player_turn();
         self.g.end_ai_recording();
@@ -1109,6 +1120,7 @@ impl PlayScene {
 
     pub fn with_autoplay(mut self, on: bool) -> Self {
         self.autoplay = on;
+        self.ui.autoplay_player = on;
         self
     }
 

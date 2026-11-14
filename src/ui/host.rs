@@ -53,6 +53,7 @@ pub struct MgHost {
     done: bool,
     autoplay: bool,
     tier: Option<Tier>,
+    final_score: u32,
 }
 
 impl MgHost {
@@ -79,6 +80,7 @@ impl MgHost {
             done: false,
             autoplay,
             tier: None,
+            final_score: 0,
         }
     }
 
@@ -89,11 +91,20 @@ impl MgHost {
 
     /// Freeze the run: write the shared outcome, show the results screen.
     fn finish(&mut self, st: MgState) {
+        let score = self.game.score();
+        self.finish_at(st, score);
+    }
+
+    /// Freeze with an explicit score - the autoplay harness resolves at the
+    /// gold line without playing, so the core's own score is still 0 and
+    /// must not leak into the outcome (a GOLD tier with score 0 voids the
+    /// purse, the best-list and the chronicle alike).
+    fn finish_at(&mut self, st: MgState, score: u32) {
         self.tier = match st {
             MgState::Won(t) => Some(t),
             MgState::Lost | MgState::Running => None,
         };
-        let score = self.game.score();
+        self.final_score = score;
         *self.cell.borrow_mut() = Some(MgOutcome {
             id: self.spec.id,
             score,
@@ -133,7 +144,7 @@ impl MgHost {
         draw_text_shadow(fb, 104, 72, head, col, BLACK);
         draw_text_shadow(fb, 88, 96, self.spec.label, WHITE, BLACK);
         // loot anim: score counts up over ~1 s, then the purse line settles
-        let shown = ((self.res_ticks * self.game.score()) / 60).min(self.game.score());
+        let shown = ((self.res_ticks * self.final_score) / 60).min(self.final_score);
         let line = format!("SCORE {shown}");
         draw_text_shadow(fb, 112, 120, &line, WHITE, BLACK);
         if self.res_ticks > 60 {
@@ -179,7 +190,7 @@ impl Scene for MgHost {
     fn tick(&mut self, app: &mut dyn AppCtx) {
         if self.phase == Phase::Results && !self.announced {
             self.announced = true;
-            app.mg_best(self.spec.id, self.game.score());
+            app.mg_best(self.spec.id, self.final_score);
             match self.tier {
                 Some(Tier::Gold) => app.sfx(Sfx::Crowd),
                 Some(_) => app.sfx(Sfx::Coin),
@@ -199,8 +210,11 @@ impl Scene for MgHost {
                 self.paused = !self.paused;
             }
             if self.autoplay {
-                // harness path: resolve straight from the current score
-                self.finish(resolve(self.game.score(), self.spec));
+                // harness path: no hands on the tiller - bank the run at
+                // the gold line so the reward wiring (purse, laurel, HOF)
+                // gets exercised exactly as a perfect play would.
+                let sc = self.spec.gold_at;
+                self.finish_at(resolve(sc, self.spec), sc);
             } else if self.paused {
                 fb.fill_rect(0, 0, 320, 256, BLACK);
                 self.game.tick(0.0, &self.input, fb); // repaint without advancing

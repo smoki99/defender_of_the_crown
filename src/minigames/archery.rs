@@ -124,8 +124,8 @@ impl Archery {
     pub fn scheduled(&self, v: u32) -> [Option<usize>; 3] {
         let n = if v >= 6 { 3 } else if v >= 3 { 2 } else { 1 };
         let mut out = [None; 3];
-        for s in 0..n {
-            out[s] = Some(self.hole(v, s as u32));
+        for (s, slot) in out.iter_mut().enumerate().take(n) {
+            *slot = Some(self.hole(v, s as u32));
         }
         out
     }

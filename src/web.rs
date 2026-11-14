@@ -1401,7 +1401,7 @@ pub fn main() -> Result<(), JsValue> {
                     };
                     ctx.music.borrow_mut().sfx(s);
                 }
-                // mute toggle (persisted)
+                // mute toggle (persisted, like the OPTIONS toggle)
                 if st.input.key_pressed(crate::engine::input::KEY_M) {
                     let v = !ctx.muted.get();
                     ctx.muted.set(v);
