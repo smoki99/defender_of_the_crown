@@ -182,3 +182,35 @@ the report dies: first tap skips the scroll, second closes it.
 - Deviation: "animated round lines" -> one scroll-in block per battle;
   the core resolves combat in a single step, per-round simulation fx are
   not in the data. Duel + breach lines cover the named content.
+
+## T307 event modals - done 2026-11-14
+
+Every dawn omen now announces itself instead of hiding in the ticker:
+a TAN-rim LINEN-plate modal (70,64 180x74) with a hand-set 16x16
+pixel icon on a NAVY plaque, NAVY title, two story rows and a raised
+DARKRED OK button with CREAM label. While it stands the whole map is
+deaf - castle taps, action buttons AND end-turn are swallowed; only a
+tap inside event_ok_rect() dismisses. Tourney year: the hosting keep
+flies a YELLOW pennant from its right crenel (fluttered with the same
+anim/8 phase as the house banner) - drawn even through fog because a
+herald's cry is public knowledge.
+- src/ui/mod.rs: event_kind/event_open/event_turn fields; hook in
+  end_turn() (one announce per turn, event_turn guard); tap intercept
+  sits BELOW the report (report first, then modal, then map);
+  event_body() story rows; draw_event_icon() 7 pictographs (bugle,
+  pouch, blighted stalks, death's head, crown, slinking man, longship);
+  tournament.contains(&Some(s.id)) pennant in the castle loop.
+- tests/event_modals.rs 3 tests (seed 13 forced plague via the spy-tip
+  override - two end_player_turn calls per END press means the tip
+  seeds roll 1 and the FINAL g.event is roll 2, so the seed was probed):
+  modal+icon+button pixels + OK close + plate gone; deaf map (keep tap
+  no-select, END swallowed, OK frees, next dawn re-announces); tourney
+  pennant YELLOW on the pick, none on a dark keep.
+- headless: dismissReport() now clears BOTH overlays (report at (64,100),
+  modal at (74,70)); OK tap at (160,128); asserts an omen DID appear;
+  shot 07-omen palette-checked (title NAVY 166px, plaque 224+32 icon
+  px, OK face 234px + label 30px). 21/21 pass, clean console.
+- Deviation: "plague/caravan/raider modals" per event -> one modal
+  template, per-omen icon+text (all 7 kinds); "screenshot each" -> one
+  representative omen shot + host pixel tests per kind stay in the
+  shared painter.

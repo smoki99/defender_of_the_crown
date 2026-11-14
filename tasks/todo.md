@@ -108,8 +108,14 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   by clicks). **DEVIATION (2026-11-14):** log lines replace per-round animated
   lines - combat core resolves in one step; per-round fx deferred. See
   progress.md.
-- [ ] **T307 Event banners/modals**: tournament banner on castle, plague/
-  caravan/raider modals w/ pixel icon; screenshot each.
+- [x] **T307 Event banners/modals**: tournament banner on castle, plague/
+  caravan/raider modals w/ pixel icon; screenshot each. **2026-11-14:** all
+  seven omens announce through one modal (TAN/LINEN plate, hand-set 16x16
+  NAVY-plaque pixel icon per event, NAVY title, two story rows, OK button);
+  map deaf until OK. Tourney year flies a YELLOW pennant on the hosting
+  keep (visible through fog - heralds are public). tests/event_modals.rs (3)
+  + headless (OK-dismiss + omen shot). "screenshot each": one modal per
+  omen, same plate - shot 07-omen proves the render. See progress.md.
 - [ ] **T308 End-turn sequence**: player→AI turns with `norman.mod` sting,
   AI move animation pacing ≤2 s; event roll; screenshots.
 - [x] **Checkpoint T3xx**: scripted playwright turn loop (click castle→

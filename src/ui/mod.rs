@@ -5,6 +5,7 @@
 
 pub mod kit;
 
+use crate::campaign::events::EventKind;
 use crate::campaign::game::{
     Difficulty, Faction, GameState, Stronghold, View, BAR_MAX, PLAYER, SPY_COST,
 };
@@ -116,6 +117,17 @@ pub fn end_turn_rect() -> Btn {
         y: 210,
         w: 100,
         h: 14,
+    }
+}
+
+/// Dismiss button of the omen modal (T307).
+pub fn event_ok_rect() -> Btn {
+    Btn {
+        id: "ok",
+        x: 140,
+        y: 122,
+        w: 40,
+        h: 12,
     }
 }
 
@@ -234,6 +246,10 @@ pub struct CampaignUi {
     pub report: Vec<String>,
     pub report_shown: usize,
     pub report_open: bool,
+    /// Omen modal: announced event, open flag, last announced turn (T307).
+    pub event_kind: Option<EventKind>,
+    pub event_open: bool,
+    event_turn: u32,
 }
 
 impl CampaignUi {
@@ -255,6 +271,9 @@ impl CampaignUi {
             report: Vec::new(),
             report_shown: 0,
             report_open: false,
+            event_kind: None,
+            event_open: false,
+            event_turn: u32::MAX,
         }
     }
 
@@ -271,7 +290,8 @@ impl CampaignUi {
                 *d = (*d - (*d - t).div_ceil(8)).max(t);
             }
         }
-        if self.report_open && self.report_shown < self.report.len() && self.anim.is_multiple_of(4) {
+        if self.report_open && self.report_shown < self.report.len() && self.anim.is_multiple_of(4)
+        {
             self.report_shown += 1;
         }
     }
@@ -332,6 +352,13 @@ impl CampaignUi {
                 self.report_shown = self.report.len();
             } else {
                 self.report_open = false;
+            }
+            return;
+        }
+        if self.event_open {
+            // omen modal: the map is deaf; only OK dismisses (T307)
+            if event_ok_rect().hits(x, y) {
+                self.event_open = false;
             }
             return;
         }
@@ -505,6 +532,15 @@ impl CampaignUi {
         self.capture_report(before);
         let tail = self.g.log.last().cloned().unwrap_or_default();
         self.say(&tail);
+        if self.g.over.is_none() {
+            if let Some(e) = self.g.event {
+                if self.event_turn != self.g.turn {
+                    self.event_turn = self.g.turn;
+                    self.event_kind = Some(e);
+                    self.event_open = true;
+                }
+            }
+        }
     }
 
     fn say(&mut self, m: &str) {
@@ -560,6 +596,13 @@ impl CampaignUi {
                 fb.set(cx + 9, cy + 1, GOLD);
                 fb.set(cx + 9, cy + 2, GOLD);
             }
+            if self.g.tournament.contains(&Some(s.id)) {
+                // tourney year: a yellow pennant flies from the right crenel
+                // (T307) - public knowledge, so it shows through fog too.
+                let p = ((self.anim / 8) & 1) == 0;
+                fb.vline(cx + 5, cy - 14, cy - 8, BLACK);
+                fb.fill_rect(cx + 6, cy - 14 + if p { 0 } else { 1 }, 3, 2, YELLOW);
+            }
             if self.sel == Some(s.id) {
                 // two-frame pulse: the ring breathes yellow -> gold (T301).
                 let p = ((self.anim / 8) & 1) == 0;
@@ -609,6 +652,7 @@ impl CampaignUi {
             self.draw_over(fb, winner);
         }
         self.draw_report(fb);
+        self.draw_event_modal(fb);
     }
 
     fn draw_hud(&mut self, fb: &mut crate::engine::gfx::Framebuffer) {
@@ -741,10 +785,108 @@ impl CampaignUi {
             draw_text_shadow(fb, bx + 8, by + 16 + (i as i32) * 10, line, c, LINEN);
         }
     }
+
+    /// The omen modal (T307): TAN-rim LINEN plate with a 16x16 event icon,
+    /// NAVY title, two body rows and an OK button; the map is deaf until OK
+    /// dismisses it.
+    fn draw_event_modal(&self, fb: &mut crate::engine::gfx::Framebuffer) {
+        if !self.event_open {
+            return;
+        }
+        use crate::engine::fonts::draw_text_shadow;
+        let Some(e) = self.event_kind else {
+            return;
+        };
+        kit::panel(fb, 70, 64, 180, 74);
+        fb.fill_rect(72, 66, 176, 70, LINEN);
+        draw_event_icon(fb, e, 80, 72);
+        draw_text_shadow(fb, 104, 72, e.title(), NAVY, LINEN);
+        let (l1, l2) = event_body(e);
+        draw_text_shadow(fb, 104, 86, l1, BLACK, LINEN);
+        draw_text_shadow(fb, 80, 102, l2, BLACK, LINEN);
+        kit::button(fb, &event_ok_rect(), false, true);
+        draw_text_shadow(fb, 155, 124, "OK", CREAM, BLACK);
+    }
 }
 
 const NORMAN_KEEP: u8 = DARKRED;
 
+/// Two story rows for each omen (T307), kept short for the 176px plate.
+fn event_body(e: EventKind) -> (&'static str, &'static str) {
+    match e {
+        EventKind::TournamentHerald => ("A TOURNARY IS HELD", "FREE SPORTS, GREAT GLORY"),
+        EventKind::MerchantCaravan => ("TOLL GOLD SWELLS THE", "TREASURY CHEST"),
+        EventKind::BadHarvest => ("ROT TAKETH THE WHEAT;", "PROVISIONS DWINDLE"),
+        EventKind::Plague => ("THE PLEAGUE SILETH THE", "LANDS. HALF INCOME."),
+        EventKind::KingsLevy => ("THE KING'S LEVY COMETH", "TO THE CAPITAL"),
+        EventKind::Deserters => ("FEET SLINK AWAY FROM", "THY LARGEST HOST"),
+        EventKind::DanishRaiders => ("HEATHEN SHIPS AT SEA;", "A COAST KEEP MAY FALL"),
+    }
+}
+
+/// 16x16 event pictograph on a NAVY plaque (T307) - the 8x8 font has no
+/// pictographs, so each omen gets a hand-set pixel icon.
+fn draw_event_icon(fb: &mut crate::engine::gfx::Framebuffer, e: EventKind, x: i32, y: i32) {
+    fb.fill_rect(x, y, 16, 16, NAVY);
+    match e {
+        EventKind::TournamentHerald => {
+            // bugle horn
+            fb.fill_rect(x + 3, y + 7, 7, 3, GOLD);
+            fb.fill_rect(x + 10, y + 5, 3, 6, YELLOW);
+            fb.fill_rect(x + 3, y + 6, 2, 5, CREAM);
+        }
+        EventKind::MerchantCaravan => {
+            // toll pouch with two coins
+            fb.fill_rect(x + 4, y + 7, 8, 7, STONE);
+            fb.fill_rect(x + 6, y + 4, 4, 3, STONE);
+            fb.fill_rect(x + 5, y + 9, 2, 2, GOLD);
+            fb.fill_rect(x + 9, y + 11, 2, 2, GOLD);
+        }
+        EventKind::BadHarvest => {
+            // three blighted stalks
+            fb.vline(x + 4, y + 6, y + 12, DARKGRAY);
+            fb.vline(x + 8, y + 6, y + 12, DARKGRAY);
+            fb.vline(x + 12, y + 6, y + 12, DARKGRAY);
+            fb.fill_rect(x + 3, y + 4, 2, 2, GRAY);
+            fb.fill_rect(x + 7, y + 5, 2, 2, GRAY);
+            fb.fill_rect(x + 11, y + 4, 2, 2, GRAY);
+        }
+        EventKind::Plague => {
+            // death's head
+            fb.fill_circle(x + 8, y + 7, 4, WHITE);
+            fb.fill_rect(x + 5, y + 10, 6, 4, WHITE);
+            fb.set(x + 6, y + 6, NAVY);
+            fb.set(x + 7, y + 6, NAVY);
+            fb.set(x + 9, y + 6, NAVY);
+            fb.set(x + 10, y + 6, NAVY);
+            fb.vline(x + 7, y + 11, y + 13, NAVY);
+            fb.vline(x + 9, y + 11, y + 13, NAVY);
+        }
+        EventKind::KingsLevy => {
+            // crown
+            fb.fill_rect(x + 3, y + 9, 10, 3, GOLD);
+            fb.fill_rect(x + 3, y + 5, 2, 4, GOLD);
+            fb.fill_rect(x + 7, y + 4, 2, 5, GOLD);
+            fb.fill_rect(x + 11, y + 5, 2, 4, GOLD);
+            fb.fill_rect(x + 7, y + 10, 2, 1, BLOOD);
+        }
+        EventKind::Deserters => {
+            // aman with a spear slipping away
+            fb.fill_rect(x + 6, y + 3, 2, 2, SILVER);
+            fb.fill_rect(x + 6, y + 6, 2, 4, SILVER);
+            fb.fill_rect(x + 4, y + 10, 3, 1, SILVER);
+            fb.fill_rect(x + 8, y + 10, 2, 1, SILVER);
+            fb.vline(x + 11, y + 4, y + 10, STONE);
+        }
+        EventKind::DanishRaiders => {
+            // longship with raven sail
+            fb.fill_rect(x + 2, y + 11, 12, 3, DARKGRAY);
+            fb.vline(x + 8, y + 3, y + 11, BLACK);
+            fb.fill_rect(x + 9, y + 4, 4, 4, WHITE);
+            fb.fill_rect(x + 10, y + 5, 2, 2, BLOOD);
+        }
+    }
+}
 /// East/south coastline as screen-space x per y: piecewise linear through
 /// the Norfolk bulge, the London bight, Dover and the sweep into the
 /// Channel corner (T301).

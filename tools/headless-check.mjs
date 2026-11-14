@@ -191,19 +191,30 @@ async function waitTurn(target, budgetMs = 20000) {
   }
   return false;
 }
-// Battle report overlay (T306): LINEN plate at a text-free probe point.
+// Overlay plates (LINEN) at text-free probe points: battle report (T306)
+// centre-left, omen modal (T307) top-left corner.
 const linAt = (x, y) => { const i = (y * W + x) * 4; return frame && frame[i] === 204 && frame[i + 1] === 204 && frame[i + 2] === 153; };
 let reportSeen = false;
+let modalSeen = false;
 async function dismissReport() {
-  for (let i = 0; i < 30 && !linAt(64, 100); i++) await Bun.sleep(100);
-  if (!linAt(64, 100)) return false;
-  if (!reportSeen) { reportSeen = true; shot("report"); }
-  tap(10, 10);
-  await Bun.sleep(150);
-  tap(10, 10);
-  await Bun.sleep(150);
-  ok(!linAt(64, 100), "report dismissed by two taps");
-  return true;
+  for (let i = 0; i < 30 && !linAt(64, 100) && !linAt(74, 70); i++) await Bun.sleep(100);
+  const rep = linAt(64, 100);
+  const mod = linAt(74, 70);
+  if (rep && !reportSeen) { reportSeen = true; shot("report"); }
+  if (rep) {
+    tap(10, 10);
+    await Bun.sleep(150);
+    tap(10, 10);
+    await Bun.sleep(150);
+    ok(!linAt(64, 100), "report dismissed by two taps");
+  }
+  if (mod && !modalSeen) { modalSeen = true; shot("omen"); }
+  if (mod) {
+    tap(160, 128); // the modal's OK button
+    await Bun.sleep(150);
+    ok(!linAt(74, 70), "OK button dismissed the omen modal");
+  }
+  return rep || mod;
 }
 const before = frameCount;
 const turn0 = decodeTurn(frame);
@@ -215,6 +226,7 @@ for (let cyc = 1; cyc <= 5; cyc++) {
   if (cyc === 1 || cyc === 5) shot(`turn-${turn0 + 2 * cyc}`);
 }
 ok(reportSeen, "a battle report appeared and was skipped+closed by clicks");
+ok(modalSeen, "an omen modal appeared and OK dismissed it");
 // jsdom's rAF throttles under polling load (~6-60fps observed); the decoded
 // TURN digits are the real liveness proof, this only catches a dead loop.
 ok(frameCount - before > 10, `frame loop alive through five cycles (${frameCount - before} frames)`);
