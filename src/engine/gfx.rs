@@ -144,7 +144,7 @@ pub const BAYER4: [[u8; 4]; 4] = [
 ];
 
 #[inline]
-fn bayer(x: i32, y: i32) -> u8 {
+pub fn bayer(x: i32, y: i32) -> u8 {
     BAYER4[(y & 3) as usize][(x & 3) as usize]
 }
 
