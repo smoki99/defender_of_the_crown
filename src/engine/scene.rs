@@ -104,14 +104,18 @@ impl SceneStack {
         self.start(Change::Push(s), tr);
     }
     pub fn pop(&mut self, tr: Transition) -> bool {
-        if self.stack.len() < 2 || self.in_transition() {
+        if self.stack.len() < 2 {
             return false;
         }
         self.start(Change::Pop, tr);
         true
     }
 
+    /// Ignored while a transition runs (a scene cannot leave twice).
     fn start(&mut self, change: Change, tr: Transition) {
+        if self.in_transition() {
+            return;
+        }
         match tr {
             Transition::None => {
                 apply(&mut self.stack, change);

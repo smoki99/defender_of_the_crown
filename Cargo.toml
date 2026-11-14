@@ -33,6 +33,12 @@ web-sys = { version = "0.3", features = [
     "DomRect",
     "Performance",
     "Storage",
+    "AudioContext",
+    "AudioNode",
+    "AudioDestinationNode",
+    "ScriptProcessorNode",
+    "AudioProcessingEvent",
+    "AudioBuffer",
     "console",
 ] }
 

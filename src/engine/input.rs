@@ -24,6 +24,7 @@ pub const KEY_LEFT: u32 = 0x1103;
 pub const KEY_UP: u32 = 0x1104;
 pub const KEY_RIGHT: u32 = 0x1105;
 pub const KEY_DOWN: u32 = 0x1106;
+pub const KEY_M: u32 = 0x1107;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dir {

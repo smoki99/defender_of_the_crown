@@ -14,7 +14,8 @@ ensure_stage() {
   docker cp "$ROOT/." crown-stage:/work
 }
 
-CMD="${1:-all}"; shift || true
+CMD="${1:-all}"
+if [ "$#" -gt 0 ]; then shift; fi
 ensure_stage
 BASE="docker run --rm -v crown-src:/work -v crown-target:/work/target -w /work $IMAGE cargo"
 # .git-less stage: exclude by not copying (docker cp whole dir incl .git is fine)
@@ -25,5 +26,9 @@ case "$CMD" in
   clippy) $BASE clippy --all-targets -- -D warnings ;;
   all)    $BASE test --release && $BASE clippy --all-targets -- -D warnings \
           && $BASE check --target wasm32-unknown-unknown ;;
+  wasm-build) $BASE build --release --target wasm32-unknown-unknown "$@" ;;
+  bindgen) docker run --rm -v crown-src:/work -v crown-target:/work/target -w /work "$IMAGE" \
+      tools/bin/wasm-bindgen --target web --out-dir /work/web/pkg \
+      /work/target/wasm32-unknown-unknown/release/defender_of_the_crown.wasm ;;
   *) echo "unknown: $CMD" && exit 2 ;;
 esac

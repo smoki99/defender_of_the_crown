@@ -310,3 +310,38 @@ fn wants_leave_exposed() {
     st.step(&mut ctx, &mut inp, 1);
     assert!(st.top_wants_leave());
 }
+
+#[test]
+fn replace_while_transition_running_does_not_restart_it() {
+    // A scene that never stops wanting leave makes a naive driver call
+    // replace() every frame; that must not stall the Fade forever.
+    let (mut a, _la) = S::new(WHITE);
+    a.leave = true;
+    let mut st = SceneStack::new(Box::new(a));
+    let mut ctx = Ctx;
+    let mut inp = Input::new();
+    st.step(&mut ctx, &mut inp, 1);
+    for f in 2..=2 * TRANS_FRAMES as u64 + 1 {
+        assert!(st.top_wants_leave());
+        let (mut spam, _l) = S::new(BLACK);
+        spam.leave = true;
+        st.replace(Box::new(spam), Transition::Fade);
+        st.step(&mut ctx, &mut inp, f);
+    }
+    assert!(
+        !st.in_transition(),
+        "fade must complete despite repeated replace calls"
+    );
+
+    // and a fresh replace after completion still runs
+    let (b, lb) = S::new(BLACK);
+    st.replace(Box::new(b), Transition::Fade);
+    assert!(st.in_transition());
+    for f in 0..=2 * TRANS_FRAMES as u64 {
+        st.step(&mut ctx, &mut inp, 100 + f);
+    }
+    assert!(!st.in_transition());
+    let l = lb.borrow();
+    assert_eq!(l.inits, 1);
+    assert_eq!(l.events.as_slice(), &[SceneEvent::Revealed]);
+}
