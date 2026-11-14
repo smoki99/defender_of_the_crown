@@ -66,30 +66,35 @@ key("Escape");
 await Bun.sleep(120);
 // Escape landed back on the menu top (BEGIN CAMPAIGN)
 
-// --- crawl by keyboard: 3 illustrated screens, then the campaign map
+// --- T4xx checkpoint: the entry sequence is THREE inputs from load -
+// boot key (1, also the audio unlock), BEGIN (2), difficulty (3). From
+// there the crawl auto-rolls (3 x 5 s) into the campaign with zero input.
 key("Enter"); // BEGIN CAMPAIGN
 await Bun.sleep(120);
-key("Enter"); // EASY by default
+key("Enter"); // EASY by default - required inputs done
 await Bun.sleep(150);
 shot("crawl-1");
 const c1 = snap();
 ok(px(2, 0)[0] > 90, `crawl flames rgb=${px(2, 0)}`);
-key("Enter");
-await Bun.sleep(200);
+// the Norman lion on leaf 1 - proves the leaf DWELLS (has not rolled yet)
+const lion = px(240, 128);
+ok(near(lion, GOLD_ON) || near(lion, GOLD_OFF), `crawl leaf dwells rgb=${lion}`);
+key("Enter"); // NEXT skips ahead early
+await Bun.sleep(250);
 shot("crawl-2");
-ok(regionDiff(c1, snap(), 40, 60, 280, 210) > 120, "crawl advances to next leaf");
-key("Enter");
-await Bun.sleep(200);
+ok(regionDiff(c1, snap(), 40, 60, 280, 210) > 120, "NEXT skips to the next leaf");
+// hands-free from here: leaf 3 rolls in, then the war commits itself
+await Bun.sleep(6500);
+shot("crawl-3");
 let crown = 0; for (let y = 145; y < 172; y++) for (let x = 138; x < 184; x++) { const p = px(x, y); if (p[0] > 90 && p[1] > 70 && p[2] < 60) crown++; }
-ok(crown > 40, `final crawl shows the crown (${crown} gold px)`);
-
-key("Enter"); // commit: the war begins
+ok(crown > 40, `final crawl leaf arrived hands-free (${crown} gold px)`);
+await Bun.sleep(6500); // auto-commit
 await Bun.sleep(1100);
 ok(getFrameCount() > 80, `frames keep flowing (${getFrameCount()})`);
 const campaign = snap();
 ok(regionDiff(campaign, c1, 0, 0, 320, 256) > 2000, "crawl gave way to the campaign map");
 
 const turn = decodeTurn(getFrame());
-ok(turn !== null, `keyboard flow reached a live campaign (HUD turn ${turn})`);
+ok(turn !== null, `3-input flow reached a live campaign (HUD turn ${turn})`);
 ok(problems.length === 0, `no errors (${problems.slice(0, 3).join(" | ") || "clean"})`);
 finish();

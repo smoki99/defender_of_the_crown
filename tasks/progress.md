@@ -357,3 +357,16 @@ herald's cry is public knowledge.
   banner + swim-back live, autoplay resolves through results → campaign pop,
   0 console errors. Full cargo suite green, clippy 0 warnings (2 own hits
   fixed). (2026-11-14)
+- T4xx CHECKPOINT (2026-11-14): entry sequence = THREE inputs from load -
+  boot key (audio unlock), BEGIN CAMPAIGN, difficulty; the intro crawl now
+  AUTO-ROLLS (CRAWL_DWELL 300 ticks = 5 s per leaf, dwell resets on NEXT /
+  BACK / entry) so a hands-off player rides straight into the war. Proof:
+  title-flow-check rewritten around the budget - dwells (leaf-1 lion pixel),
+  NEXT skips early, leaf 3 arrives hands-free (240 gold px), auto-commit
+  reaches a live campaign (decoded HUD turn 1), 19/19 in BOTH the default
+  and doc.crt=0 seed runs, 0 errors; headless-check campaign click loop
+  25/25 green on the rebuilt bundle. Music: audio-check all green - silent
+  pre-gesture, worklet sink, RMS 0.432-0.464 fanfare window, title loop
+  0.433-0.438 at +6 s, M + reload mute persistence. Screenshots: title/menu/
+  how-to/fame/options/crawl set /tmp/crown-title + shots=10 per run,
+  approved at T403-T405; committed baselines land with A3.

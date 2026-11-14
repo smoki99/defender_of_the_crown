@@ -159,8 +159,11 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   **2026-11-14:** castle/road + shield + crown pages, arrow-key paging;
   Options SOUND/CRT rows; `doc.crt` survives boot (seed run shows OFF at
   boot, flip persists "1"); CRT filter visibly darkens every scanline row.
-- [ ] **Checkpoint T4xx**: entry sequence playable ≤3 inputs from load,
+- [x] **Checkpoint T4xx**: entry sequence playable ≤3 inputs from load,
   music audible (RMS), screenshots approved.
+  **2026-11-14:** crawl auto-rolls (5 s/leaf) - 3 inputs reach a live
+  campaign hands-free, 19/19 x2 seed runs + 25/25 click loop, RMS 0.43
+  title loop, all shots approved. See progress.md.
 
 ## Phase 5 — MG framework + slice games (T5xx) → ALPHA 1
 

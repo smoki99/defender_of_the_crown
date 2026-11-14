@@ -597,6 +597,11 @@ const CRAWL: [(&str, &str, &str); 3] = [
         "TAKE YOUR CROWN IN LONDON.",
     ),
 ];
+/// T4xx: ticks each crawl screen stands before it rolls on (5 s at the
+/// fixed 60 Hz step). The intro is flavor, not a toll gate: with the crawl
+/// auto-rolling, the campaign is three inputs from load (boot key + BEGIN +
+/// difficulty); NEXT still skips ahead.
+const CRAWL_DWELL: u32 = 300;
 
 /// Entry sequence (T402/T403): black screen + unfurling heraldic banner,
 /// then an animated title card with a real menu: campaign start (difficulty
@@ -620,6 +625,7 @@ pub struct TitleScene {
     item: usize, // menu/difficulty highlight (keyboard)
     page: usize, // how-to page
     crawl: usize, // intro crawl screen (T404)
+    dwell: u32,   // ticks the current crawl leaf has stood (T4xx auto-roll)
     pending: Option<usize>, // activation deferred to tick (needs AppCtx)
     sound: bool, // OPTIONS mirror of the persisted mute flag
     crt: bool,   // OPTIONS mirror of the persisted scanline flag (T405)
@@ -634,6 +640,7 @@ impl TitleScene {
             item: 0,
             page: 0,
             crawl: 0,
+            dwell: 0,
             pending: None,
             sound: initial_sound(),
             crt: ls_get("doc.crt").as_deref() != Some("0"),
@@ -739,6 +746,7 @@ impl TitleScene {
             Stage::Difficulty => {
                 PICK.store(i as u8, std::sync::atomic::Ordering::Relaxed);
                 self.crawl = 0;
+                self.dwell = 0;
                 self.stage = Stage::Crawl;
             }
             Stage::Options => {
@@ -754,6 +762,7 @@ impl TitleScene {
         }
     }
     fn back(&mut self) {
+        self.dwell = 0;
         if self.stage == Stage::Crawl {
             self.stage = if self.crawl > 0 {
                 self.crawl -= 1;
@@ -768,6 +777,7 @@ impl TitleScene {
     }
     /// NEXT on the crawl: last screen commits the campaign start.
     fn crawl_forward(&mut self) {
+        self.dwell = 0;
         if self.crawl + 1 < CRAWL.len() {
             self.crawl += 1;
         } else {
@@ -1111,6 +1121,14 @@ impl Scene for TitleScene {
         self.ticks += 1;
         if let Some(i) = self.pending.take() {
             self.activate(i, app);
+        }
+        // T4xx: the crawl rolls by itself - a hands-off player rides the
+        // intro straight into the war.
+        if self.stage == Stage::Crawl {
+            self.dwell += 1;
+            if self.dwell >= CRAWL_DWELL {
+                self.crawl_forward();
+            }
         }
     }
     fn draw(&mut self, fb: &mut Framebuffer) {
