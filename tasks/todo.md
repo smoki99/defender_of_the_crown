@@ -29,10 +29,10 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   (wasm-bindgen, js-sys, web-sys exact features, console_error_panic_hook);
   old drafted src/ modules moved under `src/campaign/` for absorption;
   `cargo check` on wasm32 target green (docker). *Verify: check + test green.*
-- [ ] **T102 Palette + framebuffer**: 32-color palette (Amiga-like, table in
+- [x] **T102 Palette + framebuffer**: 32-color palette (Amiga-like, table in
   code w/ names), `Framebuffer` u8-indexed 320×256, blit-to-RGBA (ImageData)
-  pure fn; unit tests (bounds, palette→RGB). 
-- [ ] **T103 Drawing primitives**: px/hline/vline/rect/fill/triangle/circle +
+  pure fn; unit tests (bounds, palette→RGB).
+- [x] **T103 Drawing primitives**: px/hline/vline/rect/fill/triangle/circle +
   Bayer 4×4 dithered fill/gradient + half-bright mixing; tests incl. dither
   determinism.
 - [ ] **T104 Bitmap font**: original 8×8 glyph set (A–Z 0–9 punctuation,
