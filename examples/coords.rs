@@ -15,6 +15,15 @@ fn main() {
         .into_iter()
         .find(|b| b.id == "rec:0")
         .unwrap();
+    let sports = action_rects(true)
+        .into_iter()
+        .find(|b| b.id == "sports")
+        .unwrap();
+    println!(
+        "SPORTS {} {}",
+        sports.x + sports.w as i32 / 2,
+        sports.y + sports.h as i32 / 2
+    );
     let end = end_turn_rect();
     println!("BUCK {bx} {by}");
     let lon = castle_screen(&ui.g.strongholds[6]); // London - Norman capital, Buckingham-adjacent

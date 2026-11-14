@@ -4,10 +4,16 @@
 //! whose buttons overlay the map's lower edge.
 
 pub mod kit;
+pub mod host;
+
+pub use host::{MgHost, OutcomeCell, SportMode};
+
+use crate::minigames::framework::{SportSpec, pick as sport_pick};
+use std::rc::Rc;
 
 use crate::campaign::events::EventKind;
 use crate::campaign::game::{
-    Difficulty, Faction, GameState, Stronghold, View, BAR_MAX, PLAYER, SPY_COST,
+    Difficulty, Faction, GameState, Stronghold, View, BAR_MAX, PLAYER, SPY_COST, SPORTS_FEE,
 };
 use crate::campaign::units::UnitKind;
 use crate::engine::gfx::{
@@ -204,8 +210,12 @@ fn btn_enabled(g: &GameState, id: &str) -> bool {
         "rec:1" => gold >= UnitKind::Bowman.cost(),
         "rec:2" => gold >= UnitKind::Knight.cost(),
         "rec:3" => gold >= UnitKind::Siege.cost(),
-        "spy" => gold >= SPY_COST,
-        "sports" => false, // minigames arrive with the tourneys (T501)
+        // once games land (T502) the real gate is: a meet this season and
+        // the entry fee in the purse.
+        "sports" => {
+            let seed = ((g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+            sport_pick(g.turn, seed).is_some() && gold >= SPORTS_FEE
+        }
         _ => true,
     }
 }
@@ -219,7 +229,7 @@ fn tip(id: &str) -> &'static str {
         "rec:3" => "SIEGE: CATAPULTS BREACH WALLS",
         "spy" => "SPY: 7 IN 10 REVEAL A GARRISON",
         "close" => "CLOSE THIS ROLL",
-        "sports" => "HELD AT THE TOURNEY GROUND",
+        "sports" => "FEAT OF ARMS, FEE TEN GOLD",
         "end" => "SUMMON THE NEXT SEASON",
         "scr:up" | "scr:dn" => "SCROLL THE GARRISON ROLL",
         _ => "",
@@ -266,6 +276,12 @@ pub struct CampaignUi {
     pub report_pending: bool,
     pending_event: Option<EventKind>,
     pub sting_armed: bool,
+    /// T501: SPORTS launch request (spec, mode), consumed by the scene layer.
+    pub launch_req: Option<(&'static SportSpec, SportMode)>,
+    /// Outcome mailbox written by the layered `MgHost` on exit.
+    pub sport_out: OutcomeCell,
+    /// Run in flight: mode + spec, set on push, applied on return.
+    pub sport_ctx: Option<(SportMode, &'static SportSpec)>,
 }
 
 impl CampaignUi {
@@ -294,6 +310,9 @@ impl CampaignUi {
             report_pending: false,
             pending_event: None,
             sting_armed: false,
+            launch_req: None,
+            sport_out: Rc::default(),
+            sport_ctx: None,
         }
     }
 
@@ -301,7 +320,6 @@ impl CampaignUi {
         self.msg_ticks = self.msg_ticks.saturating_sub(1);
         self.anim = self.anim.wrapping_add(1);
         // Bars glide toward the true meters (~8 ticks); the draw pass shows a
-        // white tick at the still-unreached target, Amiga-style (T303).
         let tgt = Self::bar_targets_of(&self.g);
         for (d, t) in self.bars_disp.iter_mut().zip(tgt) {
             if *d < t {
@@ -529,7 +547,7 @@ impl CampaignUi {
         best.map(|(_, id)| id)
     }
 
-    fn act(&mut self, id: &str, sel: usize) {
+    pub fn act(&mut self, id: &str, sel: usize) {
         if id == "close" {
             self.sel = None;
             return;
@@ -549,7 +567,30 @@ impl CampaignUi {
                 Err(e) => e,
             }
         } else if id == "sports" {
-            self.say("THE SPORTS ARE HELD AT THE TOURNEY");
+            // The meet is a season-wide pick (same seed as `btn_enabled`);
+            // entry and purse differ when our own herald flies here.
+            let herald = self.g.tournament[PLAYER.index()] == Some(sel);
+            let seed = ((self.g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+            let Some(spec) = sport_pick(self.g.turn, seed) else {
+                self.say("NO SPORT IS HELD THIS SEASON");
+                return;
+            };
+            if host::make_game(spec.id, seed).is_none() {
+                self.say(if herald {
+                    "THE HERALD YET WAITS FOR A MEET"
+                } else {
+                    "THE SPORTS ARE HELD AT THE TOURNEY"
+                });
+                return;
+            }
+            self.launch_req = Some((
+                spec,
+                if herald {
+                    SportMode::Herald { sid: sel }
+                } else {
+                    SportMode::Sports { sid: sel }
+                },
+            ));
             return;
         } else {
             return;
@@ -1052,6 +1093,8 @@ pub struct PlayScene {
     pub ui: CampaignUi,
     battle: bool,  // battle.mod bed while the report overlay is open
     endgame: bool, // victory/defeat stinger fired exactly once
+    /// Harness path: minigames resolve themselves (?autoplay=1).
+    autoplay: bool,
 }
 
 impl PlayScene {
@@ -1060,6 +1103,74 @@ impl PlayScene {
             ui: CampaignUi::new(seed, difficulty),
             battle: false,
             endgame: false,
+            autoplay: false,
+        }
+    }
+
+    pub fn with_autoplay(mut self, on: bool) -> Self {
+        self.autoplay = on;
+        self
+    }
+
+    /// Layer/collect the minigame host around the campaign screen (T501).
+    fn sports_flow(&mut self, app: &mut dyn crate::engine::scene::AppCtx) {
+        if let Some((spec, mode)) = self.ui.launch_req.take() {
+            let seed = ((self.ui.g.turn as u64) << 32)
+                ^ match mode {
+                    SportMode::Sports { sid } | SportMode::Herald { sid } => {
+                        (sid as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                    }
+                };
+            if let Some(game) = host::make_game(spec.id, seed) {
+                self.ui.sport_ctx = Some((mode, spec));
+                let cell = self.ui.sport_out.clone();
+                app.push(Box::new(MgHost::new(
+                    spec, mode, game, cell, self.autoplay,
+                )));
+            }
+        }
+        let done = self.ui.sport_out.borrow_mut().take();
+        if let Some(o) = done {
+            if let Some((mode, spec)) = self.ui.sport_ctx.take() {
+                if o.tier.is_none() {
+                    // no laurel: the meet is void - no fee was taken, the
+                    // herald (if any) still waits.
+                    self.ui.say("THOU FAILED THE MEET - NO FEE, NO PURSE");
+                    return;
+                }
+                let res = match mode {
+                    SportMode::Sports { sid } => self.ui.g.play_sports(
+                        PLAYER,
+                        sid,
+                        o.score,
+                        spec.silver_at,
+                        spec.gold_at,
+                    ),
+                    SportMode::Herald { .. } => self.ui.g.play_tournament(
+                        PLAYER,
+                        o.score,
+                        spec.silver_at,
+                        spec.gold_at,
+                    ),
+                };
+                let msg = match res {
+                    Ok((tier, r)) => {
+                        let mut m = match tier {
+                            crate::campaign::game::Tier::Gold => format!("GOLD LAUREL: {} GOLD", r.gold),
+                            crate::campaign::game::Tier::Silver => {
+                                format!("SILVER LAUREL: {} PROVISIONS", r.provisions)
+                            }
+                            crate::campaign::game::Tier::Bronze => format!("BRONZE LAUREL: {} GOLD", r.gold),
+                        };
+                        if r.champion {
+                            m.push_str(" AND A CHAMPION");
+                        }
+                        m
+                    }
+                    Err(e) => e,
+                };
+                self.ui.say(&msg);
+            }
         }
     }
 }
@@ -1072,6 +1183,7 @@ impl crate::engine::scene::Scene for PlayScene {
         self.ui.event(ev, true);
     }
     fn tick(&mut self, app: &mut dyn crate::engine::scene::AppCtx) {
+        self.sports_flow(app);
         self.ui.tick();
         if self.ui.sting_armed {
             // the Norman war-horn calls across the channel (T308)

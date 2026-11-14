@@ -28,6 +28,10 @@ pub trait AppCtx {
     }
     /// Chronicle a finished run into the (persisted) hall of fame (T403).
     fn record_feat(&mut self, _feat: &str) {}
+    /// Layer a scene above the current one (T501: SPORTS opens a minigame).
+    fn push(&mut self, _s: Box<dyn Scene>) {}
+    /// Persist a minigame best score (T501; doc.mg.<id> on the web).
+    fn mg_best(&mut self, _id: &str, _score: u32) {}
 }
 
 /// Semantic events scenes receive (raw input already transformed).

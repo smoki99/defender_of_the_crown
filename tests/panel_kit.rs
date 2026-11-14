@@ -1,6 +1,8 @@
 //! T302/T304 pixel kit: three-tone bevels, garrison list scrolling, hover
-//! tooltips and the greyed SPORTS control, all asserted on the framebuffer.
-use defender_of_the_crown::campaign::game::{Difficulty, PLAYER};
+//! tooltips and the SPORTS gate (season meet + entry fee), asserted on the
+//! framebuffer.
+use defender_of_the_crown::campaign::game::{Difficulty, PLAYER, SPORTS_FEE};
+use defender_of_the_crown::minigames::framework::pick as sport_pick;
 use defender_of_the_crown::engine::gfx::{
     Framebuffer, BLACK, DARKGRAY, DARKRED, EMBER, GRAY, LINEN, ORANGE, SILVER, TAN,
 };
@@ -124,22 +126,38 @@ fn garrison_roll_scroll_when_it_overflows() {
 }
 
 #[test]
-fn sports_sit_greyed_until_the_tourneys() {
+fn sports_gate_is_the_meet_and_the_fee() {
     let mut ui = CampaignUi::new(7, Difficulty::Normal);
     select(&mut ui, "Buckingham");
     let sports = btn(&action_rects(true), "sports").clone();
-    let mut fb = Framebuffer::new();
-    ui.draw(&mut fb);
     let (cx, cy) = center(&sports);
+    let mut fb = Framebuffer::new();
+    // fee affordable -> the tone follows the season meet
+    let season_seed = ((ui.g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+    let held = sport_pick(ui.g.turn, season_seed).is_some();
+    ui.draw(&mut fb);
+    assert_eq!(
+        fb.get(cx as u32 - 20, (sports.y + 2) as u32) == GRAY,
+        !held,
+        "button tone must follow the season meet (held: {held})"
+    );
+    // purse below the fee -> greyed whatever the season
+    ui.g.gold[PLAYER.index()] = SPORTS_FEE - 1;
+    ui.draw(&mut fb);
     assert_eq!(
         fb.get(cx as u32 - 20, (sports.y + 2) as u32),
         GRAY,
-        "greyed"
+        "broke player sees a greyed button"
     );
-    let gold = ui.g.gi(PLAYER);
+    // a tap always answers honestly and costs nothing
+    ui.g.gold[PLAYER.index()] = 100;
     ui.event(&tap(cx, cy), true);
-    assert_eq!(ui.msg, "THE SPORTS ARE HELD AT THE TOURNEY");
-    assert_eq!(ui.g.gi(PLAYER), gold, "sports cost gold");
+    assert!(
+        ui.msg.contains("SPORTS") || ui.msg.contains("SPORT"),
+        "answer: {}",
+        ui.msg
+    );
+    assert_eq!(ui.g.gi(PLAYER), 100, "the answer must not charge the purse");
 }
 
 #[test]

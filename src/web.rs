@@ -85,6 +85,8 @@ struct Ctx {
     crt: Rc<Cell<bool>>,
     music: Rc<RefCell<Music>>,
     audio: AudioState,
+    /// T501: scenes queued via AppCtx::push, drained by the driver.
+    pending_push: Rc<RefCell<Vec<Box<dyn Scene>>>>,
 }
 
 /// T401: named music beds. "title" loops back to its march section
@@ -138,6 +140,16 @@ impl AppCtx for Ctx {
         entries.insert(0, feat.to_string());
         entries.truncate(5);
         ls_set("doc.hof", &entries.join(";"));
+    }
+    fn push(&mut self, s: Box<dyn Scene>) {
+        self.pending_push.borrow_mut().push(s);
+    }
+    fn mg_best(&mut self, id: &str, score: u32) {
+        let key = format!("doc.mg.{id}");
+        let prev = ls_get(&key).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+        if score > prev {
+            ls_set(&key, &score.to_string());
+        }
     }
 }
 
@@ -1281,7 +1293,7 @@ pub fn main() -> Result<(), JsValue> {
             want_leave: false,
         })
     } else if want_play {
-        Box::new(PlayScene::new(play_seed, play_diff))
+        Box::new(PlayScene::new(play_seed, play_diff).with_autoplay(query_has("autoplay=1")))
     } else {
         Box::new(TitleScene::new())
     };
@@ -1322,6 +1334,7 @@ pub fn main() -> Result<(), JsValue> {
         crt,
         music,
         audio,
+        pending_push: Rc::default(),
     }));
 
     wire_input(&state, &ctxrc);
@@ -1355,6 +1368,11 @@ pub fn main() -> Result<(), JsValue> {
                 st.frame += 1;
                 let frame = st.frame;
                 st.stack.step(&mut *ctx, &mut st.input, frame);
+                // T501: layered scenes (SPORTS minigames) queue through Ctx.
+                let queued = ctx.pending_push.borrow_mut().pop();
+                if let Some(s) = queued {
+                    st.stack.push(s, Transition::Fade);
+                }
                 if st.input.user_gesture {
                     let m = ctx.muted.clone();
                     ctx.audio.unlock(&m);
@@ -1385,7 +1403,12 @@ pub fn main() -> Result<(), JsValue> {
                     ctx.muted.set(v);
                     ls_set("doc.mute", if v { "1" } else { "0" });
                 }
-                if st.stack.top_wants_leave() {
+                if st.stack.top_wants_leave() && st.stack.depth() > 1 {
+                    // a layered scene (minigame) finished: fall back to the
+                    // campaign underneath, no mode change.
+                    st.stack.pop(Transition::Fade);
+                } else if st.stack.top_wants_leave() {
+
                     let next = match st.mode {
                         Mode::Title => {
                             let diff = match PICK.load(std::sync::atomic::Ordering::Relaxed) {
@@ -1394,7 +1417,8 @@ pub fn main() -> Result<(), JsValue> {
                                 _ => Difficulty::Normal,
                             };
                             st.mode = Mode::Play { diff, seed: 7 };
-                            Box::new(PlayScene::new(7, diff)) as Box<dyn Scene>
+                            Box::new(PlayScene::new(7, diff).with_autoplay(query_has("autoplay=1")))
+                                as Box<dyn Scene>
                         }
                         Mode::Test => Box::new(TestScene::new("FADE CYCLE COMPLETE")),
                         Mode::Demo => Box::new(DemoScene {
@@ -1404,7 +1428,8 @@ pub fn main() -> Result<(), JsValue> {
                         Mode::Play { diff, seed } => {
                             let seed = seed + 1;
                             st.mode = Mode::Play { diff, seed };
-                            Box::new(PlayScene::new(seed, diff)) as Box<dyn Scene>
+                            Box::new(PlayScene::new(seed, diff).with_autoplay(query_has("autoplay=1")))
+                                as Box<dyn Scene>
                         }
                     };
                     st.stack.replace(next, Transition::Fade);
