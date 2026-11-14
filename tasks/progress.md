@@ -249,3 +249,24 @@ herald's cry is public knowledge.
   mid-march frame shows marching dots, no modal; BAD HARVEST plate opens
   only after the last banner lands; window.__rms 0.400 bed -> 0.424 peak
   with the horn over the campaign track. 25/25 test groups, clippy clean.
+
+## T401-T403 tracks, boot herald, title card - done 2026-11-14
+- T401 — compose.ts 7 tracks (title/saxon/norman/battle/minigame/victory/
+  defeat), all decode + budget via tests/tracks.rs (title restart byte =
+  A-section, 7×~17 KiB < 128 KiB). Player render() is the only clock, so a
+  queued pre-gesture track parks at row 0: the overture resumes bar one on
+  unlock (2026-11-14)
+- T402 — TitleScene::Boot: unfurling herald banner + blinking PRESS ANY KEY;
+  first gesture swallowed as unlock (fanfare from tick 0). audio-check.ts
+  retargeted from ?scene=test to `/`: silent before gesture, worklet attached,
+  RMS 0.43 in first 600 ms window after tap, M + reload mute persistence,
+  0 errors (2026-11-14)
+- T403 — title card: flame-licked border, bobbing bejewelled crown, flanking
+  banners (black-outlined), dithered Saxon field, 4-row menu with keyboard
+  (arrows/Enter, deferred pending->tick for AppCtx access) + mouse; HOW TO
+  PLAY 3 pages (prev/next/back, Enter pages), HALL OF FAME reads doc.hof
+  (empty + rendered entries proven), OPTIONS SOUND ON/OFF round-trips
+  doc.mute with the M key and reload (playwright: 1 -> 0 -> 1). PlayScene:
+  saxon bed on init, battle bed brackets the report overlay, victory/defeat
+  sting + record_feat exactly once (tests/music_flow.rs 4/4). Screenshots
+  /tmp/crown-title k1-k9 + 01-06 (2026-11-14)

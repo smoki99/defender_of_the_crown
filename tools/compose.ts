@@ -94,6 +94,7 @@ export interface Song {
   samples: SampleDef[];   // <= 31
   patterns: Pattern[];    // <= 15, all written into the 15 slots
   order: number[];        // song length
+  restart?: number;       // pattern index the song loops back to (T401)
   speed?: number;         // encoded nowhere in MOD (player default), kept for meta
 }
 
@@ -122,7 +123,7 @@ export function buildMod(song: Song): Uint8Array {
   }
 
   // song length / restart / order table, then format tag, then patterns
-  out.push(song.order.length, 0x7f);
+  out.push(song.order.length, song.restart ?? 0x7f);
   for (let i = 0; i < 128; i++) out.push(i < song.order.length ? song.order[i] : 0);
   out.push(...[0x4d, 0x2e, 0x4b, 0x2e]); // "M.K." @1080
   for (let p = 0; p < 15; p++) {
@@ -235,18 +236,314 @@ function normanSong(): Song {
     order: [0],
   };
 }
+// ---------------------------------------------------------------- T401 tracks
+// Event: [row, durRows, note|null, volume]. A note sustains until the next
+// event; dur < 64 emits a C00 note-off so short articulations stay crisp.
+type Ev = [number, number, string, number];
+type Ch = { smp: number; evs: Ev[] } | null;
+
+function mkPat(chans: [Ch, Ch, Ch, Ch]): Pattern {
+  const p: Pattern = rows([]);
+  chans.forEach((c, ch) => {
+    if (!c) return;
+    for (const [r, d, note, vol] of c.evs) {
+      p[r][ch] = C(note, c.smp, vol);
+      if (d > 0 && r + d < 64) p[r + d][ch] = C(null, 0, 0, 12, 0);
+    }
+  });
+  return p;
+}
+
+// rolled chord: notes fire dur rows apart and the last one holds
+const roll = (start: number, dur: number, notes: string[], vol: number): Ev[] =>
+  notes.map((n, i) => [start + i * dur, i === notes.length - 1 ? -1 : dur, n, vol] as Ev);
+
+// 16th grid run (dur 4 rows) starting at row r0
+const run = (r0: number, notes: string[], vol: number): Ev[] =>
+  notes.map((n, i) => [r0 + i * 4, 4, n, vol] as Ev);
+
+const S = {
+  horn: (v = 56): SampleDef => ({ name: "HORN", data: cycle("square", 128, 100, 0.3), volume: v, loopStart: 0, loopLen: 128 }),
+  pulse: (n: string, v = 44): SampleDef => ({ name: n, data: cycle("pulse", 128, 90, 0.25), volume: v, loopStart: 0, loopLen: 128 }),
+  bass: (v = 52): SampleDef => ({ name: "BASS", data: cycle("square", 128, 110, 0.5), volume: v, loopStart: 0, loopLen: 128 }),
+  tri: (n: string, v = 48): SampleDef => ({ name: n, data: cycle("tri", 128, 95, 0.5), volume: v, loopStart: 0, loopLen: 128 }),
+  drum: (v = 64): SampleDef => ({ name: "DRUM", data: kick(128, 118), volume: v, loopStart: 0, loopLen: 0 }),
+  snr: (v = 50): SampleDef => ({ name: "SNR", data: kick(96, 96), volume: v, loopStart: 0, loopLen: 0 }),
+  hat: (v = 40): SampleDef => ({ name: "HAT", data: hat(256, 70), volume: v, loopStart: 0, loopLen: 0 }),
+};
+const D = (rv: [number, number][]): Ev[] => rv.map(([r, v]) => [r, 1, "C-2", v] as Ev);
+const R = (rv: [number, number][]): Ev[] => rv.map(([r, v]) => [r, 1, "C-3", v] as Ev);
+const Hh = (rv: [number, number][]): Ev[] => rv.map(([r, v]) => [r, 1, "C-4", v] as Ev);
+
+// galloping 8th-pair bass over one bar of chord roots
+const gallop = (roots: [string, string][]): Ev[] => {
+  const evs: Ev[] = [];
+  roots.forEach(([lo, hi], i) => {
+    const r = i * 16;
+    evs.push([r, 3, lo, 50], [r + 4, 3, hi, 44], [r + 8, 3, lo, 50], [r + 12, 3, hi, 44]);
+  });
+  return evs;
+};
+
+// "THE CROWN ENDURES" (SPEC §3): 8-bar brass fanfare over pulse triads ->
+// heroic Dorian march with singable lead over galloping bass -> lyrical
+// bridge -> reprise with drums + arpeggio sparkle. 24 bars ~= 74 s; the
+// restart byte loops the song back to the march (order 8), so the fanfare
+// only crowns the first pass.
+function titleSong(): Song {
+  // fanfare bars (D major)
+  const f1 = mkPat([
+    { smp: 1, evs: [[0, 20, "D-5", 60], [24, 12, "A-4", 54], [36, 8, "B-4", 54], [44, 20, "D-5", 60]] },
+    { smp: 2, evs: [...roll(0, 4, ["D-3", "A-3", "D-4"], 44), ...roll(16, 4, ["F#-3", "A-3", "D-4"], 44), ...roll(32, 4, ["D-3", "A-3", "D-4"], 44), ...roll(48, 4, ["A-2", "D-3", "F#-3"], 44)] },
+    { smp: 3, evs: [[0, 16, "D-2", 50], [16, 16, "D-2", 50], [32, 16, "A-2", 50], [48, 16, "D-2", 50]] },
+    { smp: 5, evs: D([[0, 60]]) },
+  ]);
+  const f2 = mkPat([
+    { smp: 1, evs: [[0, 8, "E-5", 58], [8, 8, "F#-5", 58], [16, 8, "E-5", 58], [24, 24, "D-5", 60], [52, 12, "A-4", 54]] },
+    { smp: 2, evs: [...roll(0, 4, ["A-2", "E-3", "A-3"], 44), ...roll(16, 4, ["C#-4", "E-4", "A-4"], 40), ...roll(32, 4, ["G-2", "D-3", "G-3"], 44), ...roll(48, 4, ["A-2", "E-3", "A-3"], 44)] },
+    { smp: 3, evs: [[0, 16, "A-2", 50], [16, 16, "A-2", 50], [32, 16, "G-2", 50], [48, 16, "A-2", 50]] },
+    null,
+  ]);
+  const f3 = mkPat([
+    { smp: 1, evs: [[0, 20, "A-5", 62], [24, 8, "F#-5", 58], [32, 8, "A-5", 62], [40, 24, "B-5", 62]] },
+    { smp: 2, evs: [...roll(0, 4, ["D-3", "A-3", "D-4"], 44), ...roll(24, 4, ["G-2", "D-3", "G-3"], 44), ...roll(40, 4, ["B-2", "F#-3", "B-3"], 44)] },
+    { smp: 3, evs: [[0, 16, "D-2", 50], [16, 16, "D-2", 50], [24, 16, "G-2", 50], [40, 24, "A-2", 50]] },
+    { smp: 5, evs: D([[0, 60], [32, 56]]) },
+  ]);
+  const f4 = mkPat([
+    { smp: 1, evs: [[0, 8, "A-5", 62], [8, 8, "G-5", 60], [16, 20, "F#-5", 58], [40, 24, "D-5", 62]] },
+    { smp: 2, evs: [...roll(0, 4, ["G-2", "D-3", "G-3"], 44), ...roll(16, 4, ["A-2", "E-3", "A-3"], 44), ...roll(40, 4, ["D-3", "A-3", "D-4"], 46)] },
+    { smp: 3, evs: [[0, 16, "G-2", 50], [16, 16, "A-2", 50], [40, 24, "D-2", 52]] },
+    { smp: 5, evs: D([[0, 60], [40, 64]]) },
+  ]);
+  // march bars (D Dorian: F naturals, C chord colours)
+  const m1 = mkPat([
+    { smp: 1, evs: [[0, 8, "A-4", 56], [8, 8, "D-5", 60], [16, 16, "F-5", 60], [32, 24, "A-5", 62], [56, 8, "G-5", 58]] },
+    { smp: 3, evs: gallop([["D-2", "D-3"], ["F-2", "F-3"], ["G-2", "G-3"], ["A-2", "A-3"]]) },
+    { smp: 2, evs: [[6, 8, "A-3", 38], [14, 16, "C-4", 38], [22, 8, "A-3", 38], [38, 8, "B-3", 38], [46, 16, "D-4", 38], [54, 8, "A-3", 38]] },
+    { smp: 5, evs: [...D([[0, 62], [32, 60]]), ...R([[16, 44], [48, 44]])] },
+  ]);
+  const m2 = mkPat([
+    { smp: 1, evs: [[0, 24, "A-5", 62], [24, 8, "G-5", 58], [32, 16, "F-5", 60], [48, 16, "E-5", 58]] },
+    { smp: 3, evs: gallop([["D-2", "D-3"], ["D-2", "D-3"], ["A-2", "A-3"], ["A-2", "A-3"]]) },
+    { smp: 2, evs: [[0, 30, "F-3", 36], [32, 30, "E-3", 36]] },
+    { smp: 5, evs: [...D([[0, 62]]), ...Hh([[8, 36], [24, 36], [40, 36], [56, 36]])] },
+  ]);
+  const m3 = mkPat([
+    { smp: 1, evs: [[0, 16, "D-5", 62], [16, 8, "E-5", 60], [24, 8, "F-5", 60], [32, 32, "A-5", 64]] },
+    { smp: 3, evs: [...gallop([["D-2", "D-3"], ["D-2", "D-3"]]), [48, 16, "A-2", 54]] },
+    { smp: 2, evs: [...roll(0, 4, ["D-3", "A-3", "D-4"], 44), [32, 30, "F#-3", 40]] },
+    { smp: 5, evs: [...D([[0, 64], [32, 64]]), ...R([[44, 48], [48, 48], [52, 48], [56, 52]])] },
+  ]);
+  // lyrical bridge: sparkle + soft lead, no drums
+  const b1 = mkPat([
+    { smp: 1, evs: [[0, 32, "F-5", 48], [32, 16, "E-5", 46], [48, 16, "D-5", 48]] },
+    { smp: 4, evs: run(0, ["D-4", "F-4", "A-4", "F-4", "D-4", "F-4", "A-4", "C-5"], 34) },
+    { smp: 3, evs: [[0, 32, "D-2", 44], [32, 32, "A-2", 44]] },
+    { smp: 2, evs: [[0, 30, "A-3", 30], [32, 30, "A-3", 30]] },
+  ]);
+  const b2 = mkPat([
+    { smp: 1, evs: [[0, 24, "E-5", 48], [24, 8, "D-5", 46], [32, 16, "C-5", 46], [48, 16, "D-5", 50]] },
+    { smp: 4, evs: run(0, ["C-4", "E-4", "G-4", "E-4", "C-4", "E-4", "G-4", "A-4"], 34) },
+    { smp: 3, evs: [[0, 32, "A-2", 44], [32, 32, "D-2", 44]] },
+    { smp: 2, evs: [[0, 30, "F-3", 30], [32, 30, "D-3", 30]] },
+  ]);
+  // reprise: march lead + 16th sparkle + full drums
+  const r1 = mkPat([
+    { smp: 1, evs: [[0, 8, "A-4", 58], [8, 8, "D-5", 62], [16, 16, "F-5", 62], [32, 24, "A-5", 64], [56, 8, "G-5", 60]] },
+    { smp: 4, evs: run(0, ["D-5", "A-4", "F-4", "A-4", "D-5", "A-4", "F-4", "A-4", "F-5", "C-5", "A-4", "C-5", "G-5", "D-5", "B-4", "D-5"], 30) },
+    { smp: 3, evs: gallop([["D-2", "D-3"], ["F-2", "F-3"], ["G-2", "G-3"], ["A-2", "A-3"]]) },
+    { smp: 5, evs: [...D([[0, 64], [16, 60], [32, 64], [48, 60]]), ...R([[8, 46], [24, 46], [40, 46], [56, 46]])] },
+  ]);
+  const r2 = mkPat([
+    { smp: 1, evs: [[0, 20, "A-5", 64], [20, 8, "G-5", 60], [28, 12, "F-5", 60], [40, 8, "E-5", 58], [48, 16, "D-5", 64]] },
+    { smp: 4, evs: run(0, ["F-5", "D-5", "A-4", "D-5", "F-5", "D-5", "A-4", "D-5", "A-5", "F-5", "C-5", "F-5", "A-5", "F-5", "C-5", "F-5"], 30) },
+    { smp: 3, evs: gallop([["D-2", "D-3"], ["D-2", "D-3"], ["A-2", "A-3"], ["A-2", "A-3"]]) },
+    { smp: 5, evs: [...D([[0, 64], [24, 58], [48, 64]]), ...R([[12, 48], [40, 48], [56, 52]])] },
+  ]);
+  return {
+    title: "THE CROWN ENDURES",
+    samples: [S.horn(58), S.pulse("TRIAD", 44), S.bass(52), S.tri("SPARK", 38), S.drum(64), S.snr(50)],
+    patterns: [f1, f2, f3, f4, m1, m2, m3, b1, b2, r1, r2],
+    order: [0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 4, 6, 4, 5, 4, 6, 7, 8, 7, 8, 9, 10, 9, 10],
+    restart: 8,
+  };
+}
+
+// warm major castle theme (G), harp-style rolls under a flute lead
+function saxonSong(): Song {
+  const s1 = mkPat([
+    { smp: 1, evs: run(0, ["G-3", "B-3", "D-4", "G-4", "B-4", "D-4", "B-3", "G-3"], 44).map(([r, , n, v]) => [r, 7, n, v] as Ev) },
+    { smp: 2, evs: [[0, 24, "B-4", 46], [24, 16, "A-4", 44], [40, 24, "G-4", 46]] },
+    { smp: 3, evs: [[0, 32, "G-2", 46], [32, 32, "D-3", 44]] },
+    { smp: 4, evs: [[0, 63, "D-4", 26]] },
+  ]);
+  const s2 = mkPat([
+    { smp: 1, evs: run(0, ["D-4", "F#-4", "A-4", "D-5", "A-4", "F#-4", "A-4", "D-4"], 44).map(([r, , n, v]) => [r, 7, n, v] as Ev) },
+    { smp: 2, evs: [[0, 24, "D-5", 46], [24, 8, "B-4", 44], [32, 32, "A-4", 44]] },
+    { smp: 3, evs: [[0, 32, "D-2", 46], [32, 32, "A-2", 44]] },
+    { smp: 4, evs: [[0, 63, "F#-3", 26]] },
+  ]);
+  const s3 = mkPat([
+    { smp: 1, evs: run(0, ["E-3", "G-3", "B-3", "E-4", "B-3", "G-3", "B-3", "E-3"], 42).map(([r, , n, v]) => [r, 7, n, v] as Ev) },
+    { smp: 2, evs: [[0, 16, "G-4", 44], [16, 16, "A-4", 44], [32, 16, "B-4", 46], [48, 16, "D-5", 46]] },
+    { smp: 3, evs: [[0, 64, "E-2", 44]] },
+    { smp: 4, evs: [[0, 63, "G-3", 26]] },
+  ]);
+  const s4 = mkPat([
+    { smp: 1, evs: [...run(0, ["D-4", "A-4", "F#-4", "A-4"], 44).map(([r, , n, v]) => [r, 7, n, v] as Ev), ...run(32, ["G-3", "B-3", "D-4", "G-4"], 44).map(([r, , n, v]) => [r, 7, n, v] as Ev)] },
+    { smp: 2, evs: [[0, 16, "C-5", 46], [16, 16, "B-4", 44], [32, 16, "A-4", 44], [48, 16, "G-4", 46]] },
+    { smp: 3, evs: [[0, 16, "D-2", 46], [16, 16, "A-2", 44], [32, 32, "G-2", 46]] },
+    { smp: 4, evs: [[0, 63, "B-3", 26]] },
+  ]);
+  return {
+    title: "SAXON HALL",
+    samples: [S.tri("HARP", 46), S.horn(46), S.bass(46), S.pulse("PAD", 28)],
+    patterns: [s1, s2, s3, s4],
+    order: [0, 1, 2, 3, 0, 1, 2, 3],
+  };
+}
+
+// driving 6/8 combat cue (A minor) for battle reports
+function battleSong(): Song {
+  const ost = (a: string, b: string): Ev[] =>
+    Array.from({ length: 16 }, (_, i) => [i * 4, 3, i % 2 ? b : a, 40] as Ev);
+  const b1 = mkPat([
+    { smp: 1, evs: [[0, 8, "A-4", 56], [8, 8, "C-5", 58], [16, 12, "A-4", 56], [28, 12, "E-5", 60], [40, 16, "D-5", 58], [56, 8, "C-5", 56]] },
+    { smp: 2, evs: ost("A-3", "E-4") },
+    { smp: 3, evs: [[0, 64, "A-2", 48]] },
+    { smp: 4, evs: [...D([[0, 62], [8, 58], [16, 62], [24, 58], [32, 62], [40, 58], [48, 62], [56, 58]]), ...R([[12, 50], [28, 50], [44, 50], [60, 50]])] },
+  ]);
+  const b2 = mkPat([
+    { smp: 1, evs: [[0, 12, "E-5", 60], [12, 8, "G-5", 60], [20, 12, "E-5", 58], [32, 8, "C-5", 56], [40, 12, "D-5", 58], [52, 12, "C-5", 56]] },
+    { smp: 2, evs: ost("G-3", "D-4") },
+    { smp: 3, evs: [[0, 64, "G-2", 48]] },
+    { smp: 4, evs: [...D([[0, 62], [8, 58], [16, 62], [24, 58], [32, 62], [40, 58], [48, 62], [56, 58]]), ...R([[12, 50], [28, 50], [44, 50], [60, 50]])] },
+  ]);
+  const b3 = mkPat([
+    { smp: 1, evs: [[0, 4, "A-5", 62], [4, 4, "G-5", 60], [8, 4, "F-5", 60], [12, 4, "E-5", 58], [16, 4, "D-5", 58], [20, 4, "C-5", 56], [24, 4, "B-4", 54], [28, 36, "A-4", 58]] },
+    { smp: 2, evs: ost("A-3", "E-4") },
+    { smp: 3, evs: [[0, 64, "A-2", 48]] },
+    { smp: 4, evs: [...D([[0, 62], [8, 58], [16, 62], [24, 58]]), ...D([[32, 60], [36, 56], [40, 60], [44, 56], [48, 60], [52, 56], [56, 64], [60, 60]]), ...R([[12, 50], [28, 50]])] },
+  ]);
+  return {
+    title: "TO THE WALLS",
+    samples: [S.horn(58), S.bass(42), S.bass(48), S.drum(64), S.snr(52)],
+    patterns: [b1, b2, b3],
+    order: [0, 1, 0, 2],
+  };
+}
+
+// playful tavern reel (C major) for the minigame rooms
+function minigameSong(): Song {
+  const g1 = mkPat([
+    { smp: 1, evs: [[0, 6, "C-5", 54], [6, 2, "D-5", 50], [8, 8, "E-5", 54], [16, 8, "G-5", 56], [24, 8, "E-5", 54], [32, 8, "C-5", 54], [40, 8, "D-5", 54], [48, 16, "E-5", 56]] },
+    { smp: 2, evs: [[0, 3, "C-2", 48], [4, 3, "G-3", 42], [8, 3, "C-2", 48], [12, 3, "E-3", 42], [16, 3, "C-2", 48], [20, 3, "G-3", 42], [24, 3, "E-2", 48], [28, 3, "G-3", 42], [32, 3, "C-2", 48], [36, 3, "G-3", 42], [40, 3, "C-2", 48], [44, 3, "E-3", 42], [48, 3, "A-2", 48], [52, 3, "G-3", 42], [56, 3, "G-2", 48], [60, 3, "D-3", 42]] },
+    { smp: 4, evs: [...D([[0, 52], [16, 48], [32, 52], [48, 48]]), ...Hh([[8, 34], [24, 34], [40, 34], [56, 34]])] },
+    null,
+  ]);
+  const g2 = mkPat([
+    { smp: 1, evs: [[0, 6, "F-5", 56], [6, 2, "E-5", 50], [8, 8, "D-5", 54], [16, 8, "C-5", 52], [24, 8, "G-4", 50], [32, 8, "B-4", 52], [40, 8, "D-5", 54], [48, 16, "G-5", 56]] },
+    { smp: 2, evs: [[0, 3, "F-2", 48], [4, 3, "C-3", 42], [8, 3, "F-2", 48], [12, 3, "A-3", 42], [16, 3, "C-2", 48], [20, 3, "G-3", 42], [24, 3, "C-2", 48], [28, 3, "E-3", 42], [32, 3, "G-2", 48], [36, 3, "B-3", 42], [40, 3, "G-2", 48], [44, 3, "D-3", 42], [48, 3, "G-2", 48], [52, 3, "B-3", 42], [56, 3, "G-2", 48], [60, 3, "D-3", 42]] },
+    { smp: 4, evs: [...D([[0, 52], [16, 48], [32, 52], [48, 48]]), ...Hh([[8, 34], [24, 34], [40, 34], [56, 34]])] },
+    null,
+  ]);
+  const g3 = mkPat([
+    { smp: 1, evs: [[0, 4, "C-6", 58], [4, 4, "G-5", 56], [8, 4, "E-5", 54], [12, 4, "C-5", 52], [16, 8, "D-5", 54], [24, 8, "E-5", 54], [32, 16, "G-5", 56], [48, 12, "C-6", 60]] },
+    { smp: 2, evs: [[0, 3, "C-2", 48], [4, 3, "G-3", 42], [8, 3, "C-2", 48], [12, 3, "E-3", 42], [16, 3, "F-2", 48], [20, 3, "C-3", 42], [24, 3, "F-2", 48], [28, 3, "A-3", 42], [32, 3, "G-2", 48], [36, 3, "B-3", 42], [40, 3, "G-2", 48], [44, 3, "D-3", 42], [48, 3, "C-2", 52], [52, 3, "G-3", 44], [56, 3, "C-3", 52]] },
+    { smp: 4, evs: [...D([[0, 52], [16, 48], [32, 52], [48, 56]])] },
+    null,
+  ]);
+  return {
+    title: "TAVERN REEL",
+    samples: [S.horn(52), S.bass(46), S.tri("WIPE", 30), S.drum(54), S.hat(38)],
+    patterns: [g1, g2, g3],
+    order: [0, 1, 0, 2],
+  };
+}
+
+// 6-bar victory stinger: drum crack, triumphant D arpeggio, held high D
+function victorySong(): Song {
+  const v1 = mkPat([
+    { smp: 1, evs: [...roll(0, 4, ["D-4", "A-4", "D-5"], 62), [24, 40, "F#-5", 62]] },
+    { smp: 2, evs: run(0, ["D-3", "A-3", "D-4", "F#-4", "A-4", "F#-4", "D-4", "A-3"], 46).map(([r, , n, v]) => [r, 7, n, v] as Ev) },
+    { smp: 3, evs: [[0, 32, "D-2", 54], [32, 32, "A-2", 52]] },
+    { smp: 4, evs: [...D([[0, 64], [8, 56], [16, 60], [24, 56], [32, 62], [48, 60]]), ...R([[40, 52], [56, 52]])] },
+  ]);
+  const v2 = mkPat([
+    { smp: 1, evs: [[0, 32, "A-5", 64], [32, 24, "B-5", 62], [56, 8, "A-5", 60]] },
+    { smp: 2, evs: run(0, ["F#-3", "D-4", "F#-4", "A-4", "F#-4", "D-4", "F#-4", "A-4"], 46).map(([r, , n, v]) => [r, 7, n, v] as Ev) },
+    { smp: 3, evs: [[0, 64, "D-2", 54]] },
+    { smp: 4, evs: [...D([[0, 58], [16, 58], [32, 58], [48, 58]]), ...R([[12, 48], [28, 48], [44, 48], [60, 48]])] },
+  ]);
+  const v3 = mkPat([
+    { smp: 1, evs: [[0, 48, "D-6", 64]] },
+    { smp: 2, evs: run(0, ["D-4", "F#-4", "A-4", "D-5", "A-4", "F#-4", "D-4", "F#-4"], 44).map(([r, , n, v]) => [r, 7, n, v] as Ev) },
+    { smp: 3, evs: [[0, 48, "D-2", 56]] },
+    { smp: 4, evs: [...D([[0, 64], [32, 56]]), [48, 1, "C-2", 64], [56, 1, "C-2", 52]] },
+  ]);
+  return {
+    title: "CROWN CLAIMED",
+    samples: [S.horn(60), S.pulse("TRIAD", 46), S.bass(54), S.drum(64), S.snr(50)],
+    patterns: [v1, v2, v3],
+    order: [0, 1, 2, 0, 1, 2],
+  };
+}
+
+// 6-bar defeat stinger: tolling drum, descending D-minor lament
+function defeatSong(): Song {
+  const lamen = (note: string, vol: number): Pattern =>
+    mkPat([
+      { smp: 1, evs: [[0, 56, note, vol]] },
+      { smp: 2, evs: [[0, 62, "A-3", 26]] },
+      { smp: 3, evs: [[0, 63, "D-2", 40]] },
+      { smp: 4, evs: D([[0, 60]]) },
+    ]);
+  const last = mkPat([
+    { smp: 1, evs: [[0, 40, "A-3", 38]] },
+    { smp: 2, evs: [[0, 62, "F-3", 24]] },
+    { smp: 3, evs: [[0, 63, "D-2", 36]] },
+    { smp: 4, evs: [...D([[0, 58]]), [48, 1, "C-2", 44]] },
+  ]);
+  return {
+    title: "THE CROWN FALLS",
+    samples: [S.horn(44), S.pulse("PAD", 28), S.bass(42), S.drum(60)],
+    patterns: [lamen("D-4", 50), lamen("C-4", 46), lamen("A#-3", 42), last],
+    order: [0, 0, 1, 2, 3, 3],
+  };
+}
+
 // ---------------------------------------------------------------- cli
+const SONGS: Record<string, () => Song> = {
+  demo: demoSong,
+  tone: toneSong,
+  norman: normanSong,
+  title: titleSong,
+  saxon: saxonSong,
+  battle: battleSong,
+  minigame: minigameSong,
+  victory: victorySong,
+  defeat: defeatSong,
+};
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  const out = args[0] ?? "/tmp/test.mod";
-  const song = args.includes("norman")
-    ? normanSong()
-    : args.includes("tone")
-      ? toneSong()
-      : demoSong();
-  const buf = buildMod(song);
-  await Bun.write(out, buf);
-  const back = readMod(buf);
-  const n = back.cell(back.order[0], 0, 0);
-  console.log(`wrote ${out} (${buf.length} bytes) tag=${back.tag} songLen=${back.songLen} firstCell=${JSON.stringify(n)}`);
+  if (args[0] === "all") {
+    for (const [name, make] of Object.entries(SONGS)) {
+      if (name === "demo" || name === "tone") continue;
+      const song = make();
+      const buf = buildMod(song);
+      const dest = `assets/music/${name}.mod`;
+      await Bun.write(dest, buf);
+      console.log(`${dest}: ${buf.length} bytes "${song.title}" order=${song.order.length} restart=${song.restart ?? "-"}`);
+    }
+  } else {
+    const out = args[0] ?? "/tmp/test.mod";
+    const which = Object.keys(SONGS).find((k) => args.includes(k)) ?? "demo";
+    const buf = buildMod(SONGS[which]());
+    await Bun.write(out, buf);
+    const back = readMod(buf);
+    const n = back.cell(back.order[0], 0, 0);
+    console.log(`wrote ${out} (${buf.length} bytes) tag=${back.tag} songLen=${back.songLen} firstCell=${JSON.stringify(n)}`);
+  }
 }
+

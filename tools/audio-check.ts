@@ -57,7 +57,7 @@ try {
     return v;
   };
 
-  await page.goto(`${BASE}/?scene=test`);
+  await page.goto(`${BASE}/`); // production boot: title.mod overture (T402)
   await page.waitForFunction(() => document.visibilityState === "visible");
   await page.waitForTimeout(400); // wasm boot + first frames
 

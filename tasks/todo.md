@@ -133,14 +133,21 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 4 — Title & music (T4xx)
 
-- [ ] **T401 Compose full tracks**: `title.mod` (fanfare+overture+loop),
+- [x] **T401 Compose full tracks**: `title.mod` (fanfare+overture+loop),
   `saxon.mod`, `norman.mod`, `battle.mod`, `minigame.mod`, `victory.mod`,
   `defeat.mod` via compose.ts; decode-check all in cargo test; sizes in
-  budget.
-- [ ] **T402 Boot herald + press-to-begin**: black→banner unfurl anim,
+  budget. **2026-11-14:** `tests/tracks.rs` decodes all 7, title carries the
+  A-section restart byte; 7×~17 KiB ≤ 128 KiB budget.
+- [x] **T402 Boot herald + press-to-begin**: black→banner unfurl anim,
   gesture unlocks audio, fanfare starts ≤0.5 s; screenshot + RMS proof.
-- [ ] **T403 Title card + menu**: animated crown/banners/flames, name lettering,
+  **2026-11-14:** banner unfurl + PRESS-ANY-KEY, first gesture swallowed for
+  unlock; audio-check on `/` green: silent pre-gesture, worklet attach, RMS
+  0.43 in first window after tap, M mute+persist, reload keeps state.
+- [x] **T403 Title card + menu**: animated crown/banners/flames, name lettering,
   4 menu entries w/ keyboard+mouse nav; screenshot; loop into A-section.
+  **2026-11-14:** flame border, bobbing crown, flanking banners; arrows/Enter
+  + click nav, HowTo 3 pages, Hall of Fame (empty + persisted entries),
+  OPTIONS sound toggle round-trips `doc.mute`; screenshots in /tmp/crown-title.
 - [ ] **T404 Difficulty + intro crawl**: EASY/NORMAL/HARD pick → 3-screen
   pixel crawl → campaign; screenshot.
 - [ ] **T405 How-to pages + options**: illustrated pixel how-to (3 pages),

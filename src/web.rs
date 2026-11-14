@@ -84,13 +84,30 @@ struct Ctx {
     music: Rc<RefCell<Music>>,
     audio: AudioState,
 }
+
+/// T401: named music beds. "title" loops back to its march section
+/// (restart byte), so the fanfare only plays on first entry.
+const TRACKS: &[(&str, &[u8])] = &[
+    ("title", include_bytes!("../assets/music/title.mod")),
+    ("saxon", include_bytes!("../assets/music/saxon.mod")),
+    ("battle", include_bytes!("../assets/music/battle.mod")),
+    ("minigame", include_bytes!("../assets/music/minigame.mod")),
+    ("victory", include_bytes!("../assets/music/victory.mod")),
+    ("defeat", include_bytes!("../assets/music/defeat.mod")),
+];
+
 impl AppCtx for Ctx {
     fn mute(&self) -> bool {
         self.muted.get()
     }
+    fn set_mute(&mut self, muted: bool) {
+        self.muted.set(muted);
+        ls_set("doc.mute", if muted { "1" } else { "0" });
+    }
     fn play_music(&mut self, track: Option<&'static str>) {
         let p = track
-            .and_then(|_| Mod::parse(include_bytes!("../assets/music/test.mod")).ok())
+            .and_then(|t| TRACKS.iter().find(|(n, _)| *n == t))
+            .and_then(|(_, bytes)| Mod::parse(bytes).ok())
             .map(Player::new);
         self.music.borrow_mut().set_track(p);
     }
@@ -101,6 +118,17 @@ impl AppCtx for Ctx {
         if let Ok(m) = Mod::parse(track) {
             self.music.borrow_mut().sting(Player::new(m).once());
         }
+    }
+    fn record_feat(&mut self, feat: &str) {
+        let old = ls_get("doc.hof").unwrap_or_default();
+        let mut entries: Vec<String> = old
+            .split(';')
+            .filter(|e| !e.is_empty())
+            .map(String::from)
+            .collect();
+        entries.insert(0, feat.to_string());
+        entries.truncate(5);
+        ls_set("doc.hof", &entries.join(";"));
     }
 }
 
@@ -530,63 +558,419 @@ impl Scene for DemoScene {
     }
 }
 
-/// Entry scene: title card with a difficulty pick; tapping a banner (or
-/// anywhere else - Normal) dissolves into the campaign.
+/// Entry sequence (T402/T403): black screen + unfurling heraldic banner,
+/// then an animated title card with a real menu: campaign start (difficulty
+/// pick), how-to pages, hall of fame, sound options. Mouse/keyboard equal.
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum Stage {
+    Boot,
+    Menu,
+    Difficulty,
+    HowTo,
+    Fame,
+    Options,
+}
+
 pub struct TitleScene {
     ticks: u32,
     touched: bool,
+    stage: Stage,
+    item: usize, // menu/difficulty highlight (keyboard)
+    page: usize, // how-to page
+    pending: Option<usize>, // activation deferred to tick (needs AppCtx)
+    sound: bool, // OPTIONS mirror of the persisted mute flag
 }
+
+impl TitleScene {
+    pub fn new() -> Self {
+        Self {
+            ticks: 0,
+            touched: false,
+            stage: Stage::Boot,
+            item: 0,
+            page: 0,
+            pending: None,
+            sound: initial_sound(),
+        }
+    }
+}
+
+/// Persisted mute flag inverted: OPTIONS opens showing the stored truth.
+fn initial_sound() -> bool {
+    match ls_get("doc.mute").as_deref() {
+        Some("1") => false,
+        Some("0") => true,
+        _ => !query_has("mute=1"),
+        }
+    }
+
+const MENU: [&str; 4] = ["BEGIN CAMPAIGN", "HOW TO PLAY", "HALL OF FAME", "OPTIONS"];
+const HOWTO: [(&str, [&str; 5]); 3] = [
+    (
+        "THE LIBERATION",
+        [
+            "CLICK A SAXON KEEP TO SELECT IT",
+            "GOLD BUYS LEVIES IN THE PANEL",
+            "DRAG AN ARMY TO AN ADJACENT KEEP",
+            "END TURN SUMMONS THE NEXT MARCH",
+            "OMENS WARN OF NORMAN PLANS",
+        ],
+    ),
+    (
+        "WAR AND WIT",
+        [
+            "WALLS FAVOR THE DEFENDER",
+            "A LOST KEEP MEANS LOST TROOPS",
+            "SPIES PIERCE THE FOG OF WAR",
+            "TOURNAMENTS BRING GOLD AND FAME",
+            "HUNGER WASTES IDLE ARMIES",
+        ],
+    ),
+    (
+        "VICTORY AND DEFEAT",
+        [
+            "RAZE EVERY NORMAN GARRISON",
+            "HOLD EVERY SAXON HEARTH",
+            "THE CHRONICLE ENDS AT TOTAL",
+            "VICTORY OR TOTAL DEFEAT -",
+            "NEVER AT A DRAW",
+        ],
+    ),
+];
 
 fn diff_rect(i: usize) -> (i32, i32, u32, u32) {
-    (46 + i as i32 * 80, 170, 72, 14)
+    (46 + i as i32 * 80, 178, 72, 14)
+}
+const DIFF_NAMES: [&str; 3] = ["EASY", "NORMAL", "HARD"];
+fn menu_rect(i: usize) -> (i32, i32, u32, u32) {
+    (100, 118 + i as i32 * 17, 120, 13)
+}
+fn in_rect(r: (i32, i32, u32, u32), x: i32, y: i32) -> bool {
+    x >= r.0 && x < r.0 + r.2 as i32 && y >= r.1 && y < r.1 + r.3 as i32
+}
+fn back_rect() -> (i32, i32, u32, u32) {
+    (134, 226, 52, 14)
 }
 
-const DIFF_NAMES: [&str; 3] = ["EASY", "NORMAL", "HARD"];
-
-impl Scene for TitleScene {
-    fn event(&mut self, ev: &SceneEvent) {
-        match ev {
-            SceneEvent::Tap { x, y } => {
-                for (i, d) in [0u8, 1, 2].iter().enumerate() {
-                    let (dx, dy, dw, dh) = diff_rect(i);
-                    if *x >= dx && *x < dx + dw as i32 && *y >= dy && *y < dy + dh as i32 {
-                        PICK.store(*d, std::sync::atomic::Ordering::Relaxed);
+/// `s` in `sc`-scaled 8x8 bitmap caps with offset shadow.
+fn draw_caps(fb: &mut Framebuffer, x: i32, y: i32, s: &str, fg: u8, sh: u8, sc: u32) {
+    for (col, ox) in [(sh, sc as i32), (fg, 0)].into_iter() {
+        let mut cx = x + ox;
+        for ch in s.chars() {
+            for (r, bits) in crate::engine::fonts::glyph(ch).iter().enumerate() {
+                for c in 0..8u32 {
+                    if bits & (0x80 >> c) != 0 {
+                        fb.fill_rect(
+                            cx + c as i32 * sc as i32,
+                            y + ox + r as i32 * sc as i32,
+                            sc,
+                            sc,
+                            col,
+                        );
                     }
                 }
+            }
+            cx += 8 * sc as i32;
+        }
+    }
+}
+
+impl TitleScene {
+    fn activate(&mut self, i: usize, app: &mut dyn AppCtx) {
+        match self.stage {
+            Stage::Menu => {
+                self.stage = match i {
+                    0 => Stage::Difficulty,
+                    1 => {
+                        self.page = 0;
+                        Stage::HowTo
+                    }
+                    2 => Stage::Fame,
+                    _ => Stage::Options,
+                };
+                self.item = 0;
+            }
+            Stage::Difficulty => {
+                PICK.store(i as u8, std::sync::atomic::Ordering::Relaxed);
                 self.touched = true;
             }
-            SceneEvent::Key { pressed: true, .. } => {
-                self.touched = true;
+            Stage::Options => {
+                app.set_mute(!app.mute());
+                self.sound = !app.mute();
             }
             _ => {}
         }
     }
-    fn tick(&mut self, _app: &mut dyn AppCtx) {
-        self.ticks += 1;
+    fn back(&mut self) {
+        self.stage = Stage::Menu;
+        self.item = 0;
     }
-    fn draw(&mut self, fb: &mut Framebuffer) {
-        fb.clear(NAVY);
-        fb.gradient_v(0, 90, W, 40, SAXON_BLUE, BLOOD);
-        fb.fill_rect(0, 128, W, 2, GOLD);
-        draw_text_shadow(fb, 60, 56, "THE CROWN ENDURES", YELLOW, DARKGRAY);
-        draw_text_shadow(fb, 84, 120, "A SAXON LIBERATION", WHITE, DARKGRAY);
-        draw_text_shadow(fb, 115, 156, "CHOOSE YOUR FOE", GRAY, DARKGRAY);
-        for i in 0..3 {
-            let (dx, dy, dw, dh) = diff_rect(i);
-            fb.fill_rect(dx, dy, dw, dh, BLOOD);
-            fb.rect(dx, dy, dw, dh, GOLD);
-            let n = DIFF_NAMES[i];
-            draw_text_shadow(
-                fb,
-                dx + (dw as i32 - n.len() as i32 * 6) / 2,
-                dy + 4,
-                n,
-                WHITE,
-                BLACK,
+    /// Flame-licked border: 2px cycling fire on all four edges.
+    fn draw_flames(&self, fb: &mut Framebuffer) {
+        let pal = [BLOOD, GOLD, YELLOW];
+        for x in (0..W as i32).step_by(2) {
+            fb.fill_rect(x, 0, 2, 2, pal[((x / 3 + self.ticks as i32 / 2) as usize) % 3]);
+            fb.fill_rect(
+                x,
+                H as i32 - 2,
+                2,
+                2,
+                pal[((x / 5 + self.ticks as i32 / 3) as usize) % 3],
             );
         }
-        if self.ticks / 20 % 2 == 0 {
-            draw_text_shadow(fb, 85, 196, "OR PRESS A KEY FOR NORMAL", WHITE, DARKGRAY);
+        for y in (0..H as i32).step_by(2) {
+            fb.fill_rect(0, y, 2, 2, pal[((y / 3 + self.ticks as i32 / 2) as usize) % 3]);
+            fb.fill_rect(
+                W as i32 - 2,
+                y,
+                2,
+                2,
+                pal[((y / 5 + self.ticks as i32 / 3) as usize) % 3],
+            );
+        }
+    }
+    fn draw_back(&self, fb: &mut Framebuffer) {
+        let r = back_rect();
+        fb.fill_rect(r.0, r.1, r.2, r.3, BLOOD);
+        fb.rect(r.0, r.1, r.2, r.3, GOLD);
+        draw_text_shadow(fb, r.0 + 13, r.1 + 4, "BACK", WHITE, BLACK);
+    }
+    fn draw_nav(&self, fb: &mut Framebuffer) {
+        for (x, t) in [(12, "<"), (264, ">")] {
+            fb.fill_rect(x, 226, 44, 14, BLOOD);
+            fb.rect(x, 226, 44, 14, GOLD);
+            draw_text_shadow(fb, x + 19, 230, t, WHITE, BLACK);
+        }
+        self.draw_back(fb);
+    }
+    fn draw_fame(&self, fb: &mut Framebuffer) {
+        fb.fill_rect(16, 96, 288, 116, BLACK);
+        fb.rect(16, 96, 288, 116, GOLD);
+        draw_text_shadow(fb, 100, 104, "HALL OF FAME", GOLD, BLACK);
+        match ls_get("doc.hof") {
+            Some(s) if !s.is_empty() => {
+                for (i, e) in s.split(';').take(5).enumerate() {
+                    draw_text_shadow(fb, 28, 124 + i as i32 * 14, e, WHITE, BLACK);
+                }
+            }
+            _ => {
+                draw_text_shadow(fb, 64, 130, "NO FEATS RECORDED - WIN A WAR", GRAY, BLACK);
+            }
+        }
+        self.draw_back(fb);
+    }
+}
+
+impl Scene for TitleScene {
+    fn event(&mut self, ev: &SceneEvent) {
+        // The boot herald swallows the very first gesture (it also unlocks
+        // audio one tick later in the app loop).
+        if self.stage == Stage::Boot {
+            if matches!(ev, SceneEvent::Tap { .. } | SceneEvent::Key { pressed: true, .. }) {
+                self.stage = Stage::Menu;
+            }
+            return;
+        }
+        match ev {
+            SceneEvent::Tap { x, y } => {
+                let (x, y) = (*x, *y);
+                match self.stage {
+                    Stage::Menu => {
+                        for i in 0..MENU.len() {
+                            if in_rect(menu_rect(i), x, y) {
+                                self.item = i;
+                                self.pending = Some(i);
+                            }
+                        }
+                    }
+                    Stage::Difficulty => {
+                        for i in 0..3 {
+                            if in_rect(diff_rect(i), x, y) {
+                                PICK.store(i as u8, std::sync::atomic::Ordering::Relaxed);
+                                self.touched = true;
+                            }
+                        }
+                        if in_rect(back_rect(), x, y) {
+                            self.back();
+                        }
+                    }
+                    Stage::HowTo => {
+                        if in_rect((12, 226, 44, 14), x, y) {
+                            self.page = self.page.saturating_sub(1);
+                        }
+                        if in_rect((264, 226, 44, 14), x, y) {
+                            self.page = (self.page + 1).min(HOWTO.len() - 1);
+                        }
+                        if in_rect(back_rect(), x, y) {
+                            self.back();
+                        }
+                    }
+                    Stage::Fame => {
+                        if in_rect(back_rect(), x, y) {
+                            self.back();
+                        }
+                    }
+                    Stage::Options => {
+                        if in_rect((100, 118, 120, 14), x, y) {
+                            self.pending = Some(0);
+                        }
+                        if in_rect(back_rect(), x, y) {
+                            self.back();
+                        }
+                    }
+                    Stage::Boot => {}
+                }
+            }
+            SceneEvent::Key {
+                code,
+                pressed: true,
+            } => {
+                let n = match self.stage {
+                    Stage::Menu => MENU.len(),
+                    Stage::Difficulty => 3,
+                    Stage::Options => 1,
+                    _ => 0,
+                };
+                match *code {
+                    KEY_UP if n > 0 => self.item = (self.item + n - 1) % n,
+                    KEY_DOWN if n > 0 => self.item = (self.item + 1) % n,
+                    KEY_LEFT if self.stage == Stage::HowTo => {
+                        self.page = self.page.saturating_sub(1)
+                    }
+                    KEY_RIGHT if self.stage == Stage::HowTo => {
+                        self.page = (self.page + 1).min(HOWTO.len() - 1)
+                    }
+                    KEY_ENTER | KEY_SPACE if self.stage == Stage::HowTo => {
+                        if self.page + 1 >= HOWTO.len() {
+                            self.back();
+                        } else {
+                            self.page += 1;
+                        }
+                    }
+                    KEY_ENTER | KEY_SPACE if n > 0 => {
+                        // deferred: tick() picks it up (needs &mut AppCtx)
+                        self.pending = Some(self.item);
+                    }
+                    KEY_ESC if self.stage != Stage::Menu => self.back(),
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    fn tick(&mut self, app: &mut dyn AppCtx) {
+        self.ticks += 1;
+        if let Some(i) = self.pending.take() {
+            self.activate(i, app);
+        }
+    }
+    fn draw(&mut self, fb: &mut Framebuffer) {
+        if self.stage == Stage::Boot {
+            // heraldic banner unfurls from the top over 30 frames (T402)
+            fb.clear(BLACK);
+            let h = (self.ticks * 4).min(120);
+            fb.fill_rect(132, 12, 56, h, BLOOD);
+            fb.fill_rect(134, 12, 52, h, SAXON_BLUE);
+            if h >= 24 {
+                fb.fill_rect(138, 116, 44, 8, GOLD);
+            }
+            if h >= 90 {
+                fb.fill_rect(146, 44, 28, 10, GOLD);
+                for px in [146, 158, 170] {
+                    fb.fill_rect(px, 38, 4, 6, GOLD);
+                }
+                fb.fill_rect(152, 46, 4, 4, BLOOD);
+                fb.fill_rect(164, 46, 4, 4, BLOOD);
+            }
+            if self.ticks > 44 && self.ticks % 40 < 26 {
+                draw_text_shadow(fb, 68, 190, "PRESS ANY KEY - SOUND ON", WHITE, BLACK);
+            }
+            return;
+        }
+        fb.clear(NAVY);
+        fb.gradient_v(0, 84, W, 126, SAXON_BLUE, NAVY);
+        self.draw_flames(fb);
+        // side banners flanking the menu panel, clear of the lettering
+        for (bx, col) in [(40, BLOOD), (268, SAXON_BLUE)] {
+            fb.rect(bx - 1, 99, 14, 78, BLACK);
+            fb.fill_rect(bx, 100, 12, 76, col);
+            fb.fill_rect(bx + 5, 100, 2, 76, GOLD);
+            fb.fill_rect(bx, 126, 12, 2, GOLD);
+        }
+        // bobbing crown above the name
+        let bob = (self.ticks / 20 % 2) as i32;
+        fb.fill_rect(144, 30 + bob, 32, 6, GOLD);
+        for px in [144, 158, 172] {
+            fb.fill_rect(px, 24 + bob, 4, 6, GOLD);
+        }
+        fb.fill_rect(150, 32 + bob, 3, 3, BLOOD);
+        fb.fill_rect(159, 32 + bob, 3, 3, SAXON_BLUE);
+        fb.fill_rect(168, 32 + bob, 3, 3, BLOOD);
+        draw_caps(fb, 24, 44, "THE CROWN ENDURES", YELLOW, BLOOD, 2);
+        draw_text_shadow(fb, 63, 66, "A SAXON LIBERATION", WHITE, DARKGRAY);
+        match self.stage {
+            Stage::Menu => {
+                fb.fill_rect(96, 112, 128, 84, NAVY);
+                for i in 0..MENU.len() {
+                    let r = menu_rect(i);
+                    let hi = self.item == i;
+                    fb.fill_rect(r.0, r.1, r.2, r.3, if hi { BLOOD } else { NAVY });
+                    fb.rect(r.0, r.1, r.2, r.3, if hi { GOLD } else { DARKGRAY });
+                    let t = MENU[i];
+                    draw_text_shadow(
+                        fb,
+                        r.0 + (r.2 as i32 - t.len() as i32 * 6) / 2,
+                        r.1 + 3,
+                        t,
+                        if hi { WHITE } else { GRAY },
+                        BLACK,
+                    );
+                }
+            }
+            Stage::Difficulty => {
+                draw_text_shadow(fb, 108, 162, "CHOOSE YOUR FOE", GOLD, BLACK);
+                for i in 0..3 {
+                    let r = diff_rect(i);
+                    let hi = self.item == i;
+                    fb.fill_rect(r.0, r.1, r.2, r.3, if hi { GOLD } else { BLOOD });
+                    fb.rect(r.0, r.1, r.2, r.3, GOLD);
+                    let n = DIFF_NAMES[i];
+                    draw_text_shadow(
+                        fb,
+                        r.0 + (r.2 as i32 - n.len() as i32 * 6) / 2,
+                        r.1 + 4,
+                        n,
+                        if hi { BLACK } else { WHITE },
+                        BLACK,
+                    );
+                }
+                draw_text_shadow(fb, 66, 200, "ENTER CHOOSES - ESC GOES BACK", GRAY, BLACK);
+                self.draw_back(fb);
+            }
+            Stage::HowTo => {
+                let (head, lines) = HOWTO[self.page];
+                fb.fill_rect(16, 96, 288, 116, BLACK);
+                fb.rect(16, 96, 288, 116, GOLD);
+                let hx = (W as i32 - head.len() as i32 * 6) / 2;
+                draw_text_shadow(fb, hx, 104, head, GOLD, BLACK);
+                for (i, l) in lines.iter().enumerate() {
+                    let lx = (W as i32 - l.len() as i32 * 6) / 2;
+                    draw_text_shadow(fb, lx, 126 + i as i32 * 13, l, WHITE, BLACK);
+                }
+                let pg = format!("{}/{}", self.page + 1, HOWTO.len());
+                draw_text_shadow(fb, 152, 196, &pg, GRAY, BLACK);
+                self.draw_nav(fb);
+            }
+            Stage::Fame => self.draw_fame(fb),
+            Stage::Options => {
+                let t = format!("SOUND: {}", if self.sound { "ON" } else { "OFF" });
+                fb.fill_rect(100, 118, 120, 14, if self.item == 0 { BLOOD } else { NAVY });
+                fb.rect(100, 118, 120, 14, GOLD);
+                draw_text_shadow(fb, 118, 121, &t, WHITE, BLACK);
+                draw_text_shadow(fb, 78, 146, "M TOGGLES THE SOUND ANYTIME", GRAY, BLACK);
+                self.draw_back(fb);
+            }
+            _ => {}
         }
         draw_text_shadow(fb, 4, 246, "RUST + WASM + 320X256", DARKGRAY, BLACK);
     }
@@ -623,7 +1007,9 @@ pub fn main() -> Result<(), JsValue> {
         _ => query_has("mute=1"),
     }));
     let music = Rc::new(RefCell::new(Music::new()));
-    if let Ok(m) = Mod::parse(include_bytes!("../assets/music/test.mod")) {
+    // T402: the overture is queued pre-gesture but silent; the first click or
+    // key unlocks the AudioContext and the fanfare starts from bar one.
+    if let Ok(m) = Mod::parse(TRACKS[0].1) {
         music.borrow_mut().set_track(Some(Player::new(m)));
     }
     let audio = AudioState {
@@ -652,10 +1038,7 @@ pub fn main() -> Result<(), JsValue> {
     } else if want_play {
         Box::new(PlayScene::new(play_seed, play_diff))
     } else {
-        Box::new(TitleScene {
-            ticks: 0,
-            touched: false,
-        })
+        Box::new(TitleScene::new())
     };
     let app = App {
         fb: Framebuffer::new(),

@@ -232,6 +232,9 @@ pub const AI_ANIM_TICKS: u32 = 60;
 
 /// The Norman turn-call, played once per AI dawn (T308).
 pub const NORMAN_STING: &[u8] = include_bytes!("../../assets/music/norman.mod");
+/// T401 endgame one-shots (played instead of the looping bed).
+pub const VICTORY_MOD: &[u8] = include_bytes!("../../assets/music/victory.mod");
+pub const DEFEAT_MOD: &[u8] = include_bytes!("../../assets/music/defeat.mod");
 
 /// The whole in-game screen: map, panel, HUD, endgame overlay.
 pub struct CampaignUi {
@@ -1047,17 +1050,24 @@ fn draw_line(
 /// Thin adapter so the campaign screen rides the engine's `SceneStack`.
 pub struct PlayScene {
     pub ui: CampaignUi,
+    battle: bool,  // battle.mod bed while the report overlay is open
+    endgame: bool, // victory/defeat stinger fired exactly once
 }
 
 impl PlayScene {
     pub fn new(seed: u64, difficulty: Difficulty) -> Self {
         Self {
             ui: CampaignUi::new(seed, difficulty),
+            battle: false,
+            endgame: false,
         }
     }
 }
 
 impl crate::engine::scene::Scene for PlayScene {
+    fn init(&mut self, app: &mut dyn crate::engine::scene::AppCtx) {
+        app.play_music(Some("saxon"));
+    }
     fn event(&mut self, ev: &SceneEvent) {
         self.ui.event(ev, true);
     }
@@ -1067,6 +1077,23 @@ impl crate::engine::scene::Scene for PlayScene {
             // the Norman war-horn calls across the channel (T308)
             self.ui.sting_armed = false;
             app.sting(NORMAN_STING);
+        }
+        // battle.mod drives the report overlay, then the hall theme returns
+        if self.ui.report_open != self.battle {
+            self.battle = self.ui.report_open;
+            app.play_music(Some(if self.battle { "battle" } else { "saxon" }));
+        }
+        if !self.endgame {
+            if let Some(winner) = self.ui.g.over {
+                self.endgame = true;
+                app.play_music(None);
+                app.sting(if winner == PLAYER { VICTORY_MOD } else { DEFEAT_MOD });
+                app.record_feat(&format!(
+                    "{} - TURN {}",
+                    if winner == PLAYER { "CROWNED" } else { "CROWN LOST" },
+                    self.ui.g.turn
+                ));
+            }
         }
     }
     fn draw(&mut self, fb: &mut crate::engine::gfx::Framebuffer) {

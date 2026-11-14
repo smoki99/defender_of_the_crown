@@ -36,6 +36,8 @@ pub struct Mod {
     pub patterns: Vec<Vec<[Cell; 4]>>,
     pub order: Vec<u8>,
     pub song_len: usize,
+    /// Pattern index the song loops back to (T401 restart byte); 0 = from top.
+    pub restart: usize,
 }
 
 impl Mod {
@@ -60,6 +62,7 @@ impl Mod {
             pcm_sizes.push(len_words * 2);
         }
         let song_len = bytes[950] as usize;
+        let restart = if bytes[951] < 127 { bytes[951] as usize } else { 0 };
         if song_len == 0 || song_len > 128 {
             return Err("bad song length".into());
         }
@@ -101,6 +104,7 @@ impl Mod {
             patterns,
             order,
             song_len,
+            restart: if restart < song_len { restart } else { 0 },
         })
     }
 }
@@ -272,8 +276,9 @@ impl Player {
                 if self.once && self.pos >= self.m.song_len {
                     self.done = true;
                     self.pos = self.m.song_len - 1;
-                } else {
-                    self.pos %= self.m.song_len.max(1); // v1: loop forever
+                } else if self.pos >= self.m.song_len {
+                    // T401: loop back to the restart pattern (0 = from top)
+                    self.pos = self.m.restart;
                 }
             }
         }

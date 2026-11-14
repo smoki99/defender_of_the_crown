@@ -14,12 +14,16 @@ use crate::engine::input::{Dir, Gesture, Input};
 /// Minimal shared services handed to a scene on `init`.
 pub trait AppCtx {
     fn mute(&self) -> bool;
+    /// Persisted mute flag (title OPTIONS); default: no-op.
+    fn set_mute(&mut self, _muted: bool) {}
     fn play_music(&mut self, track: Option<&'static str>);
     fn sfx(&mut self, kind: crate::engine::audio::Sfx);
     /// One-shot sting from a .MOD payload (T308); default: silence.
     fn sting(&mut self, track: &'static [u8]) {
         let _ = track;
     }
+    /// Chronicle a finished run into the (persisted) hall of fame (T403).
+    fn record_feat(&mut self, _feat: &str) {}
 }
 
 /// Semantic events scenes receive (raw input already transformed).
