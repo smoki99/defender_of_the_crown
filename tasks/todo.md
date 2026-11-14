@@ -210,7 +210,9 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [x] **T605 mg-cloak**: 5 cells, sight cones, alarm-bell escalation.
   **2026-11-14:** GOLD scripted (prediction-gated safe steps); deep-link +
   baseline frames green. See progress.md.
-- [ ] **T606 mg-forge**: 3-tempo rhythm hammering, sword-quality tiers.
+- [x] **T606 mg-forge**: 3-tempo rhythm hammering, sword-quality tiers.
+  **2026-11-14:** GOLD 95 scripted (all-perfect clean chain); live Chromium
+  play smoke. See progress.md.
 - [ ] **Checkpoint P6**: 9 games in registry; batch soak: autoplay each ×3;
   suite + clippy green.
 

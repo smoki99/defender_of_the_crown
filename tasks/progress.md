@@ -379,6 +379,24 @@ herald's cry is public knowledge.
   errors; title regression unharmed. Full cargo suite green, clippy 0
   warnings (6 own hits fixed), wasm32 check green, 507 KB bundle rebuilt.
   (2026-11-14)
+
+- T606 - mg-forge (commit ed38270): RHYTHM in the SMITHY - hammer three
+  tempos against the sweep line: eighteen beats at 40/28/18 ticks, space
+  judged +/-3 PERFECT (5), +/-6 GOOD (2), anything else wastes the steel,
+  and an unstruck beat walks away as a miss. The clean-chain bounty (+5)
+  makes all-perfect exactly 95 - the gold blade line; bronze 40, silver 70,
+  the sword quality IS the reward tier. The blank's heat colour cools on a
+  miss and re-sparks on a perfect blow. Zero seed variance: the run is a
+  pure function of the taps. Ten scripted tests (gold chain 95, all-GOOD
+  bronze 41, one GOOD denies gold at 92, wasted swing + combo break, tempo
+  ramp seam 40->28->18, idle-all-lost, space-only input, determinism).
+  Real Chromium smoke via ?scene=mg&mg=forge: PRESENT banner, TEMPO I
+  tableau (hammer, anvil, sweep bar, pips), an honest early Space judged
+  MISSED with blood flash and cooled blank, autoplay plate GOLD LAUREL
+  SCORE 95 PURSE GOLD, 0 console errors. Full cargo suite green, all 18/18
+  baselines diff-clean (PLAY frames 0 px, plates within blink tol), clippy
+  0 warnings, wasm32 check green, 511 KB bundle rebuilt; title regression
+  1010 frames green. (2026-11-14)
 - T4xx CHECKPOINT (2026-11-14): entry sequence = THREE inputs from load -
   boot key (audio unlock), BEGIN CAMPAIGN, difficulty; the intro crawl now
   AUTO-ROLLS (CRAWL_DWELL 300 ticks = 5 s per leaf, dwell resets on NEXT /
