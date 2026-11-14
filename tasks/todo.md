@@ -201,7 +201,9 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [x] **T603 mg-maze**: dungeon rescue, guard patrol, torch fright power.
   **2026-11-14:** GOLD scripted (90 pts via y11 bridge + fright column
   dash); real-Chromium smoke green. See progress.md.
-- [ ] **T604 mg-river**: canoe pole-vault, rocks, enemy pike boats.
+- [x] **T604 mg-river**: canoe pole-vault, rocks, enemy pike boats.
+  **2026-11-14:** GOLD scripted (wake-row + landing-skim fairness); live
+  Chromium play smoke. See progress.md.
 - [ ] **T605 mg-cloak**: 5 cells, sight cones, alarm-bell escalation.
 - [ ] **T606 mg-forge**: 3-tempo rhythm hammering, sword-quality tiers.
 - [ ] **Checkpoint P6**: 9 games in registry; batch soak: autoplay each ×3;

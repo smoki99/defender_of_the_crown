@@ -340,3 +340,20 @@ herald's cry is public knowledge.
   Chromium smoke: turn-30 SPORTS draw lands on RESCUE, the dungeon paints
   bridge + new torch spots, runner answers arrows, torch II grabs (score
   0→5, flame gone, watch frozen), 0 console errors. (2026-11-14)
+- T604 — mg-river (commit 88a9357): CANOE on the RIVER — pole-and-vault to
+  the falls: charge/release vaults over seeded rocks, four pike boats sweep
+  the lanes, wipeout sinks the paddler and swims them back, 2600 px ends the
+  run. The scripted-gold test exposed unclearable seed pairs (boat@1900 +
+  rock@2000), so two fairness rules welded in: WAKE ROWS — a boat with a
+  rock within 130 px behind sweeps only that rock's lane (mid±20) instead of
+  the full 228 px stream, which makes both marks hittable in sequence under
+  the lane-bias guarantee; LANDING SKIM — 14 ticks of touch-down grace where
+  an in-lane mark is credited as the hop itself, never a capsize (grounded
+  contact without skim still wipes out). tests/mg_river.rs 6/6: seed-7 bot
+  vaults all 8 rocks, sinks all 4 boats, 0 wipeouts → GOLD; drift-reaches-
+  falls, banks, wipeout-score + sweep-invariant tests green. QA deep link
+  ?scene=mg&mg=<id>[&seed=][&autoplay=1] boots any shipped sport standalone.
+  Real Chromium smoke: tableau renders, keyboard steer + charge bar, WIPEOUT
+  banner + swim-back live, autoplay resolves through results → campaign pop,
+  0 console errors. Full cargo suite green, clippy 0 warnings (2 own hits
+  fixed). (2026-11-14)
