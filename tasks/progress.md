@@ -67,11 +67,11 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   5 recruit buttons w/ costs (10/20/45/60), spy 15 g; one-tap march to
   adjacent; win/lose overlay w/ new-war restart. Title scene: EASY/NORMAL/HARD
   pick -> difficulty + seed (deep-link query too). tests/ui_play.rs 7
-  click-contract green. NOT met: T301 coastline/forest shading + 2-frame
-  banner sprites; T302 scrollbar/tooltip kit; T303 animated bar tweens +
-  norman.mod end-turn sting; T304 sports button (blocked on T501); T306
-  animated battle report (battle result = ticker line); T307 event modals
-  (ticker line only). Those boxes stay open.
+  click-contract green. NOT met: T303 animated bar tweens + norman.mod
+  end-turn sting; T306 animated battle report (battle result = ticker line);
+  T307 event modals (ticker line only). Those boxes stay open. T301 shipped
+  (see entry below); T302 kit + T304 castle panel shipped 2026-11-14, sports
+  button greyed w/ "HELD AT THE TOURNEY" msg until T501.
 - T305 march verified end-to-end in the browser: click Buckingham -> click
   London -> panel reads "Buckingham (Saxon) 0 men" (host moved out) + ticker
   "THE HOST MARCHES ON London" (screenshot /tmp/crown-shots/04-march.png).
@@ -110,3 +110,26 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   01-campaign.png (full map: coast, trees, hills, banners) and
   03-levy.png (panel open over new terrain). Baselines commit with the
   T3xx checkpoint follow-up once native Chromium libs are restored.
+
+- T302+T304 PANEL UI KIT + CASTLE PANEL GREEN (2026-11-14): new src/ui/kit.rs
+  pixel kit: 3-tone bevel buttons (normal/hot/disabled), TAN-rimmed panel
+  w/ GRAY-lit BLACK-shadow inner bevel, LINEN tooltip plate w/ BLACK rim,
+  list scrollbar (WHITE arrows, TAN thumb, DARKGRAY track) + hit-testing,
+  ALL-CAPS 8px text throughout. Castle panel grown to y86..172: info line
+  (name/faction/men/walls), scrollable garrison roll (unit rows + WALLS
+  row), recruit row LEVY/BOW/KNIGHT/SIEGE w/ costs, CLOSE/SPY/SPORTS row;
+  SPORTS greyed, click says "THE SPORTS ARE HELD AT THE TOURNEY" (T501);
+  hover tooltips on every control (ui.hover + tip()); scrollbar arrows
+  + track drag set ui.list_top. Verify: tests/panel_kit.rs 6 pixel tests
+  (button tones, panel bevels, tooltip plate, garrison scroll, sports
+  grey+msg, end-turn hit order) + ./test.sh all green + check:headless
+  17/17 exit 0 on rebuilt bundle, shots /tmp/crown-shots/02-selected.png
+  + 03-levy.png (panel open, LEVY X7 recruited, tooltip visible).
+  TOOLING (root cause, was silently shipping stale wasm): test.sh staged
+  the host tree BEFORE every stage incl. pull-pkg, so bindgen output in
+  crown-src:/work/web/pkg got clobbered by the stale host web/pkg copy
+  before it was copied back. Fixed: test.sh pull-pkg skips ensure_stage;
+  new stage pull-pkg (docker cp out of crown-stage); build-web.ts calls
+  ./test.sh pull-pkg instead of raw docker cp (docker env lives only in
+  test.sh); headless-check.mjs now process.exit()s with the verdict
+  instead of hanging in jsdom rAF until killed.

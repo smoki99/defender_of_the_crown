@@ -83,12 +83,15 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 - [x] **T301 Map renderer**: coastline/forest/hills shading, castle sprites
   (2 frames banner), roads, ownership colors, selected pulse; screenshot.
-- [ ] **T302 Panel UI kit**: pixel buttons/lists/scrollbar/tooltip, 3-tone
-  shading, ALL-CAPS text; hit-testing; screenshot sheet.
+- [x] **T302 Panel UI kit**: src/ui/kit.rs 3-tone buttons, bevelled panels,
+  scrollable list + scrollbar, LINEN hover tooltips, ALL-CAPS text,
+  hit-testing; tests/panel_kit.rs + shots 02-selected/03-levy. See progress.md.
 - [ ] **T303 Turn bar + bars HUD**: 4 kingdom bars w/ animations, end-turn
   button, turn counter, event banner area; screenshot.
-- [ ] **T304 Castle panel**: garrison list w/ fog estimate, recruit buttons
-  (costs), spy button (cost/odds text), sports button; click-through test.
+- [x] **T304 Castle panel**: info line, scrollable garrison roll (own keep =
+  true counts; enemy fog stays "??"), 4 recruit buttons w/ costs, spy 15 g,
+  sports button greyed w/ tourney msg (real sports = T501); click-through via
+  tests/panel_kit.rs + headless. See progress.md.
 - [x] **T305 March UI**: select→adjacent highlight→move preview→confirm;
   cancel; screenshot. **DEVIATION (2026-11-14):** shipped as one-tap march —
   select own keep, tap adjacent target, army moves immediately (no

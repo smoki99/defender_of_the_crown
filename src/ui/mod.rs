@@ -3,13 +3,15 @@
 //! map band, a 56px HUD band (SPEC 7): the selected castle opens a panel
 //! whose buttons overlay the map's lower edge.
 
+pub mod kit;
+
 use crate::campaign::game::{
     Difficulty, Faction, GameState, Stronghold, View, BAR_MAX, PLAYER, SPY_COST,
 };
 use crate::campaign::units::UnitKind;
 use crate::engine::gfx::{
-    BLACK, BLOOD, CREAM, DARKGREEN, DARKGRAY, DARKRED, DEEPWATER, GOLD, GRASS, GRAY, GREEN,
-    NAVY, SAXON_BLUE, SILVER, SKY, STONE, TAN, TEAL, W, WHITE, YELLOW,
+    BLACK, BLOOD, CREAM, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, GOLD, GRASS, GRAY, GREEN, NAVY,
+    SAXON_BLUE, SILVER, SKY, STONE, TEAL, W, WHITE, YELLOW,
 };
 pub use crate::engine::scene::SceneEvent;
 
@@ -39,42 +41,49 @@ pub fn action_rects(sel_own: bool) -> Vec<Btn> {
             Btn {
                 id: "rec:0",
                 x: 6,
-                y: 104,
+                y: 140,
                 w: 68,
                 h: 14,
             },
             Btn {
                 id: "rec:1",
                 x: 78,
-                y: 104,
+                y: 140,
                 w: 68,
                 h: 14,
             },
             Btn {
                 id: "rec:2",
                 x: 150,
-                y: 104,
+                y: 140,
                 w: 68,
                 h: 14,
             },
             Btn {
                 id: "rec:3",
                 x: 222,
-                y: 104,
-                w: 68,
-                h: 14,
-            },
-            Btn {
-                id: "spy",
-                x: 78,
-                y: 122,
+                y: 140,
                 w: 68,
                 h: 14,
             },
             Btn {
                 id: "close",
                 x: 6,
-                y: 122,
+                y: 158,
+                w: 68,
+                h: 14,
+            },
+            Btn {
+                id: "spy",
+                x: 78,
+                y: 158,
+                w: 68,
+                h: 14,
+            },
+            Btn {
+                id: "sports",
+                x: 150,
+                y: 158,
                 w: 68,
                 h: 14,
             },
@@ -84,14 +93,14 @@ pub fn action_rects(sel_own: bool) -> Vec<Btn> {
             Btn {
                 id: "spy",
                 x: 6,
-                y: 104,
+                y: 122,
                 w: 102,
                 h: 14,
             },
             Btn {
                 id: "close",
                 x: 112,
-                y: 104,
+                y: 122,
                 w: 102,
                 h: 14,
             },
@@ -118,6 +127,7 @@ fn btn_label(id: &str) -> String {
         "rec:3" => format!("SIEGE {}", UnitKind::Siege.cost()),
         "spy" => format!("SPY {SPY_COST}"),
         "close" => "CLOSE".to_string(),
+        "sports" => "SPORTS".to_string(),
         "end" => "END TURN".to_string(),
         other => other.to_string(),
     }
@@ -144,6 +154,66 @@ fn info_line(g: &GameState, f: Faction, s: &Stronghold) -> String {
     }
 }
 
+/// Garrison list window height in rows (T304).
+pub const LIST_ROWS: usize = 4;
+
+/// Short ASCII unit tags: the 8x8 font has no pictographs.
+const KIND_TAG: [&str; 5] = ["LEVY", "BOW", "KNIGHT", "SIEGE", "CHAMP"];
+
+fn kind_tag(k: UnitKind) -> &'static str {
+    KIND_TAG[k as usize]
+}
+
+/// Garrison roll lines for the panel list (T304): exact for known views,
+/// fog estimate for rough or hidden garrisons.
+fn garrison_rows(g: &GameState, sel: usize) -> Vec<String> {
+    let s = &g.strongholds[sel];
+    match g.view(PLAYER, sel) {
+        View::Own(i) | View::Spied(i) => {
+            let mut rows: Vec<String> = crate::campaign::units::ALL_KINDS
+                .iter()
+                .enumerate()
+                .filter(|(k, _)| i.counts[*k] > 0)
+                .map(|(k, _)| format!("{} X{}", KIND_TAG[k], i.counts[k]))
+                .collect();
+            rows.push(format!("WALLS {}", s.walls));
+            rows
+        }
+        View::Rough { total } => vec![format!("~{total} MEN?"), "WALLS ??".to_string()],
+        View::Dark => vec!["GARRISON UNKNOWN".to_string(), "WALLS ??".to_string()],
+    }
+}
+
+/// Whether a control is operable with the current purse (greyed otherwise).
+fn btn_enabled(g: &GameState, id: &str) -> bool {
+    let gold = g.gi(PLAYER);
+    match id {
+        "rec:0" => gold >= UnitKind::Levy.cost(),
+        "rec:1" => gold >= UnitKind::Bowman.cost(),
+        "rec:2" => gold >= UnitKind::Knight.cost(),
+        "rec:3" => gold >= UnitKind::Siege.cost(),
+        "spy" => gold >= SPY_COST,
+        "sports" => false, // minigames arrive with the tourneys (T501)
+        _ => true,
+    }
+}
+
+/// Tooltip line for each hoverable control (T302).
+fn tip(id: &str) -> &'static str {
+    match id {
+        "rec:0" => "MILITIA: CHEAP, MANY, WEAK",
+        "rec:1" => "BOWMEN: SHOOT FROM THE WALLS",
+        "rec:2" => "KNIGHTS: HEAVY SWORD, LEAD DUELS",
+        "rec:3" => "SIEGE: CATAPULTS BREACH WALLS",
+        "spy" => "SPY: 7 IN 10 REVEAL A GARRISON",
+        "close" => "CLOSE THIS ROLL",
+        "sports" => "HELD AT THE TOURNEY GROUND",
+        "end" => "SUMMON THE NEXT SEASON",
+        "scr:up" | "scr:dn" => "SCROLL THE GARRISON ROLL",
+        _ => "",
+    }
+}
+
 /// The whole in-game screen: map, panel, HUD, endgame overlay.
 pub struct CampaignUi {
     pub g: GameState,
@@ -152,6 +222,10 @@ pub struct CampaignUi {
     msg_ticks: u32,
     pub anim: u32,
     pub want_restart: bool,
+    /// Hovered control id for bevel highlight + tooltip (T302).
+    pub hover: Option<&'static str>,
+    pub hover_xy: (i32, i32),
+    pub list_top: usize,
 }
 
 impl CampaignUi {
@@ -165,6 +239,9 @@ impl CampaignUi {
             msg_ticks: 0,
             want_restart: false,
             anim: 0,
+            hover: None,
+            hover_xy: (0, 0),
+            list_top: 0,
         }
     }
 
@@ -206,8 +283,21 @@ impl CampaignUi {
     /// One semantic event. `own_gesture` marks real user input (the web
     /// adapter passes true; tests replay taps the same way).
     pub fn event(&mut self, ev: &SceneEvent, _own_gesture: bool) {
+        if let SceneEvent::Move { x, y } = *ev {
+            self.update_hover(x, y);
+            return;
+        }
         let SceneEvent::Tap { x, y } = ev else { return };
         let (x, y) = (*x, *y);
+        if let Some(sel) = self.sel {
+            if self.g.strongholds[sel].owner == PLAYER {
+                if let Some(d) = self.scrollbar(sel).hit(x, y) {
+                    let max = garrison_rows(&self.g, sel).len().saturating_sub(LIST_ROWS);
+                    self.list_top = (self.list_top as i32 + d).clamp(0, max as i32) as usize;
+                    return;
+                }
+            }
+        }
         if self.g.over.is_some() {
             self.want_restart = true;
             return;
@@ -232,6 +322,7 @@ impl CampaignUi {
                 let name = self.g.strongholds[id].name;
                 if self.g.strongholds[id].owner == PLAYER {
                     self.sel = Some(id);
+                    self.list_top = 0;
                 } else if let Some(sel) = self.sel {
                     if self.g.adj(sel).contains(&id) {
                         let msg = match self.g.march(PLAYER, sel, id) {
@@ -244,14 +335,58 @@ impl CampaignUi {
                     }
                 } else {
                     self.sel = Some(id);
+                    self.list_top = 0;
                 }
             }
             None => {
                 self.sel = None;
+                self.list_top = 0;
                 self.msg.clear();
                 self.msg_ticks = 0;
             }
         }
+    }
+
+    /// Garrison scrollbar geometry (T304).
+    fn scrollbar(&self, sel: usize) -> kit::Scrollbar {
+        kit::Scrollbar {
+            x: 200,
+            y: 100,
+            h: 36,
+            top: self.list_top,
+            total: garrison_rows(&self.g, sel).len(),
+            rows: LIST_ROWS,
+        }
+    }
+
+    /// Pointer-move: remember the hovered control for bevel + tooltip.
+    fn update_hover(&mut self, x: i32, y: i32) {
+        self.hover_xy = (x, y);
+        let mut h: Option<&'static str> = if end_turn_rect().hits(x, y) {
+            Some("end")
+        } else {
+            None
+        };
+        if let Some(sel) = self.sel {
+            let own = self.g.strongholds[sel].owner == PLAYER;
+            if own {
+                let scr = self.scrollbar(sel);
+                if scr.visible() {
+                    if scr.up().hits(x, y) {
+                        h = Some("scr:up");
+                    } else if scr.down().hits(x, y) {
+                        h = Some("scr:dn");
+                    }
+                }
+            }
+            if h.is_none() {
+                h = action_rects(own)
+                    .into_iter()
+                    .find(|b| b.hits(x, y))
+                    .map(|b| b.id);
+            }
+        }
+        self.hover = h;
     }
 
     /// Nearest stronghold within tap reach, if any.
@@ -285,9 +420,12 @@ impl CampaignUi {
             .and_then(|i| UnitKind::from_index(i.parse().unwrap_or(9)))
         {
             match self.g.recruit(PLAYER, sel, kind) {
-                Ok(()) => format!("{} JOIN THE GARRISON", kind.name()),
+                Ok(()) => format!("{} JOIN THE GARRISON", kind_tag(kind)),
                 Err(e) => e,
             }
+        } else if id == "sports" {
+            self.say("THE SPORTS ARE HELD AT THE TOURNEY");
+            return;
         } else {
             return;
         };
@@ -397,6 +535,12 @@ impl CampaignUi {
         if let Some(sel) = self.sel {
             self.draw_panel(fb, sel);
         }
+        if let Some(id) = self.hover {
+            let text = tip(id);
+            if !text.is_empty() {
+                kit::tooltip(fb, self.hover_xy.0 + 8, self.hover_xy.1 + 10, text);
+            }
+        }
         if let Some(winner) = self.g.over {
             self.draw_over(fb, winner);
         }
@@ -421,8 +565,7 @@ impl CampaignUi {
             BLACK,
         );
         let e = end_turn_rect();
-        fb.fill_rect(e.x, e.y, e.w, e.h, BLOOD);
-        fb.rect(e.x, e.y, e.w, e.h, GOLD);
+        kit::button(fb, &e, self.hover == Some("end"), true);
         draw_text_shadow(fb, e.x + 24, e.y + 4, "END TURN", WHITE, BLACK);
         let line = if self.msg_ticks > 0 || !self.msg.is_empty() {
             self.msg.clone()
@@ -438,26 +581,33 @@ impl CampaignUi {
         let s = &self.g.strongholds[sel];
         let own = s.owner == PLAYER;
         let info = info_line(&self.g, PLAYER, s);
-        let px = 4;
-        let pw = 292;
-        fb.fill_rect(px, 86, pw, if own { 54 } else { 36 }, DARKGRAY);
-        fb.rect(px, 86, pw, if own { 54 } else { 36 }, TAN);
-        draw_text_shadow(fb, px + 4, 90, &info, WHITE, BLACK);
+        kit::panel(fb, 4, 86, 292, if own { 86 } else { 52 });
+        draw_text_shadow(fb, 8, 90, &info, WHITE, BLACK);
+        let rows = garrison_rows(&self.g, sel);
+        let top = self.list_top.min(rows.len().saturating_sub(LIST_ROWS));
+        for (i, row) in rows.iter().skip(top).take(LIST_ROWS).enumerate() {
+            draw_text_shadow(fb, 10, 100 + i as i32 * 9, row, CREAM, BLACK);
+        }
+        if own {
+            let scr = self.scrollbar(sel);
+            if scr.visible() {
+                scr.draw(fb, self.hover);
+            }
+        }
         for b in action_rects(own) {
-            fb.fill_rect(b.x, b.y, b.w, b.h, DARKRED);
-            fb.rect(b.x, b.y, b.w, b.h, TAN);
+            let enabled = btn_enabled(&self.g, b.id);
+            kit::button(fb, &b, self.hover == Some(b.id), enabled);
             let label = btn_label(b.id);
             draw_text_shadow(
                 fb,
                 b.x + (b.w as i32 - label.len() as i32 * 6) / 2,
                 b.y + 4,
                 &label,
-                WHITE,
+                if enabled { WHITE } else { BLACK },
                 BLACK,
             );
         }
     }
-
     fn draw_over(&mut self, fb: &mut crate::engine::gfx::Framebuffer, winner: Faction) {
         use crate::engine::fonts::draw_text_shadow;
         fb.fill_rect(0, 0, W, 256, BLACK);
@@ -503,8 +653,16 @@ const NORMAN_KEEP: u8 = DARKRED;
 /// Channel corner (T301).
 fn coast_edge(y: i32) -> i32 {
     const P: [(i32, i32); 10] = [
-        (0, 226), (40, 224), (70, 208), (95, 206), (110, 216), (135, 222), (150, 210),
-        (170, 194), (190, 176), (201, 168),
+        (0, 226),
+        (40, 224),
+        (70, 208),
+        (95, 206),
+        (110, 216),
+        (135, 222),
+        (150, 210),
+        (170, 194),
+        (190, 176),
+        (201, 168),
     ];
     for w in P.windows(2) {
         if y <= w[1].0 {
@@ -518,8 +676,16 @@ fn coast_edge(y: i32) -> i32 {
 
 /// Forest clusters: Sherwood, New Forest, Essex, far southwest.
 const TREES: [(i32, i32); 10] = [
-    (150, 30), (159, 36), (151, 43), (55, 146), (64, 150), (73, 146), (196, 50), (204, 57),
-    (18, 162), (28, 168),
+    (150, 30),
+    (159, 36),
+    (151, 43),
+    (55, 146),
+    (64, 150),
+    (73, 146),
+    (196, 50),
+    (204, 57),
+    (18, 162),
+    (28, 168),
 ];
 
 /// Hills: Midlands knolls plus the Kent/Channel ridge.
