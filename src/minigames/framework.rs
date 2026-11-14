@@ -8,7 +8,7 @@
 //! score through [`resolve`] to build the [`MgOutcome`] the reward layer
 //! pays out (SPEC 5.5).
 
-use crate::campaign::game::Tier;
+pub use crate::campaign::game::Tier;
 use crate::campaign::rng::Xor;
 use crate::engine::gfx::Framebuffer;
 use crate::engine::input::Input;
