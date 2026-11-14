@@ -235,11 +235,12 @@ impl Scene for MgHost {
 }
 
 /// Registry factory: one arm per sport that has actually shipped
-/// (T502: joust; T503+: sword/dragon). An id with no arm yet has no game,
-/// and the SPORTS button says so honestly.
+/// (T502: joust, T503: catapult; T504+: sword/dragon). An id with no arm
+/// yet has no game, and the SPORTS button says so honestly.
 pub fn make_game(id: &str, seed: u64) -> Option<Box<dyn Minigame>> {
     match id {
         "joust" => Some(Box::new(crate::minigames::joust::Joust::new(seed))),
+        "catapult" => Some(Box::new(crate::minigames::catapult::Catapult::new(seed))),
         _ => None,
     }
 }

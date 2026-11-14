@@ -164,13 +164,13 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 5 — MG framework + slice games (T5xx) → ALPHA 1
 
-- [ ] **T501 mg-framework**: `Minigame` trait + registry, MgState, tier
+- [x] **T501 mg-framework**: `Minigame` trait + registry, MgState, tier
   thresholds data, 60 s cheer-timer convention, results screen (tier + loot
   anim), SPORTS wiring (10 g), unlock schedule data, `?autoplay=`/`?shot=`
   harness hooks; framework tests.
-- [ ] **T502 mg-joust** — MG-QA Q1–Q6. 2 passes, lane aim + release timing,
+- [x] **T502 mg-joust** — MG-QA Q1–Q6. 2 passes, lane aim + release timing,
   lance snap, crowd cheer; perfect script wins gold tier.
-- [ ] **T503 mg-catapult** — MG-QA. 6 stones, angle/power vs wind, towers +
+- [x] **T503 mg-catapult** — MG-QA. 6 stones, angle/power vs wind, towers +
   ships; distance-scored.
 - [ ] **T504 mg-sword** — MG-QA. 3 telegraphs high/mid/low, parry-riposte,
   best-of-5; pattern-perfect script wins.

@@ -278,3 +278,17 @@ herald's cry is public knowledge.
   headless-check.mjs (click campaign: turn +1/cycle proven 1..6) and
   title-flow-check.mjs (T404/T405 keyboard flow, LS_SEED CRT-off variant).
   3 scenarios 0 fails; 27 cargo suites green; clippy -D warnings clean (2026-11-14)
+- T501 — minigame framework: `Minigame` trait + SportSpec registry (12
+  sports, DRAGON unlock_turn=u32::MAX = rare-event only), deterministic
+  per-season `pick(turn, seed)` (xorshift64* — joust/catapult/sword/archery
+  from turn 1, rampart..cloak +turn5, forge..tavern +turn10), Cheer 60 s
+  wall-clock threshold, tier+loot results screen, MgHost scene bridged
+  through the campaign (SPORTS, 10 g fee, herald variant), ?autoplay= hook.
+- T502 — mg-joust: two passes, lane aim + release timing, lance-snap fail,
+  crowd cheer ramp; gold-tier perfect script proven in tests + browser
+  (crown-shots/00-joust-present, 01-joust-end); sports-check ticker smoke.
+- T503 — mg-catapult: 6 stones, angle+power vs per-volley wind, towers and
+  river ships as targets, distance-scored; full battery incl. sail-hit
+  gold path (tests/mg_catapult.rs 6/6), host arm wired, whole suite green,
+  wasm rebuilt, campaign browser smoke end to end (menu->crawl->map->levy->
+  END TURN->omen modal OK dismissal, Chrome 150 on the debian .so sysroot).
