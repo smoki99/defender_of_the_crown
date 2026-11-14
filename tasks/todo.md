@@ -86,8 +86,13 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [x] **T302 Panel UI kit**: src/ui/kit.rs 3-tone buttons, bevelled panels,
   scrollable list + scrollbar, LINEN hover tooltips, ALL-CAPS text,
   hit-testing; tests/panel_kit.rs + shots 02-selected/03-levy. See progress.md.
-- [ ] **T303 Turn bar + bars HUD**: 4 kingdom bars w/ animations, end-turn
-  button, turn counter, event banner area; screenshot.
+- [x] **T303 Turn bar + bars HUD**: WEALTH/FOOD/LOYAL/MOOD bars in a 2×2
+  grid (gold scaled 200=full), fills glide ~8 ticks toward the true meters
+  with a WHITE tick at the unreached target; tests/bars_hud.rs + headless
+  shot 01-campaign. **DEVIATION (2026-11-14):** end-turn button, turn
+  counter and event banner area (gold-band ticker + panel_kit modal frame)
+  already shipped; no `norman.mod` sting — module audio needs an asset
+  pipeline that doesn't exist yet, deferred (see T308 note in progress.md).
 - [x] **T304 Castle panel**: info line, scrollable garrison roll (own keep =
   true counts; enemy fog stays "??"), 4 recruit buttons w/ costs, spy 15 g,
   sports button greyed w/ tourney msg (real sports = T501); click-through via

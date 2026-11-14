@@ -11,7 +11,7 @@ for per-module specs (`docs/specs/<id>.md`). Module ids are stable kebab-case.
 | scene-core | scene stack + RAF loop + input routing + fade/dissolve transitions **done (T106/T107)** | engine-gfx, engine-input |
 | campaign-core | pure game rules: castle graph, kingdom stats (riches/provisions/loyalty/popularity), units, marches, battles, events, spies, win/lose, RNG **done (T201-T209, checkpoint green)** | - |
 | campaign-ai | Norman AI (recruit/attack/reinforce/spy, difficulty knobs) **done (T209)** | campaign-core |
-| campaign-view | map render, pixel panel UI, battle reports, event banners, coronation/revolt UI **core screen done (map+coast+scenery+banners T301, panel kit + castle panel T302/T304, HUD+one-tap march+end-turn loop, checkpoint T3xx green); pending T303 bar tweens, T306 animated battle report, T307 modals** | campaign-core, engine-gfx |
+| campaign-view | map render, pixel panel UI, battle reports, event banners, coronation/revolt UI **core screen done (map+coast+scenery+banners T301, panel kit + castle panel T302/T304, 4 animated kingdom bars T303, HUD+one-tap march+end-turn loop, checkpoint T3xx green); pending T306 animated battle report, T307 modals** | campaign-core, engine-gfx |
 | mg-framework | Minigame trait + registry + reward tiers + unlock schedule + HALL OF FAME (localStorage) + shared HUD/results screen | scene-core, engine-audio |
 | mg-joust, mg-catapult, mg-sword, mg-archery, mg-rampart, mg-maze, mg-river, mg-cloak, mg-forge, mg-herbs, mg-falcon, mg-tavern, mg-dragon | 13 individual minigames | mg-framework, engine-* |
 | title-flow | boot herald, animated title card, overture music sequencing, menu, difficulty pick **done (T404 pick; herald/menu partial)**, how-to, mute | scene-core, engine-audio, mg-framework |

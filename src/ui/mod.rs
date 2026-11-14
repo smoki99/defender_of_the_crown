@@ -226,12 +226,16 @@ pub struct CampaignUi {
     pub hover: Option<&'static str>,
     pub hover_xy: (i32, i32),
     pub list_top: usize,
+    /// Animated (tweened toward the real meters) bar fills:
+    /// [wealth, provisions, loyalty, mood] (T303).
+    pub bars_disp: [u32; 4],
 }
 
 impl CampaignUi {
     pub fn new(seed: u64, difficulty: Difficulty) -> Self {
         let mut g = GameState::new(seed);
         g.difficulty[1] = difficulty;
+        let bars_disp = Self::bar_targets_of(&g);
         Self {
             g,
             sel: None,
@@ -242,12 +246,34 @@ impl CampaignUi {
             hover: None,
             hover_xy: (0, 0),
             list_top: 0,
+            bars_disp,
         }
     }
 
     pub fn tick(&mut self) {
         self.msg_ticks = self.msg_ticks.saturating_sub(1);
         self.anim = self.anim.wrapping_add(1);
+        // Bars glide toward the true meters (~8 ticks); the draw pass shows a
+        // white tick at the still-unreached target, Amiga-style (T303).
+        let tgt = Self::bar_targets_of(&self.g);
+        for (d, t) in self.bars_disp.iter_mut().zip(tgt) {
+            if *d < t {
+                *d = (*d + (t - *d).div_ceil(8)).min(t);
+            } else if *d > t {
+                *d = (*d - (*d - t).div_ceil(8)).max(t);
+            }
+        }
+    }
+
+    /// Drawn bar values in 0..=BAR_MAX: gold is scaled 200 -> full.
+    fn bar_targets_of(g: &GameState) -> [u32; 4] {
+        let b = g.bars[PLAYER.index()];
+        [
+            g.gi(PLAYER).min(2 * BAR_MAX) / 2,
+            b.provisions.min(BAR_MAX),
+            b.loyalty.min(BAR_MAX),
+            b.popularity.min(BAR_MAX),
+        ]
     }
 
     /// North Sea + Channel: hatched shoreline, deep-water fill and teal
@@ -552,10 +578,12 @@ impl CampaignUi {
         fb.hline(0, W as i32 - 1, MAP_BOTTOM, GOLD);
         let me = self.g.gi(PLAYER);
         draw_text_shadow(fb, 4, 204, &format!("GOLD {me}"), GOLD, BLACK);
-        let bars = self.g.bars[PLAYER.index()];
-        bar(fb, 4, 214, "FOOD", bars.provisions, GREEN);
-        bar(fb, 4, 224, "LOYAL", bars.loyalty, SAXON_BLUE);
-        bar(fb, 4, 234, "MOOD", bars.popularity, YELLOW);
+        let tgt = Self::bar_targets_of(&self.g);
+        let disp = self.bars_disp;
+        bar(fb, 4, 214, "WEALTH", disp[0], tgt[0], GOLD);
+        bar(fb, 84, 214, "FOOD", disp[1], tgt[1], GREEN);
+        bar(fb, 4, 224, "LOYAL", disp[2], tgt[2], SAXON_BLUE);
+        bar(fb, 84, 224, "MOOD", disp[3], tgt[3], YELLOW);
         draw_text_shadow(
             fb,
             120,
@@ -691,12 +719,25 @@ const TREES: [(i32, i32); 10] = [
 /// Hills: Midlands knolls plus the Kent/Channel ridge.
 const HILLS: [(i32, i32); 5] = [(120, 58), (130, 52), (185, 135), (195, 143), (188, 166)];
 
-fn bar(fb: &mut crate::engine::gfx::Framebuffer, x: i32, y: i32, label: &str, v: u32, c: u8) {
+fn bar(
+    fb: &mut crate::engine::gfx::Framebuffer,
+    x: i32,
+    y: i32,
+    label: &str,
+    v: u32,
+    tgt: u32,
+    c: u8,
+) {
     use crate::engine::fonts::draw_text_shadow;
     draw_text_shadow(fb, x, y, label, CREAM, BLACK);
     fb.rect(x + 34, y, 42, 6, GRAY);
     let w = (v.min(BAR_MAX) as i32 * 40) / BAR_MAX as i32;
     fb.fill_rect(x + 35, y + 1, w.max(0) as u32, 4, c);
+    if tgt != v {
+        // White tick where the still-gliding fill has to arrive (T303).
+        let mx = x + 35 + (tgt.min(BAR_MAX) as i32 * 40) / BAR_MAX as i32;
+        fb.fill_rect(mx, y, 1, 6, WHITE);
+    }
 }
 
 fn draw_line(

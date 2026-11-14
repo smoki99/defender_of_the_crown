@@ -133,3 +133,27 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   ./test.sh pull-pkg instead of raw docker cp (docker env lives only in
   test.sh); headless-check.mjs now process.exit()s with the verdict
   instead of hanging in jsdom rAF until killed.
+```
+
+2026-11-14 — T303 kingdom bars HUD (Phase 3)
+```
+WEALTH/FOOD/LOYAL/MOOD in a 2x2 grid under the GOLD readout (gold bar
+scaled 200=full, spec-adjacent: DoC shows a gold number plus three bars;
+the fourth makes the gold visible as a meter too). Fills tween: bars_disp
+[u32;4] in CampaignUi glides toward the true meters each tick with
+step=diff.div_ceil(8) (~8 ticks, deterministic), and while a bar moves a
+WHITE tick marks the unreached target column (Amiga change-marker feel).
+Exact GOLD n text + TURN/ARMY + ticker row kept untouched (ui_play pixel
+tests still pass).
+- src/ui/mod.rs: bars_disp field + bar_targets_of + tick glide; bar()
+takes (v,tgt); draw_hud 2x2 at (4|84,214|224).
+- tests/bars_hud.rs 3 tests: settled bar has no marker; drained gold
+shows old-long fill + white tick mid-glide, converges, marker gone
+(GRAY border returns); provisions bar same on the FOOD track.
+- Deviations: end-turn button, turn counter and event banner area
+(ticker + panel_kit modal frame) were already shipped in earlier tasks;
+norman.mod AI-turn sting NOT done - module audio needs an asset pipeline
+that does not exist (browser has no mod decoder), deferred.
+Verified: cargo test host green; docker gate green (22 suites, exit 0);
+headless 17/17 clean; shot 01-campaign pixels confirmed for all four bar
+colors + ticker text.
