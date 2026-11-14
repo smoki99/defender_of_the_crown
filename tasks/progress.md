@@ -292,3 +292,15 @@ herald's cry is public knowledge.
   gold path (tests/mg_catapult.rs 6/6), host arm wired, whole suite green,
   wasm rebuilt, campaign browser smoke end to end (menu->crawl->map->levy->
   END TURN->omen modal OK dismissal, Chrome 150 on the debian .so sysroot).
+- T504 — mg-sword: THE DUEL on the tilt band; foe telegraphs a lane via its
+  blade tip (high/mid/low arrow keys), late feints switch the tell before the
+  strike (last guard press wins), parry opens a 12-tick stagger meter whose
+  BLACK gap (ticks 14..26, `riposte_ok`) takes one SPACE thrust per round;
+  3 parries decide the bout, tier via resolve on the 0..=100 scale.
+  tests/mg_sword.rs scripted bout + feint determinism, mg_host_tests sword
+  arm, panel_kit probes; whole cargo suite green 2026-11-14, clippy clean.
+  tools/sword-play-check.mjs pixel-solver (tip read at x178..188, guard on
+  lane change, SPACE 250 ms into stagger) wins GOLD LAUREL off the real
+  framebuffer twice frame-deterministic, purse 70->146 + "GOLD LAUREL: 86
+  GOLD" log line on the map (crown-shots/00-sword-present, 01-sword-end,
+  02-sword-home). Pushed ec84967.

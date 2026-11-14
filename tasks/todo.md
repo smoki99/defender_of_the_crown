@@ -172,8 +172,10 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   lance snap, crowd cheer; perfect script wins gold tier.
 - [x] **T503 mg-catapult** — MG-QA. 6 stones, angle/power vs wind, towers +
   ships; distance-scored.
-- [ ] **T504 mg-sword** — MG-QA. 3 telegraphs high/mid/low, parry-riposte,
-  best-of-5; pattern-perfect script wins.
+- [x] **T504 mg-sword** — MG-QA. 3 telegraphs high/mid/low, parry-riposte,
+  best-of-5; pattern-perfect script wins. **2026-11-14:** up-to-5 rounds,
+  3 parries take the bout; pixel-solver wins GOLD in Chromium. See
+  progress.md.
 - [ ] **T505 Reward-loop integration test**: campaign→joust→gold applied→
   hall-of-fame entry written (playwright scripted).
 - [ ] **Checkpoint ALPHA 1** — see gate below.
