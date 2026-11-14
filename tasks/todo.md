@@ -176,8 +176,10 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   best-of-5; pattern-perfect script wins. **2026-11-14:** up-to-5 rounds,
   3 parries take the bout; pixel-solver wins GOLD in Chromium. See
   progress.md.
-- [ ] **T505 Reward-loop integration test**: campaign→joust→gold applied→
-  hall-of-fame entry written (playwright scripted).
+- [x] **T505 Reward-loop integration test**: campaign→joust→gold applied→
+  hall-of-fame entry written (playwright scripted). **2026-11-14:**
+  reward-loop-check.mjs 8/8 green (jsdom stand-in per T3xx note). See
+  progress.md.
 - [ ] **Checkpoint ALPHA 1** — see gate below.
 
 ### GATE ALPHA 1 (all green, then commit tag `alpha1`, push)

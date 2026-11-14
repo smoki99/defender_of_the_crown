@@ -1156,7 +1156,11 @@ impl PlayScene {
                 let msg = match res {
                     Ok((tier, r)) => {
                         let mut m = match tier {
-                            crate::campaign::game::Tier::Gold => format!("GOLD LAUREL: {} GOLD", r.gold),
+                            crate::campaign::game::Tier::Gold => {
+                                // a gold laurel is chronicle material (T505)
+                                app.record_feat(&format!("{} GOLD - SCORE {}", spec.label, o.score));
+                                format!("GOLD LAUREL: {} GOLD", r.gold)
+                            }
                             crate::campaign::game::Tier::Silver => {
                                 format!("SILVER LAUREL: {} PROVISIONS", r.provisions)
                             }

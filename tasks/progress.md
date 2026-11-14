@@ -304,3 +304,11 @@ herald's cry is public knowledge.
   framebuffer twice frame-deterministic, purse 70->146 + "GOLD LAUREL: 86
   GOLD" log line on the map (crown-shots/00-sword-present, 01-sword-end,
   02-sword-home). Pushed ec84967.
+- T505 — reward loop welded: a GOLD laurel now writes `doc.hof` via
+  AppCtx::record_feat in sports_flow (title HALL OF FAME reads the same
+  key), and tools/reward-loop-check.mjs drives the whole chain in jsdom:
+  title->NORMAL->END TURN x4->turn 5 joust draw->pixel-solver two perfect
+  lances->GOLD LAUREL plate (head band >8 GOLD px while ENTER waits)->map
+  purse line (4,204..212) repainted->`doc.hof = "TOURNAMENT GOLD - SCORE
+  97"`. 8/8 asserts, 0 errors, frame-deterministic; full cargo suite +
+  clippy 0 warnings (2026-11-14).
