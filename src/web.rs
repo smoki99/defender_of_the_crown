@@ -14,10 +14,10 @@ extern "C" {
 }
 
 use crate::engine::audio::{Mod, Music, Player, Sfx};
-use crate::engine::fonts::draw_text_shadow;
+use crate::engine::fonts::{draw_text, draw_text_shadow};
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, DARKGRAY, GOLD, GRAY, GREEN, LIGHTBLUE, NAVY, SAXON_BLUE, TAN,
-    WHITE, YELLOW, H, W,
+    Framebuffer, BLACK, BLOOD, DARKGREEN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTBLUE, LINEN, NAVY,
+    SAXON_BLUE, TAN, WHITE, YELLOW, H, W,
 };
 use crate::engine::input::{
     Gesture, Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP,
@@ -48,6 +48,7 @@ fn query_get(key: &str) -> Option<String> {
 enum Mode {
     Title,
     Test,
+    Demo,
 }
 
 struct App {
@@ -66,6 +67,8 @@ struct App {
     fps_at: f64,
     shot_at: u64,
     shot_done: bool,
+    perf_acc: f64,
+    perf_n: u32,
 }
 
 struct Ctx {
@@ -424,6 +427,92 @@ impl Scene for TestScene {
     }
 }
 
+/// T1xx checkpoint scene: font sheet, full palette strip, dither swatches,
+/// gradient bands, sprite anim/scaled/flash. Music loops from boot; the loop
+/// fires rotating SFX while in Demo mode.
+pub struct DemoScene {
+    ticks: u32,
+    want_leave: bool,
+}
+impl Scene for DemoScene {
+    fn event(&mut self, ev: &SceneEvent) {
+        match *ev {
+            SceneEvent::Key {
+                code: KEY_ESC,
+                pressed: true,
+            }
+            | SceneEvent::Key {
+                code: KEY_SPACE,
+                pressed: true,
+            }
+            | SceneEvent::Tap { ..} => self.want_leave = true,
+            _ => {}
+        }
+    }
+    fn tick(&mut self) {
+        self.ticks += 1;
+    }
+    fn draw(&mut self, fb: &mut Framebuffer) {
+        fb.gradient_v(0, 0, W, 72, NAVY, BLACK);
+        fb.fill_rect(0, 72, W, 88, BLACK);
+        fb.gradient_v(0, 160, W, 96, DARKGREEN, BLACK);
+        draw_text_shadow(fb, 8, 4, "T1xx ENGINE CHECKPOINT", GOLD, DARKGRAY);
+        fb.fill_rect(0, 13, W, 36, LINEN);
+        // font sheet: every glyph in a distinct palette color
+        let rows = [
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+            "0123456789 .,:;!?+-*/=#%&'",
+            "abcdefghijklmnopqrstuvwxyz",
+        ];
+        for (r, row) in rows.iter().enumerate() {
+            let y = 16 + r as i32 * 11;
+            for (i, ch) in row.chars().enumerate() {
+                let mut b = [0u8; 4];
+                let s = ch.encode_utf8(&mut b);
+                draw_text(fb, 8 + i as i32 * 8, y, s, 1 + ((i + r * 10) % 31) as u8);
+            }
+        }
+        // full 32-color palette strip (index == position)
+        for i in 0..32u8 {
+            fb.fill_rect(i as i32 * 10, 50, 8, 8, i);
+        }
+        fb.rect(0, 49, 320, 10, DARKGRAY);
+        // dither blend swatches GOLD->NAVY
+        for i in 0..8u8 {
+            fb.fill_rect_dither(8 + i as i32 * 20, 76, 16, 16, GOLD, NAVY, i * 2);
+        }
+        draw_text_shadow(fb, 176, 80, "DITHER+", WHITE, BLACK);
+        draw_text_shadow(fb, 176, 90, "GRADIENTS", WHITE, BLACK);
+        // sprite row: marching anim pair, x3 scaled w/ periodic flash, x4 banner
+        let march = (self.ticks as i32 / 2) % (W as i32 + 32) - 16;
+        let frame = (self.ticks / 10) as u32;
+        if self.ticks % 70 < 4 {
+            FOOT_SOLDIER.blit(fb, march, 110, true);
+        } else {
+            blit_anim(&FOOT_SOLDIER, &FOOT_SOLDIER_B, fb, march, 110, frame);
+        }
+        blit_anim(&FOOT_SOLDIER_B, &FOOT_SOLDIER, fb, march + 14, 112, frame + 1);
+        FOOT_SOLDIER.blit_scaled(fb, 200, 108, 3, false);
+        BANNER_SPRITE.blit_scaled(fb, 288, 100, 4, false);
+        draw_text_shadow(
+            fb,
+            8,
+            148,
+            "MODPLAYER+SFX LIVE (AUDIO-CHECK PROVES)",
+            WHITE,
+            BLACK,
+        );
+        let msg = format!("TICK {}", self.ticks);
+        draw_text_shadow(fb, 248, 246, &msg, YELLOW, BLACK);
+        if self.ticks % 40 < 20 {
+            fb.fill_rect(240, 246, 6, 8, YELLOW);
+        }
+    }
+    fn wants_leave(&self) -> bool {
+        self.want_leave
+    }
+}
+
 /// Entry scene: title card; any tap/key dissolves into the test scene.
 pub struct TitleScene {
     ticks: u32,
@@ -491,9 +580,14 @@ pub fn main() -> Result<(), JsValue> {
     let audio = AudioState { ctx: None, music: music.clone() };
     let want_test = query_has("scene=test");
     let shot_at: u64 = query_get("shot").and_then(|v| v.parse().ok()).unwrap_or(0);
-
+    let want_demo = query_has("scene=demo");
     let first: Box<dyn Scene> = if want_test {
         Box::new(TestScene::new("TEST SCENE"))
+    } else if want_demo {
+        Box::new(DemoScene {
+            ticks: 0,
+            want_leave: false,
+        })
     } else {
         Box::new(TitleScene {
             ticks: 0,
@@ -505,7 +599,13 @@ pub fn main() -> Result<(), JsValue> {
         scratch: Framebuffer::new(),
         input: Input::new(),
         stack: SceneStack::new(first),
-        mode: if want_test { Mode::Test } else { Mode::Title },
+        mode: if want_test {
+            Mode::Test
+        } else if want_demo {
+            Mode::Demo
+        } else {
+            Mode::Title
+        },
         frame: 0,
         rgba,
         canvas,
@@ -516,6 +616,8 @@ pub fn main() -> Result<(), JsValue> {
         fps_at: 0.0,
         shot_at,
         shot_done: false,
+        perf_acc: 0.0,
+        perf_n: 0,
     };
     let state = Rc::new(RefCell::new(app));
     let ctxrc = Rc::new(RefCell::new(Ctx { muted, music, audio }));
@@ -545,6 +647,7 @@ pub fn main() -> Result<(), JsValue> {
             st.acc += (now - st.last).min(250.0);
             st.last = now;
             const STEP: f64 = 1000.0 / 60.0;
+            let t0 = js_sys::Date::now();
             while st.acc >= STEP {
                 st.acc -= STEP;
                 st.frame += 1;
@@ -561,6 +664,14 @@ pub fn main() -> Result<(), JsValue> {
                 if st.input.key_pressed(crate::engine::input::KEY_SPACE) {
                     ctx.music.borrow_mut().sfx(Sfx::Coin);
                 }
+                if matches!(st.mode, Mode::Demo) && frame % 45 == 0 {
+                    let s = match (frame / 45) % 3 {
+                        0 => Sfx::Coin,
+                        1 => Sfx::Sword,
+                        _ => Sfx::Hoof,
+                    };
+                    ctx.music.borrow_mut().sfx(s);
+                }
                 // mute toggle (persisted)
                 if st.input.key_pressed(crate::engine::input::KEY_M) {
                     let v = !ctx.muted.get();
@@ -574,6 +685,10 @@ pub fn main() -> Result<(), JsValue> {
                             Box::new(TestScene::new("TEST SCENE")) as Box<dyn Scene>
                         }
                         Mode::Test => Box::new(TestScene::new("FADE CYCLE COMPLETE")),
+                        Mode::Demo => Box::new(DemoScene {
+                            ticks: 0,
+                            want_leave: false,
+                        }),
                     };
                     st.stack.replace(next, Transition::Fade);
                 }
@@ -586,6 +701,8 @@ pub fn main() -> Result<(), JsValue> {
             {
                 let _ = st.ctx2d.put_image_data(&img, 0.0, 0.0);
             }
+            st.perf_acc += js_sys::Date::now() - t0;
+            st.perf_n += 1;
             if now - st.fps_at >= 1000.0 {
                 st.fps_at = now;
                 let fps = st.fps_seen;
@@ -595,6 +712,16 @@ pub fn main() -> Result<(), JsValue> {
                     &JsValue::from_str("__fps"),
                     &JsValue::from(fps),
                 );
+                if st.perf_n > 0 {
+                    let ms = (st.perf_acc * 100.0 / st.perf_n as f64).round() / 100.0;
+                    st.perf_acc = 0.0;
+                    st.perf_n = 0;
+                    let _ = js_sys::Reflect::set(
+                        &w().into(),
+                        &JsValue::from_str("__ms"),
+                        &JsValue::from(ms),
+                    );
+                }
             }
             if st.shot_at > 0 && st.frame >= st.shot_at && !st.shot_done {
                 st.shot_done = true;

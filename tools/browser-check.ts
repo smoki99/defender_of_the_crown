@@ -148,6 +148,25 @@ try {
   ok((await countPix(GREEN)) > 5000, "title -> test transition");
   await page.screenshot({ path: "/tmp/crown-after-click.png" });
 
+  // ---- T1xx checkpoint: engine demo scene
+  const LINEN = [204, 204, 153];
+  const EMBER = [255, 136, 0];
+  const GOLDP = [204, 170, 0];
+  const NAVYP = [17, 34, 85];
+  await page.goto(`${BASE}/?scene=demo`);
+  await page.waitForFunction("window.__fps > 0 && window.__ms > 0", null, { timeout: 10000 });
+  ok((await page.evaluate("window.__fps")) >= 45, "demo fps >= 45");
+  const ms = await page.evaluate("window.__ms");
+  ok((ms as number) <= 12, `frame cost ${ms}ms <= 12ms`);
+  ok((await countPix(LINEN, { x: 0, y: 13, w: 320, h: 36 })) > 9000, "font sheet band");
+  // palette strip: index == position; EMBER is slot 31, GOLD slot 22
+  ok((await countPix(EMBER, { x: 310, y: 50, w: 8, h: 8 })) === 64, "palette slot 31 exact");
+  ok((await countPix(GOLDP, { x: 220, y: 50, w: 8, h: 8 })) === 64, "palette slot 22 exact");
+  const dith = { x: 8, y: 76, w: 160, h: 16 };
+  ok((await countPix(GOLDP, dith)) > 300 && (await countPix(NAVYP, dith)) > 300, "dither swatches blend");
+  ok((await countPix([0, 68, 170], { x: 196, y: 104, w: 32, h: 32 })) > 100, "scaled sprite drawn (saxon blue px)");
+  await page.screenshot({ path: "/tmp/crown-demo.png" });
+
   ok(errors.length === 0, `no console errors (${errors.slice(0, 3).join(" | ")})`);
 } finally {
   await browser?.close();

@@ -46,11 +46,11 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [x] **T107 Scene stack**: `Scene` trait (init/ event/draw/tick), push/pop/
   replace, fade + dither-dissolve transitions, RAF driver w/ fixed logic step;
   test scene runs in browser (`?scene=test`) screenshot + 60fps probe.
-- [ ] **T108 Audio engine**: modplayer→f32 PCM → WebAudio (AudioWorklet,
+- [x] **T108 Audio engine**: modplayer→f32 PCM → WebAudio (AudioWorklet,
   ScriptProcessor fallback), music manager (play/loop/stinger/mixdown),
   mute-persist localStorage; SFX synth module (blip/coin/sword/crowd/hoof/
   boom/etc. factory) — RMS gate test in Chromium. *Verify: module loops audibly.*
-- [ ] **Checkpoint T1xx**: engine demo page (font sheet, dither gradient,
+- [x] **Checkpoint T1xx**: engine demo page (font sheet, dither gradient,
   sprite anim, music+sfx) screenshots clean, 0 console errors, perf ≤12 ms.
 
 ## Phase 2 — Campaign core (T2xx)
