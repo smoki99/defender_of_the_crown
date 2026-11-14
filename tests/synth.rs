@@ -4,14 +4,23 @@ use defender_of_the_crown::engine::audio::modplayer::{Mod, Player};
 use defender_of_the_crown::engine::audio::music::Music;
 use defender_of_the_crown::engine::audio::synth::{play, Sfx, SR};
 
-const ALL: [Sfx; 6] = [Sfx::Blip, Sfx::Coin, Sfx::Sword, Sfx::Hoof, Sfx::Boom, Sfx::Crowd];
+const ALL: [Sfx; 6] = [
+    Sfx::Blip,
+    Sfx::Coin,
+    Sfx::Sword,
+    Sfx::Hoof,
+    Sfx::Boom,
+    Sfx::Crowd,
+];
 
 fn rms(x: &[f32]) -> f32 {
     (x.iter().map(|s| s * s).sum::<f32>() / x.len() as f32).sqrt()
 }
 
 fn zcr(x: &[f32]) -> usize {
-    x.windows(2).filter(|w| w[0].signum() != w[1].signum() && w[0] != 0.0).count()
+    x.windows(2)
+        .filter(|w| w[0].signum() != w[1].signum() && w[0] != 0.0)
+        .count()
 }
 
 #[test]

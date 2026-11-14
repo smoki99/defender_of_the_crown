@@ -21,14 +21,40 @@ pub trait AppCtx {
 /// Semantic events scenes receive (raw input already transformed).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SceneEvent {
-    Move { x: i32, y: i32 },
-    DragStart { x: i32, y: i32 },
-    DragMove { x0: i32, y0: i32, x: i32, y: i32 },
-    Tap { x: i32, y: i32 },
-    DragEnd { x0: i32, y0: i32, x1: i32, y1: i32 },
-    Swipe { dir: Dir },
-    Key { code: u32, pressed: bool },
-    Wheel { dy: i32 },
+    Move {
+        x: i32,
+        y: i32,
+    },
+    DragStart {
+        x: i32,
+        y: i32,
+    },
+    DragMove {
+        x0: i32,
+        y0: i32,
+        x: i32,
+        y: i32,
+    },
+    Tap {
+        x: i32,
+        y: i32,
+    },
+    DragEnd {
+        x0: i32,
+        y0: i32,
+        x1: i32,
+        y1: i32,
+    },
+    Swipe {
+        dir: Dir,
+    },
+    Key {
+        code: u32,
+        pressed: bool,
+    },
+    Wheel {
+        dy: i32,
+    },
     /// Transition finished; scene is now fully visible and interactive.
     Revealed,
 }
@@ -210,7 +236,13 @@ impl SceneStack {
             }
             Some(r) => r,
         };
-        let Running { kind, old, t, in_half, .. } = r;
+        let Running {
+            kind,
+            old,
+            t,
+            in_half,
+            ..
+        } = r;
         let t = *t;
         let in_half = *in_half;
         live.draw(scratch);
@@ -220,7 +252,11 @@ impl SceneStack {
                     // black -> new: new shows through as bayer rises under t
                     for (i, p) in fb.data.iter_mut().enumerate() {
                         let (x, y) = ((i as u32 % W) as i32, (i as u32 / W) as i32);
-                        *p = if bayer(x, y) < t { scratch.data[i] } else { BLACK };
+                        *p = if bayer(x, y) < t {
+                            scratch.data[i]
+                        } else {
+                            BLACK
+                        };
                     }
                 } else {
                     // old -> black
@@ -234,7 +270,11 @@ impl SceneStack {
                 // old -> new
                 for (i, p) in fb.data.iter_mut().enumerate() {
                     let (x, y) = ((i as u32 % W) as i32, (i as u32 / W) as i32);
-                    *p = if bayer(x, y) < t { scratch.data[i] } else { old.data[i] };
+                    *p = if bayer(x, y) < t {
+                        scratch.data[i]
+                    } else {
+                        old.data[i]
+                    };
                 }
             }
             Transition::None => unreachable!(),
@@ -261,7 +301,12 @@ pub fn collect_events(input: &mut Input) -> Vec<SceneEvent> {
         if input.pressed() {
             evs.push(SceneEvent::DragStart { x: mx, y: my });
         } else {
-            evs.push(SceneEvent::DragMove { x0, y0, x: mx, y: my });
+            evs.push(SceneEvent::DragMove {
+                x0,
+                y0,
+                x: mx,
+                y: my,
+            });
         }
     } else if input.prev_mouse() != (mx, my) && mx >= 0 {
         evs.push(SceneEvent::Move { x: mx, y: my });

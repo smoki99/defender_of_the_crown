@@ -29,7 +29,11 @@ impl Sprite {
         for (row, p) in self.px.chunks(self.w as usize).enumerate() {
             for (col, &c) in p.iter().enumerate() {
                 if c != TRANS {
-                    fb.set(x + col as i32, y + row as i32, if flash { WHITE } else { c });
+                    fb.set(
+                        x + col as i32,
+                        y + row as i32,
+                        if flash { WHITE } else { c },
+                    );
                 }
             }
         }

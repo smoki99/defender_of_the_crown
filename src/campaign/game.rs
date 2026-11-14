@@ -1,9 +1,9 @@
 use crate::campaign::ai;
 use crate::campaign::combat::{self, BattleOutcome, FULL_WALLS};
+use crate::campaign::events::EventKind;
 use crate::campaign::map;
 use crate::campaign::rng::Xor;
-use crate::campaign::units::{KindCounts, Unit, UnitKind, MAX_GARRISON};
-use crate::campaign::events::EventKind;
+use crate::campaign::units::{KindCounts, Unit, UnitKind, ALL_KINDS, MAX_GARRISON};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Faction {
@@ -39,6 +39,71 @@ impl Faction {
 
 pub const PLAYER: Faction = Faction::Saxon;
 
+/// AI rig (SPEC 6.1): selected at the title screen, steers the war council.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Difficulty {
+    /// Timid: strikes only overwhelming odds, hoards gold, never scouts.
+    Easy,
+    #[default]
+    Normal,
+    /// Ruthless: spies every turn, spends to the last penny, and only
+    /// storms a garrisoned keep when catapults ride with the host.
+    Hard,
+}
+
+impl Difficulty {
+    /// Minimum power ratio before the council dares a strike.
+    pub fn min_ratio(self) -> f32 {
+        match self {
+            Difficulty::Easy => 2.6,
+            Difficulty::Normal => 2.2,
+            Difficulty::Hard => 2.0,
+        }
+    }
+    /// Ratio accepted when a spy's report (not guesswork) fixed the odds.
+    pub fn confident_ratio(self) -> f32 {
+        match self {
+            Difficulty::Easy => 2.6,
+            Difficulty::Normal => 1.9,
+            Difficulty::Hard => 1.75,
+        }
+    }
+    /// Gold left unspent after feeding the realm.
+    pub fn food_reserve(self) -> u32 {
+        match self {
+            Difficulty::Easy => 40,
+            Difficulty::Normal => 15,
+            Difficulty::Hard => 5,
+        }
+    }
+    /// Extra gold the council demands on every single purchase.
+    pub fn recruit_tax(self) -> u32 {
+        match self {
+            Difficulty::Easy => 20,
+            _ => 0,
+        }
+    }
+    /// Share of the barn cap the council will keep under arms (feeds wars).
+    pub fn army_pct(self) -> u32 {
+        match self {
+            Difficulty::Easy => 25,
+            Difficulty::Normal => 35,
+            Difficulty::Hard => 45,
+        }
+    }
+    /// Turns between covert looks at the frontier; 0 = never spies.
+    pub fn spy_every(self) -> u32 {
+        match self {
+            Difficulty::Easy => 0,
+            Difficulty::Normal => 2,
+            Difficulty::Hard => 1,
+        }
+    }
+    pub fn reinforces(self) -> bool {
+        !matches!(self, Difficulty::Easy)
+    }
+}
+
 /// Kingdom meters besides gold (SPEC 5.2), clamped per field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Bars {
@@ -51,6 +116,44 @@ pub struct Bars {
 }
 
 pub const BAR_MAX: u32 = 100;
+
+/// Minigame result grade (SPEC 5.5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tier {
+    Bronze,
+    Silver,
+    Gold,
+}
+
+impl Tier {
+    pub fn of(score: u32, silver_at: u32, gold_at: u32) -> Tier {
+        if score >= gold_at {
+            Tier::Gold
+        } else if score >= silver_at {
+            Tier::Silver
+        } else {
+            Tier::Bronze
+        }
+    }
+}
+
+/// One minigame's haul (SPEC 5.5). Returned *after* crediting, so the UI
+/// narrates exactly what landed; `champion` means the triple crown was won.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Reward {
+    pub gold: u32,
+    pub provisions: u32,
+    pub loyalty: i32,
+    pub popularity: i32,
+    /// Per kind, in `UnitKind::index()` order.
+    pub troops: KindCounts,
+    pub champion: bool,
+}
+
+/// Cost of the SPORTS button at any owned castle.
+pub const SPORTS_FEE: u32 = 10;
+/// SPEC 5.3: at most three champions under one banner.
+pub const MAX_CHAMPIONS: usize = 3;
 
 pub fn starting_bars() -> Bars {
     Bars {
@@ -97,7 +200,9 @@ pub struct Intel {
 pub enum View {
     Own(Intel),
     /// Scouts eyeball "SEEN: ~N": within ±50% of the truth.
-    Rough { total: u32 },
+    Rough {
+        total: u32,
+    },
     /// Exact but stamped spy report.
     Spied(Intel),
     /// No eyes, no report.
@@ -115,6 +220,18 @@ pub struct GameState {
     salt: u64,
     /// Next-turn event leaked by spies; consumed when events land (T206).
     pub tip: Option<EventKind>,
+    /// Today's omen over England (SPEC 5.4); `None` before the first turn.
+    pub event: Option<EventKind>,
+    /// Turns of plague-hit income left, per faction.
+    pub plague: [u32; 3],
+    /// Castle whose herald tendeth a free tourney, per faction.
+    pub tournament: [Option<usize>; 3],
+    /// Event-tourney GOLDs banked; three recruit a champion (SPEC 5.5).
+    pub golds: [u32; 3],
+    /// Home keep per faction (Saxon=Buckingham, Norman=London, SPEC 5.6).
+    pub homes: [usize; 3],
+    /// Despair for a fallen home keep strikes once, not every turn.
+    pub home_lost: [bool; 3],
     /// [Saxon, Norman, Neutral-unused]
     pub gold: [u32; 3],
     /// Indexed like `gold`; Neutral never holds bars.
@@ -124,6 +241,8 @@ pub struct GameState {
     pub known: Vec<[Option<Intel>; 2]>,
     pub log: Vec<String>,
     pub over: Option<Faction>,
+    /// AI rig per faction seat (tests pit one difficulty against another).
+    pub difficulty: [Difficulty; 3],
 }
 
 impl GameState {
@@ -134,7 +253,11 @@ impl GameState {
             .map(|(id, d)| Stronghold {
                 id,
                 name: d.name,
-                owner: if d.is_saxon { Faction::Saxon } else { Faction::Norman },
+                owner: if d.is_saxon {
+                    Faction::Saxon
+                } else {
+                    Faction::Norman
+                },
                 capital: d.capital,
                 income: d.income,
                 x: d.x,
@@ -152,12 +275,31 @@ impl GameState {
             })
             .collect();
         let n = strongholds.len();
+        let home_of = |f: Faction| {
+            strongholds
+                .iter()
+                .find(|s| s.capital && s.owner == f)
+                .map(|s| s.id)
+                .unwrap_or(usize::MAX)
+        };
+        let homes = [
+            home_of(Faction::Saxon),
+            home_of(Faction::Norman),
+            usize::MAX,
+        ];
         let mut g = GameState {
             turn: 1,
             rng: Xor::new(seed),
             event_rng: Xor::new(seed ^ 0xE6E71),
             salt: seed ^ 0x5A175,
             tip: None,
+            event: None,
+            plague: [0; 3],
+            tournament: [None; 3],
+            golds: [0; 3],
+            difficulty: [Difficulty::default(); 3],
+            homes,
+            home_lost: [false; 3],
             gold: [70, 70, 0],
             bars: [starting_bars(); 3],
             strongholds,
@@ -331,6 +473,8 @@ impl GameState {
             self.add_loyalty(f, -3);
         } else {
             self.bars[idx].provisions = (stock - troops) as u32;
+            // A fed realm forgets its grievances a little (SPEC 4).
+            self.add_loyalty(f, 1);
         }
     }
 
@@ -383,7 +527,12 @@ impl GameState {
             .filter(|s| s.owner == f)
             .map(|s| s.income)
             .sum();
-        raw * (BAR_MAX / 2 + self.bars[f.index()].loyalty) / BAR_MAX
+        let scaled = raw * (BAR_MAX / 2 + self.bars[f.index()].loyalty) / BAR_MAX;
+        if self.plague[f.index()] > 0 {
+            scaled / 2
+        } else {
+            scaled
+        }
     }
 
     pub fn ids_of(&self, f: Faction) -> Vec<usize> {
@@ -401,7 +550,11 @@ impl GameState {
     }
 
     pub fn army_power(&self, sid: usize) -> u32 {
-        self.strongholds[sid].garrison.iter().map(|u| u.power()).sum()
+        self.strongholds[sid]
+            .garrison
+            .iter()
+            .map(|u| u.power())
+            .sum()
     }
 
     pub fn defense_power(&self, sid: usize) -> u32 {
@@ -474,7 +627,35 @@ impl GameState {
         self.can_march(f, from, to)?;
         let army = std::mem::take(&mut self.strongholds[from].garrison);
         self.strongholds[from].moved = true;
+        self.march_army(f, from, to, army)
+    }
 
+    /// Like [`march`](Self::march), but at most `n` soldiers depart and the
+    /// keep keeps a rear guard - a host massing for war must not gift its
+    /// own home to the first banner that rides up to it.
+    pub fn march_part(
+        &mut self,
+        f: Faction,
+        from: usize,
+        to: usize,
+        n: usize,
+    ) -> Result<(), String> {
+        self.can_march(f, from, to)?;
+        let all = std::mem::take(&mut self.strongholds[from].garrison);
+        let keep = all.len().saturating_sub(n.min(all.len()));
+        let army = all[keep..].to_vec();
+        self.strongholds[from].garrison = all[..keep].to_vec();
+        self.strongholds[from].moved = true;
+        self.march_army(f, from, to, army)
+    }
+
+    fn march_army(
+        &mut self,
+        f: Faction,
+        from: usize,
+        to: usize,
+        army: Vec<Unit>,
+    ) -> Result<(), String> {
         if self.strongholds[to].owner == f {
             let n = army.len();
             self.strongholds[to].garrison.extend(army);
@@ -503,6 +684,13 @@ impl GameState {
                 }
             } else {
                 self.strongholds[to].garrison = out.def_survivors.clone();
+                self.strongholds[to].walls = out.walls_left;
+                // survivors limp back to the staging castle
+                self.strongholds[from].garrison = out.atk_survivors.clone();
+                self.push_log(format!(
+                    "{} SURVIVORS RETREAT TO {atk_name}.",
+                    out.atk_survivors.len()
+                ));
                 self.add_loyalty(f, -3);
                 if def_f != Faction::Neutral {
                     self.add_popularity(def_f, 1);
@@ -516,7 +704,11 @@ impl GameState {
     }
 
     fn log_battle(&mut self, out: &BattleOutcome, _atk: &str, def: &str, f: Faction) {
-        let verb = if f == PLAYER { "YOUR ATTACK ON" } else { "THE ATTACK ON" };
+        let verb = if f == PLAYER {
+            "YOUR ATTACK ON"
+        } else {
+            "THE ATTACK ON"
+        };
         self.push_log(format!(
             "{} {}: {} IN {} ROUNDS.",
             verb,
@@ -524,6 +716,9 @@ impl GameState {
             if out.attacker_won { "WON" } else { "REPULSED" },
             out.rounds
         ));
+        if out.duel_won {
+            self.push_log(format!("BUT {def}'S CHAMPION TURNED THE DAY!"));
+        }
         self.push_log(format!(
             "LOST {} | ENEMY LOST {}",
             combat::fmt_counts(&out.atk_loss),
@@ -539,12 +734,76 @@ impl GameState {
             if self.ids_of(f).is_empty() {
                 let w = f.other();
                 self.over = Some(w);
-                self.push_log(if w == PLAYER {
-                    "ENGLAND IS FREE! VICTORY!"
-                } else {
-                    "ENGLAND IS LOST. DEFEAT."
-                }
-                    .to_string());
+                self.push_log(
+                    if w == PLAYER {
+                        "ENGLAND IS FREE! VICTORY!"
+                    } else {
+                        "ENGLAND IS LOST. DEFEAT."
+                    }
+                    .to_string(),
+                );
+                return;
+            }
+        }
+    }
+
+    /// Losing one's home keep is not death - it is despair: -30 loyalty,
+    /// once (SPEC 5.6, modern mercy).
+    fn capital_watch(&mut self) {
+        for f in [Faction::Saxon, Faction::Norman] {
+            let idx = f.index();
+            if self.home_lost[idx] || self.strongholds[self.homes[idx]].owner == f {
+                continue;
+            }
+            self.home_lost[idx] = true;
+            self.add_loyalty(f, -30);
+            if f == PLAYER {
+                self.push_log("BUCKINGHAM HAS FALLEN! DESPAIR GRIEVETH THE SAXONS. -30 LOYALTY.");
+            } else {
+                self.push_log("LONDON IS LOST! THE NORMANS MOURN. -30 LOYALTY.");
+            }
+        }
+    }
+
+    /// Turn 90: the chronicle counts castles and writes the ending (5.6).
+    fn chronicle_judgment(&mut self) {
+        if self.over.is_some() {
+            return;
+        }
+        let s = self.ids_of(Faction::Saxon).len();
+        let n = self.ids_of(Faction::Norman).len();
+        if s == n {
+            self.push_log("TURN XC. THE CHRONICLE RECORDS AN EVEN TALE - THE WAR DRAGGETH ON.");
+            return;
+        }
+        let w = if s > n {
+            Faction::Saxon
+        } else {
+            Faction::Norman
+        };
+        self.over = Some(w);
+        let c = s.max(n);
+        self.push_log(if w == PLAYER {
+            format!("TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES THINE. VICTORY!")
+        } else {
+            format!("TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES HIS. DEFEAT.")
+        });
+    }
+
+    /// Coronation (SPEC 5.6): London's lord with eight shires bows all.
+    fn coronation_check(&mut self) {
+        for f in [Faction::Saxon, Faction::Norman] {
+            let ids = self.ids_of(f);
+            if ids.len() >= 8 && ids.iter().any(|&i| self.strongholds[i].name == "London") {
+                self.over = Some(f);
+                self.push_log(
+                    if f == PLAYER {
+                        "LONDON IS THINE AND EIGHT SHIRES BOW: CROWNED! VICTORY!"
+                    } else {
+                        "THE NORMAN HOLDS LONDON AND THE SHIRES. CROWNED. DEFEAT."
+                    }
+                    .to_string(),
+                );
                 return;
             }
         }
@@ -561,17 +820,289 @@ impl GameState {
             return;
         }
         self.turn += 1;
+        self.roll_events();
         for f in [Faction::Saxon, Faction::Norman] {
             self.pay_day(f);
         }
+        for p in self.plague.iter_mut() {
+            *p = p.saturating_sub(1);
+        }
         for f in [Faction::Saxon, Faction::Norman] {
             self.maybe_revolt(f);
-            self.check_over();
+        }
+        self.capital_watch();
+        self.coronation_check();
+        self.check_over();
+        if self.turn == 90 {
+            self.chronicle_judgment();
         }
         for s in self.strongholds.iter_mut() {
             s.walls = FULL_WALLS;
             s.moved = false;
         }
+    }
+
+    /// One omen a turn over all England (SPEC 5.4); a spy's tip overrides
+    /// the dice exactly once. Both factions suffer - and profit - equally.
+    pub fn roll_events(&mut self) {
+        let e = self
+            .tip
+            .take()
+            .unwrap_or_else(|| EventKind::roll(&mut self.event_rng, self.turn));
+        self.event = Some(e);
+        self.push_log(format!("OMEN: {}.", e.title()));
+        for f in [Faction::Saxon, Faction::Norman] {
+            self.apply_event(f, e);
+        }
+    }
+
+    fn apply_event(&mut self, f: Faction, e: EventKind) {
+        let idx = f.index();
+        let pop = self.bars[idx].popularity;
+        match e {
+            EventKind::TournamentHerald => {
+                let ids = self.ids_of(f);
+                if ids.is_empty() {
+                    return;
+                }
+                let pick = ids[self.event_rng.below(ids.len() as u32) as usize];
+                self.tournament[idx] = Some(pick);
+                let name = self.strongholds[pick].name;
+                self.push_log(format!("A HERALD CRIES TOURNARY IN {name}!"));
+            }
+            EventKind::MerchantCaravan => {
+                let gain = 20 + pop / 5;
+                self.gold[idx] += gain;
+                self.push_log(format!(
+                    "MERCHANT CARAVANS SWELL THE {name} TREASURY. +{gain}.",
+                    name = f.name().to_uppercase()
+                ));
+            }
+            EventKind::BadHarvest => {
+                let loss = 40 - pop / 5;
+                self.add_provisions(f, -(loss as i32));
+                self.push_log(format!(
+                    "BAD HARVEST IN THE {name} LANDS. -{loss} PROVISIONS.",
+                    name = f.name().to_uppercase()
+                ));
+            }
+            EventKind::Plague => {
+                self.plague[idx] = 2;
+                self.push_log(format!(
+                    "A PLEAGUE STRIKETH THE {name}! HALF INCOME TWO TURNS.",
+                    name = f.name().to_uppercase()
+                ));
+            }
+            EventKind::KingsLevy => {
+                let cap = self
+                    .strongholds
+                    .iter()
+                    .filter(|s| s.owner == f && s.capital)
+                    .map(|s| s.id)
+                    .next()
+                    .or_else(|| {
+                        self.strongholds
+                            .iter()
+                            .filter(|s| s.owner == f)
+                            .min_by_key(|s| s.id)
+                            .map(|s| s.id)
+                    });
+                if let Some(id) = cap {
+                    for _ in 0..3 {
+                        self.strongholds[id]
+                            .garrison
+                            .push(Unit::new(UnitKind::Levy));
+                    }
+                    let name = self.strongholds[id].name;
+                    self.push_log(format!("THE KING'S LEVY HARBOURS IN {name}. +3 LEVIES."));
+                }
+            }
+            EventKind::Deserters => {
+                let target = self
+                    .strongholds
+                    .iter()
+                    .filter(|s| s.owner == f && !s.garrison.is_empty())
+                    .max_by_key(|s| (s.garrison.len(), std::cmp::Reverse(s.id)))
+                    .map(|s| s.id);
+                if let Some(id) = target {
+                    let g = &mut self.strongholds[id].garrison;
+                    let n = g.len().min(2);
+                    g.sort_by_key(|u| u.kind.index());
+                    g.drain(..n);
+                    let name = self.strongholds[id].name;
+                    self.push_log(format!("DESERTERS! {n} SLINK AWAY FROM {name}."));
+                }
+            }
+            EventKind::DanishRaiders => self.raiders_strike(f),
+        }
+    }
+
+    /// The heathen come from the sea: a weak coast castle is sacked, a
+    /// strong shore sends them home with spoils (SPEC 5.4).
+    fn raiders_strike(&mut self, f: Faction) {
+        let idx = f.index();
+        let weak = self
+            .strongholds
+            .iter()
+            .filter(|s| s.owner == f && s.coast && s.garrison.len() < 10)
+            .min_by_key(|s| (s.garrison.len(), s.id))
+            .map(|s| s.id);
+        let Some(id) = weak else {
+            self.gold[idx] += 20;
+            self.push_log(format!(
+                "THE RAIDERS PUT BACK TO SEA. THE {name} GAIN +20.",
+                name = f.name().to_uppercase()
+            ));
+            return;
+        };
+        let mut raiders = vec![Unit::new(UnitKind::Levy); 6];
+        raiders.push(Unit::new(UnitKind::Knight));
+        raiders.push(Unit::new(UnitKind::Knight));
+        let walls = self.strongholds[id].walls;
+        let def = self.strongholds[id].garrison.clone();
+        let out = combat::simulate(&raiders, &def, walls, &mut self.event_rng);
+        let name = self.strongholds[id].name;
+        if out.attacker_won {
+            self.strongholds[id].garrison = out.def_survivors;
+            self.strongholds[id].walls = out.walls_left.min(FULL_WALLS / 2);
+            let loot = self.gold[idx].min(50);
+            self.gold[idx] -= loot;
+            self.push_log(format!("DANISH RAIDERS SACK {name}! {loot} GOLD GONE."));
+        } else {
+            self.strongholds[id].garrison = out.def_survivors;
+            self.strongholds[id].walls = out.walls_left;
+            self.gold[idx] += 40;
+            self.push_log(format!(
+                "RAIDERS REPULSED AT {name}! THE GARRISON WINNETH +40."
+            ));
+        }
+    }
+
+    /// Champions under one banner (SPEC 5.3: at most three).
+    pub fn count_champions(&self, f: Faction) -> usize {
+        self.strongholds
+            .iter()
+            .filter(|s| s.owner == f)
+            .flat_map(|s| s.garrison.iter())
+            .filter(|u| u.kind == UnitKind::Champion)
+            .count()
+    }
+
+    /// Base purse of a tier; popularity thickens it (SPEC 5.2 rewards).
+    fn reward_for(&self, f: Faction, tier: Tier) -> Reward {
+        let pop = self.bars[f.index()].popularity;
+        let (gold, provisions, loyalty, popularity, levy, bow, knight) = match tier {
+            Tier::Bronze => (20, 10, 1, 2, 2, 0, 0),
+            Tier::Silver => (40, 20, 2, 3, 0, 2, 0),
+            Tier::Gold => (80, 30, 3, 4, 0, 2, 1),
+        };
+        Reward {
+            gold: gold + pop / 10,
+            provisions,
+            loyalty,
+            popularity,
+            troops: [levy, bow, knight, 0, 0],
+            champion: false,
+        }
+    }
+
+    /// Credit a haul: bars clamp at their caps, troops join the host
+    /// castle (or the home keep if the host fell), capped at garrison room.
+    fn credit(&mut self, f: Faction, sid: usize, r: &Reward) {
+        self.gold[f.index()] += r.gold;
+        self.add_provisions(f, r.provisions as i32);
+        self.add_loyalty(f, r.loyalty);
+        self.add_popularity(f, r.popularity);
+        let home = self.homes[f.index()];
+        let dest = if self.strongholds[sid].owner == f {
+            sid
+        } else {
+            home
+        };
+        for (k, &n) in r.troops.iter().enumerate() {
+            let kind = ALL_KINDS[k];
+            for _ in 0..n {
+                let g = &mut self.strongholds[dest].garrison;
+                if g.len() < MAX_GARRISON {
+                    g.push(Unit::new(kind));
+                }
+            }
+        }
+    }
+
+    /// SPORTS button (SPEC 5.5): 10g at any owned castle; the minigame's
+    /// score meets its own thresholds, and the purse lands in that castle.
+    pub fn play_sports(
+        &mut self,
+        f: Faction,
+        sid: usize,
+        score: u32,
+        silver_at: u32,
+        gold_at: u32,
+    ) -> Result<(Tier, Reward), String> {
+        if self.over.is_some() {
+            return Err("THE GAME IS OVER.".into());
+        }
+        if self.strongholds[sid].owner != f {
+            return Err("THIS CASTLE IS NOT THINE.".into());
+        }
+        if self.gi(f) < SPORTS_FEE {
+            return Err("NOT ENOUGH GOLD.".into());
+        }
+        self.gold[f.index()] -= SPORTS_FEE;
+        let tier = Tier::of(score, silver_at, gold_at);
+        let r = self.reward_for(f, tier);
+        self.credit(f, sid, &r);
+        let name = self.strongholds[sid].name;
+        self.push_log(format!("SPORTS AT {name}: {tier:?} - +{} GOLD.", r.gold));
+        Ok((tier, r))
+    }
+
+    /// TOURNAMENT HERALD (SPEC 5.4/5.5): the free featured meet pays
+    /// double, and three GOLDs across meets recruit a CHAMPION.
+    pub fn play_tournament(
+        &mut self,
+        f: Faction,
+        score: u32,
+        silver_at: u32,
+        gold_at: u32,
+    ) -> Result<(Tier, Reward), String> {
+        if self.over.is_some() {
+            return Err("THE GAME IS OVER.".into());
+        }
+        let Some(sid) = self.tournament[f.index()].take() else {
+            return Err("NO HERALD AWAITS THEE.".into());
+        };
+        let tier = Tier::of(score, silver_at, gold_at);
+        let mut r = self.reward_for(f, tier);
+        r.gold *= 2;
+        r.provisions *= 2;
+        if tier == Tier::Gold {
+            self.golds[f.index()] += 1;
+            if self.golds[f.index()] >= 3 {
+                self.golds[f.index()] = 0;
+                if self.count_champions(f) < MAX_CHAMPIONS {
+                    let g = &mut self.strongholds[sid].garrison;
+                    if g.len() < MAX_GARRISON {
+                        r.champion = true;
+                        g.push(Unit::new(UnitKind::Champion));
+                    }
+                }
+                if !r.champion {
+                    r.gold += 40;
+                }
+            }
+        }
+        self.credit(f, sid, &r);
+        let name = self.strongholds[sid].name;
+        self.push_log(format!("TOURNAMENT AT {name}: {tier:?}! DOUBLE HAUL."));
+        if r.champion {
+            self.push_log(format!(
+                "THE TRIPLE CROWN! A CHAMPION RIDES FOR {}!",
+                f.name()
+            ));
+        }
+        Ok((tier, r))
     }
 }
 

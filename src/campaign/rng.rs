@@ -9,7 +9,11 @@ pub struct Xor {
 impl Xor {
     pub fn new(seed: u64) -> Self {
         Xor {
-            state: if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed },
+            state: if seed == 0 {
+                0x9E37_79B9_7F4A_7C15
+            } else {
+                seed
+            },
         }
     }
 

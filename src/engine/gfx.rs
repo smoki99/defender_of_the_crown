@@ -136,12 +136,7 @@ pub fn mix(a: u8, b: u8, t: u8) -> u8 {
 }
 
 /// 4x4 Bayer matrix, thresholds 0..15 (classic ordered pattern).
-pub const BAYER4: [[u8; 4]; 4] = [
-    [0, 8, 2, 10],
-    [12, 4, 14, 6],
-    [3, 11, 1, 9],
-    [15, 7, 13, 5],
-];
+pub const BAYER4: [[u8; 4]; 4] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
 #[inline]
 pub fn bayer(x: i32, y: i32) -> u8 {

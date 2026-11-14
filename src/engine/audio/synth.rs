@@ -102,7 +102,11 @@ fn sword() -> Vec<f32> {
 fn hoof() -> Vec<f32> {
     build(0.09, |t, i| {
         let thud = (110.0 * t).sin() * env_ad(t, 0.002, 0.09);
-        let click = if i < 64 { 0.3 * (i as f32 * 2.1).sin() } else { 0.0 };
+        let click = if i < 64 {
+            0.3 * (i as f32 * 2.1).sin()
+        } else {
+            0.0
+        };
         let a = 0.5 * (thud + click);
         (a, a)
     })

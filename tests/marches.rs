@@ -2,7 +2,7 @@
 //! no two-leg days, captured castles already spent their day - and dawn
 //! (end_player_turn) resets every flag.
 
-use defender_of_the_crown::campaign::game::{GameState, Faction, PLAYER};
+use defender_of_the_crown::campaign::game::{Faction, GameState, PLAYER};
 
 fn own_with_garrison(g: &GameState, min: usize) -> usize {
     (0..g.strongholds.len())
@@ -11,7 +11,11 @@ fn own_with_garrison(g: &GameState, min: usize) -> usize {
 }
 
 fn own_neighbour(g: &GameState, sid: usize) -> usize {
-    g.adj(sid).iter().copied().find(|&a| g.strongholds[a].owner == PLAYER).unwrap()
+    g.adj(sid)
+        .iter()
+        .copied()
+        .find(|&a| g.strongholds[a].owner == PLAYER)
+        .unwrap()
 }
 
 #[test]
@@ -55,9 +59,16 @@ fn no_two_leg_day_for_the_arriving_army() {
     let a = own_with_garrison(&g, 3);
     let b = own_neighbour(&g, a);
     assert!(g.march(PLAYER, a, b).is_ok()); // reinforcements arrive
-    if let Some(c) = g.adj(b).iter().copied().find(|&x| x != a && g.strongholds[x].owner == PLAYER)
+    if let Some(c) = g
+        .adj(b)
+        .iter()
+        .copied()
+        .find(|&x| x != a && g.strongholds[x].owner == PLAYER)
     {
-        assert!(g.march(PLAYER, b, c).is_err(), "armies march one road a day");
+        assert!(
+            g.march(PLAYER, b, c).is_err(),
+            "armies march one road a day"
+        );
     } else {
         panic!("{b} needs a second own neighbour");
     }
@@ -83,7 +94,11 @@ fn the_same_castle_marches_again_next_dawn() {
     let b = own_neighbour(&g, a);
     assert!(g.march(PLAYER, a, b).is_ok());
     g.end_player_turn();
-    let c = g.adj(b).iter().copied().find(|&x| x != a && g.strongholds[x].owner == PLAYER);
+    let c = g
+        .adj(b)
+        .iter()
+        .copied()
+        .find(|&x| x != a && g.strongholds[x].owner == PLAYER);
     if let Some(c) = c {
         assert!(g.march(PLAYER, b, c).is_ok(), "the army is rested and free");
     }
@@ -100,7 +115,10 @@ fn a_capturing_march_leaves_the_winner_spent() {
     g.strongholds[target].walls = 0;
     assert!(g.march(PLAYER, from, target).is_ok());
     assert_eq!(g.strongholds[target].owner, PLAYER);
-    assert!(g.strongholds[target].moved, "the victors already fought their way in");
+    assert!(
+        g.strongholds[target].moved,
+        "the victors already fought their way in"
+    );
     assert!(g.march(PLAYER, target, from).is_err());
 }
 
@@ -119,12 +137,17 @@ fn march_gates_refuse_illegal_moves() {
         .adj(b)
         .iter()
         .copied()
-        .find(|&i| i != a && g.strongholds[i].owner == PLAYER && g.strongholds[i].garrison.len() >= 2)
+        .find(|&i| {
+            i != a && g.strongholds[i].owner == PLAYER && g.strongholds[i].garrison.len() >= 2
+        })
         .expect("a garrisoned own neighbour of the rebel hold");
     g.strongholds[b].owner = Faction::Neutral;
     g.strongholds[b].garrison.clear();
     g.strongholds[b].walls = 0;
     assert!(g.march(PLAYER, c, b).is_ok(), "rebel holds may be seized");
     g.over = Some(Faction::Norman);
-    assert!(g.march(PLAYER, c, own_neighbour(&g, c)).is_err(), "the game is done");
+    assert!(
+        g.march(PLAYER, c, own_neighbour(&g, c)).is_err(),
+        "the game is done"
+    );
 }

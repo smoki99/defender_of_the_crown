@@ -65,7 +65,10 @@ fn coastal_raid_axis_and_port_exist() {
     let coast: Vec<&str> = defs.iter().filter(|d| d.coast).map(|d| d.name).collect();
     assert_eq!(coast, vec!["Wallingford", "London", "Dover"]);
     assert_eq!(
-        defs.iter().filter(|d| d.port).map(|d| d.name).collect::<Vec<_>>(),
+        defs.iter()
+            .filter(|d| d.port)
+            .map(|d| d.name)
+            .collect::<Vec<_>>(),
         vec!["Dover"]
     );
 }
@@ -91,7 +94,10 @@ fn five_unit_kinds_with_unique_indexes() {
 fn champions_cannot_be_bought() {
     let mut g = GameState::new(1);
     let buck = 0usize; // player capital
-    assert_eq!(g.recruit(PLAYER, buck, UnitKind::Champion).unwrap_err(), "CHAMPIONS ARE EARNED, NOT BOUGHT.");
+    assert_eq!(
+        g.recruit(PLAYER, buck, UnitKind::Champion).unwrap_err(),
+        "CHAMPIONS ARE EARNED, NOT BOUGHT."
+    );
     assert_eq!(g.gi(PLAYER), 70, "rejected recruit must not spend gold");
 }
 

@@ -5,8 +5,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
 use wasm_bindgen::Clamped;
+use wasm_bindgen::JsCast;
 
 #[wasm_bindgen(module = "/src/promise_hook.js")]
 extern "C" {
@@ -16,8 +16,8 @@ extern "C" {
 use crate::engine::audio::{Mod, Music, Player, Sfx};
 use crate::engine::fonts::{draw_text, draw_text_shadow};
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, DARKGREEN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTBLUE, LINEN, NAVY,
-    SAXON_BLUE, TAN, WHITE, YELLOW, H, W,
+    Framebuffer, BLACK, BLOOD, DARKGRAY, DARKGREEN, GOLD, GRAY, GREEN, H, LIGHTBLUE, LINEN, NAVY,
+    SAXON_BLUE, TAN, W, WHITE, YELLOW,
 };
 use crate::engine::input::{
     Gesture, Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP,
@@ -148,7 +148,9 @@ fn attach_script(ctx: &web_sys::AudioContext, music: Rc<RefCell<Music>>, muted: 
         let n = buf.length() as usize;
         let mut out = vec![0.0f32; n * 2];
         if !muted.get() {
-            music.borrow_mut().render(&mut out, buf.sample_rate() as u32);
+            music
+                .borrow_mut()
+                .render(&mut out, buf.sample_rate() as u32);
         }
         let mut l = vec![0.0f32; n];
         let mut r = vec![0.0f32; n];
@@ -242,7 +244,8 @@ impl AudioState {
                         arr.copy_from(&buf);
                         let _ = feed_port.post_message(&arr);
                         set_rms(&buf);
-                    }) as Box<dyn FnMut(web_sys::MessageEvent)>);
+                    })
+                        as Box<dyn FnMut(web_sys::MessageEvent)>);
                     port.set_onmessage(Some(feed.as_ref().unchecked_ref()));
                     feed.forget();
                 });
@@ -276,36 +279,23 @@ impl AudioState {
 /// T105 demo troops: two-frame marching, 8x8, palette-indexed.
 const T: u8 = TRANS;
 static FOOT_A: [u8; 64] = [
-    T, T, GRAY, GRAY, GRAY, GRAY, T, T,
-    T, GRAY, GRAY, GRAY, GRAY, GRAY, GRAY, T,
-    T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T,
-    T, SAXON_BLUE, SAXON_BLUE, WHITE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T,
-    T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T,
-    T, T, TAN, T, T, TAN, T, T,
-    T, TAN, TAN, T, T, TAN, TAN, T,
-    T, T, T, T, T, T, T, T,
+    T, T, GRAY, GRAY, GRAY, GRAY, T, T, T, GRAY, GRAY, GRAY, GRAY, GRAY, GRAY, T, T, T, SAXON_BLUE,
+    SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T, T, SAXON_BLUE, SAXON_BLUE, WHITE, SAXON_BLUE,
+    SAXON_BLUE, SAXON_BLUE, T, T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T, T, T,
+    TAN, T, T, TAN, T, T, T, TAN, TAN, T, T, TAN, TAN, T, T, T, T, T, T, T, T, T,
 ];
 static FOOT_B: [u8; 64] = [
-    T, T, GRAY, GRAY, GRAY, GRAY, T, T,
-    T, GRAY, GRAY, GRAY, GRAY, GRAY, GRAY, T,
-    T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T,
-    T, SAXON_BLUE, SAXON_BLUE, WHITE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T,
-    T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T,
-    T, T, TAN, TAN, TAN, TAN, T, T,
-    T, T, TAN, T, T, TAN, T, T,
-    T, T, T, T, T, T, T, T,
+    T, T, GRAY, GRAY, GRAY, GRAY, T, T, T, GRAY, GRAY, GRAY, GRAY, GRAY, GRAY, T, T, T, SAXON_BLUE,
+    SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T, T, SAXON_BLUE, SAXON_BLUE, WHITE, SAXON_BLUE,
+    SAXON_BLUE, SAXON_BLUE, T, T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T, T, T,
+    TAN, TAN, TAN, TAN, T, T, T, T, TAN, T, T, TAN, T, T, T, T, T, T, T, T, T, T,
 ];
 static FOOT_SOLDIER: Sprite = Sprite::square(8, &FOOT_A);
 static FOOT_SOLDIER_B: Sprite = Sprite::square(8, &FOOT_B);
 static BANNER: [u8; 64] = [
-    TAN, BLOOD, BLOOD, BLOOD, BLOOD, T, T, T,
-    TAN, BLOOD, GOLD, GOLD, BLOOD, T, T, T,
-    TAN, BLOOD, GOLD, GOLD, BLOOD, T, T, T,
-    TAN, BLOOD, BLOOD, BLOOD, BLOOD, T, T, T,
-    TAN, T, T, T, T, T, T, T,
-    TAN, T, T, T, T, T, T, T,
-    TAN, T, T, T, T, T, T, T,
-    TAN, T, T, T, T, T, T, T,
+    TAN, BLOOD, BLOOD, BLOOD, BLOOD, T, T, T, TAN, BLOOD, GOLD, GOLD, BLOOD, T, T, T, TAN, BLOOD,
+    GOLD, GOLD, BLOOD, T, T, T, TAN, BLOOD, BLOOD, BLOOD, BLOOD, T, T, T, TAN, T, T, T, T, T, T, T,
+    TAN, T, T, T, T, T, T, T, TAN, T, T, T, T, T, T, T, TAN, T, T, T, T, T, T, T,
 ];
 static BANNER_SPRITE: Sprite = Sprite::square(8, &BANNER);
 
@@ -407,7 +397,14 @@ impl Scene for TestScene {
         } else {
             blit_anim(&FOOT_SOLDIER, &FOOT_SOLDIER_B, fb, march, 148, frame);
         }
-        blit_anim(&FOOT_SOLDIER_B, &FOOT_SOLDIER, fb, march - 20, 150, frame + 1);
+        blit_anim(
+            &FOOT_SOLDIER_B,
+            &FOOT_SOLDIER,
+            fb,
+            march - 20,
+            150,
+            frame + 1,
+        );
         FOOT_SOLDIER.blit_scaled(fb, 4, 232, 2, false);
         BANNER_SPRITE.blit_scaled(fb, 302, 72, 2, false);
         let (cx, cy) = (self.circle.0 / 256, self.circle.1 / 256);
@@ -445,7 +442,7 @@ impl Scene for DemoScene {
                 code: KEY_SPACE,
                 pressed: true,
             }
-            | SceneEvent::Tap { ..} => self.want_leave = true,
+            | SceneEvent::Tap { .. } => self.want_leave = true,
             _ => {}
         }
     }
@@ -491,7 +488,14 @@ impl Scene for DemoScene {
         } else {
             blit_anim(&FOOT_SOLDIER, &FOOT_SOLDIER_B, fb, march, 110, frame);
         }
-        blit_anim(&FOOT_SOLDIER_B, &FOOT_SOLDIER, fb, march + 14, 112, frame + 1);
+        blit_anim(
+            &FOOT_SOLDIER_B,
+            &FOOT_SOLDIER,
+            fb,
+            march + 14,
+            112,
+            frame + 1,
+        );
         FOOT_SOLDIER.blit_scaled(fb, 200, 108, 3, false);
         BANNER_SPRITE.blit_scaled(fb, 288, 100, 4, false);
         draw_text_shadow(
@@ -577,7 +581,10 @@ pub fn main() -> Result<(), JsValue> {
     if let Ok(m) = Mod::parse(include_bytes!("../assets/music/test.mod")) {
         music.borrow_mut().set_track(Some(Player::new(m)));
     }
-    let audio = AudioState { ctx: None, music: music.clone() };
+    let audio = AudioState {
+        ctx: None,
+        music: music.clone(),
+    };
     let want_test = query_has("scene=test");
     let shot_at: u64 = query_get("shot").and_then(|v| v.parse().ok()).unwrap_or(0);
     let want_demo = query_has("scene=demo");
@@ -620,7 +627,11 @@ pub fn main() -> Result<(), JsValue> {
         perf_n: 0,
     };
     let state = Rc::new(RefCell::new(app));
-    let ctxrc = Rc::new(RefCell::new(Ctx { muted, music, audio }));
+    let ctxrc = Rc::new(RefCell::new(Ctx {
+        muted,
+        music,
+        audio,
+    }));
 
     wire_input(&state, &ctxrc);
     {
@@ -658,7 +669,12 @@ pub fn main() -> Result<(), JsValue> {
                     ctx.audio.unlock(&m);
                 }
                 // T108: gestures fire SFX through the mix
-                if st.input.gestures().iter().any(|g| matches!(g, Gesture::Tap { .. })) {
+                if st
+                    .input
+                    .gestures()
+                    .iter()
+                    .any(|g| matches!(g, Gesture::Tap { .. }))
+                {
                     ctx.music.borrow_mut().sfx(Sfx::Blip);
                 }
                 if st.input.key_pressed(crate::engine::input::KEY_SPACE) {
@@ -696,9 +712,7 @@ pub fn main() -> Result<(), JsValue> {
             }
             st.stack.paint(&mut st.fb, &mut st.scratch);
             st.fb.to_rgba(&mut st.rgba);
-            if let Ok(img) =
-                web_sys::ImageData::new_with_u8_clamped_array(Clamped(&st.rgba), W)
-            {
+            if let Ok(img) = web_sys::ImageData::new_with_u8_clamped_array(Clamped(&st.rgba), W) {
                 let _ = st.ctx2d.put_image_data(&img, 0.0, 0.0);
             }
             st.perf_acc += js_sys::Date::now() - t0;
@@ -826,7 +840,9 @@ fn wire_input(state: &Rc<RefCell<App>>, ctx: &Rc<RefCell<Ctx>>) {
         let s = state.clone();
         let cb = Closure::wrap(Box::new(move |e: web_sys::WheelEvent| {
             e.prevent_default();
-            s.borrow_mut().input.push(Raw::Wheel { dy: e.delta_y() as i32 });
+            s.borrow_mut().input.push(Raw::Wheel {
+                dy: e.delta_y() as i32,
+            });
         }) as Box<dyn FnMut(web_sys::WheelEvent)>);
         canvas
             .add_event_listener_with_callback("wheel", cb.as_ref().unchecked_ref())
@@ -837,9 +853,10 @@ fn wire_input(state: &Rc<RefCell<App>>, ctx: &Rc<RefCell<Ctx>>) {
         let s = state.clone();
         let cb = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
             if let Some(code) = key_code(&e.key()) {
-                s.borrow_mut()
-                    .input
-                    .push(Raw::Key { code, pressed: true });
+                s.borrow_mut().input.push(Raw::Key {
+                    code,
+                    pressed: true,
+                });
                 if e.key().starts_with("Arrow") || e.key() == " " {
                     e.prevent_default();
                 }
@@ -853,9 +870,10 @@ fn wire_input(state: &Rc<RefCell<App>>, ctx: &Rc<RefCell<Ctx>>) {
         let s = state.clone();
         let cb = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
             if let Some(code) = key_code(&e.key()) {
-                s.borrow_mut()
-                    .input
-                    .push(Raw::Key { code, pressed: false });
+                s.borrow_mut().input.push(Raw::Key {
+                    code,
+                    pressed: false,
+                });
             }
         }) as Box<dyn FnMut(web_sys::KeyboardEvent)>);
         w().add_event_listener_with_callback("keyup", cb.as_ref().unchecked_ref())
@@ -866,7 +884,12 @@ fn wire_input(state: &Rc<RefCell<App>>, ctx: &Rc<RefCell<Ctx>>) {
 }
 
 fn ls_get(k: &str) -> Option<String> {
-    w().local_storage().ok().flatten()?.get_item(k).ok().flatten()
+    w().local_storage()
+        .ok()
+        .flatten()?
+        .get_item(k)
+        .ok()
+        .flatten()
 }
 
 fn ls_set(k: &str, v: &str) {

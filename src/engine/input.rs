@@ -8,12 +8,26 @@ use std::collections::VecDeque;
 /// One raw DOM-level event; coordinates already mapped to internal 320x256.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Raw {
-    Down { x: i32, y: i32 },
-    Move { x: i32, y: i32 },
-    Up { x: i32, y: i32 },
+    Down {
+        x: i32,
+        y: i32,
+    },
+    Move {
+        x: i32,
+        y: i32,
+    },
+    Up {
+        x: i32,
+        y: i32,
+    },
     /// Key state change; `code` = codepoint when printable, else KEY_*.
-    Key { code: u32, pressed: bool },
-    Wheel { dy: i32 },
+    Key {
+        code: u32,
+        pressed: bool,
+    },
+    Wheel {
+        dy: i32,
+    },
 }
 
 // Synthetic codes for non-printable keys (extend as needed).
@@ -179,11 +193,22 @@ impl Input {
                     let frames = frame.saturating_sub(f0).max(1);
                     let speed = (travel as u64 / frames).max(1) as i32;
                     if travel <= TAP_SLOP && frames <= TAP_FRAMES {
-                        self.gestures.push(Gesture::Tap { x: ox, y: oy, frame: f0 });
+                        self.gestures.push(Gesture::Tap {
+                            x: ox,
+                            y: oy,
+                            frame: f0,
+                        });
                     } else if travel >= SWIPE_MIN && speed >= SWIPE_SPEED {
-                        self.gestures.push(Gesture::Swipe { dir: bucket(dx, dy) });
+                        self.gestures.push(Gesture::Swipe {
+                            dir: bucket(dx, dy),
+                        });
                     } else {
-                        self.gestures.push(Gesture::DragEnd { x0: ox, y0: oy, x1: x, y1: y });
+                        self.gestures.push(Gesture::DragEnd {
+                            x0: ox,
+                            y0: oy,
+                            x1: x,
+                            y1: y,
+                        });
                     }
                 }
             }

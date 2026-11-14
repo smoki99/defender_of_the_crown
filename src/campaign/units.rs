@@ -37,10 +37,10 @@ impl UnitKind {
 
     pub fn icon(self) -> &'static str {
         match self {
-            UnitKind::Levy => "\u{1FA93}",   // axe
-            UnitKind::Bowman => "\u{1F3F9}", // bow-ish banner
-            UnitKind::Knight => "\u{1F40E}", // horse
-            UnitKind::Siege => "\u{1F680}",  // trebuchet stand-in
+            UnitKind::Levy => "\u{1FA93}",    // axe
+            UnitKind::Bowman => "\u{1F3F9}",  // bow-ish banner
+            UnitKind::Knight => "\u{1F40E}",  // horse
+            UnitKind::Siege => "\u{1F680}",   // trebuchet stand-in
             UnitKind::Champion => "\u{265B}", // crown
         }
     }

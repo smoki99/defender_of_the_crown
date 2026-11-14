@@ -11,7 +11,10 @@ pub struct BattleOutcome {
     pub repelled_by_walls: bool,
     pub rounds: usize,
     pub walls_broken_round: Option<usize>,
-    /// Losses and survivors indexed by `UnitKind::index()`.
+    /// Wall hit points when the battle ended (breach persists).
+    pub walls_left: u32,
+    /// A defending champion turned a lost day (SPEC 5.3 duel).
+    pub duel_won: bool,
     pub atk_loss: KindCounts,
     pub def_loss: KindCounts,
     pub atk_survivors: Vec<Unit>,
@@ -45,6 +48,9 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
     let mut def: Vec<Unit> = defender.to_vec();
     let atk_start = counts(&atk);
     let def_start = counts(&def);
+    let champ = |us: &[Unit]| us.iter().any(|u| u.kind == UnitKind::Champion && u.hp > 0);
+    let atk_champ = champ(&atk);
+    let def_champ = champ(&def);
 
     let mut walls_hp = walls;
     let mut walls_broken_round = None;
@@ -60,7 +66,8 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
             if a.hp == 0 {
                 continue;
             }
-            let dmg = a.kind.atk();
+            let base = a.kind.atk();
+            let dmg = if atk_champ { base + base / 4 } else { base };
             let is_siege = a.kind == UnitKind::Siege;
             if walls_hp > 0 {
                 let wall_dmg = if is_siege { dmg * 3 } else { (dmg / 2).max(1) };
@@ -91,7 +98,14 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
             if d.hp == 0 {
                 continue;
             }
-            let dmg = d.kind.atk();
+            let mut dmg = d.kind.atk();
+            if def_champ {
+                dmg += dmg / 4;
+            }
+            if walls_hp > 0 {
+                // defenders shoot from the battlements (SPEC 5.3)
+                dmg += dmg / 2;
+            }
             let n = alive_count(&atk);
             if n == 0 {
                 break;
@@ -103,6 +117,21 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
         }
         if alive_count(&atk) == 0 {
             break;
+        }
+    }
+
+    // A champion in a losing defence turns the day one time in four.
+    let mut duel_won = false;
+    if attacker_won && def_champ && rng.below(100) < 25 {
+        attacker_won = false;
+        duel_won = true;
+        let best = atk
+            .iter()
+            .enumerate()
+            .filter(|(_, u)| u.hp > 0)
+            .max_by_key(|(_, u)| (u.kind.index(), u.hp));
+        if let Some((i, _)) = best {
+            atk[i].hp = 0;
         }
     }
 
@@ -127,6 +156,8 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
         repelled_by_walls,
         rounds: round,
         walls_broken_round,
+        walls_left: walls_hp,
+        duel_won,
         atk_loss,
         def_loss,
         atk_survivors,

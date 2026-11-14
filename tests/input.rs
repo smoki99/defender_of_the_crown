@@ -10,7 +10,11 @@ fn queue_drains_once_per_frame() {
     inp.begin_frame(1);
     assert_eq!(inp.mouse(), (30, 40, false), "last event wins in a frame");
     inp.begin_frame(2);
-    assert_eq!(inp.prev_mouse(), (30, 40), "prev holds frame-start position");
+    assert_eq!(
+        inp.prev_mouse(),
+        (30, 40),
+        "prev holds frame-start position"
+    );
 }
 
 #[test]
@@ -35,7 +39,14 @@ fn quick_press_release_is_tap() {
     inp.begin_frame(10);
     inp.push(Raw::Up { x: 103, y: 62 }); // within slop
     inp.begin_frame(11);
-    assert_eq!(inp.gestures(), &[Gesture::Tap { x: 100, y: 60, frame: 10 }]);
+    assert_eq!(
+        inp.gestures(),
+        &[Gesture::Tap {
+            x: 100,
+            y: 60,
+            frame: 10
+        }]
+    );
 }
 
 #[test]
@@ -60,7 +71,12 @@ fn drag_reports_origin_and_travel_and_ends() {
     inp.begin_frame(2);
     assert_eq!(
         inp.gestures(),
-        &[Gesture::DragEnd { x0: 10, y0: 10, x1: 40, y1: 12 }]
+        &[Gesture::DragEnd {
+            x0: 10,
+            y0: 10,
+            x1: 40,
+            y1: 12
+        }]
     );
     assert_eq!(inp.dragging(), None, "stroke cleared after release");
 }
@@ -105,14 +121,26 @@ fn bucket_eights() {
 #[test]
 fn key_edges_repeat_suppressed_and_text() {
     let mut inp = Input::new();
-    inp.push(Raw::Key { code: b'a' as u32, pressed: true });
-    inp.push(Raw::Key { code: b'a' as u32, pressed: true }); // OS repeat
+    inp.push(Raw::Key {
+        code: b'a' as u32,
+        pressed: true,
+    });
+    inp.push(Raw::Key {
+        code: b'a' as u32,
+        pressed: true,
+    }); // OS repeat
     inp.begin_frame(1);
     assert!(inp.key_pressed(b'a' as u32) && inp.key_down(b'a' as u32));
     assert_eq!(inp.take_text(), "aa", "repeat feeds text buffer");
     inp.begin_frame(2);
-    assert!(!inp.key_pressed(b'a' as u32), "repeat must not re-fire edge");
-    inp.push(Raw::Key { code: b'a' as u32, pressed: false });
+    assert!(
+        !inp.key_pressed(b'a' as u32),
+        "repeat must not re-fire edge"
+    );
+    inp.push(Raw::Key {
+        code: b'a' as u32,
+        pressed: false,
+    });
     inp.begin_frame(3);
     assert!(inp.key_released(b'a' as u32) && !inp.key_down(b'a' as u32));
 }
@@ -120,7 +148,10 @@ fn key_edges_repeat_suppressed_and_text() {
 #[test]
 fn space_key_codes_both_paths() {
     let mut inp = Input::new();
-    inp.push(Raw::Key { code: KEY_SPACE, pressed: true });
+    inp.push(Raw::Key {
+        code: KEY_SPACE,
+        pressed: true,
+    });
     inp.begin_frame(1);
     assert!(inp.key_pressed(KEY_SPACE));
     assert_eq!(inp.take_text(), " ", "KEY_SPACE yields a space char");

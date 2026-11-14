@@ -155,7 +155,12 @@ fn to_rgba_maps_palette() {
 
 #[test]
 fn mix_endpoints_and_rows_are_correct() {
-    for (a, b) in [(SKY, NAVY), (BLACK, WHITE), (GOLD, NORMAN_RED), (SAXON_BLUE, CREAM)] {
+    for (a, b) in [
+        (SKY, NAVY),
+        (BLACK, WHITE),
+        (GOLD, NORMAN_RED),
+        (SAXON_BLUE, CREAM),
+    ] {
         assert_eq!(mix(a, b, 0), a);
         assert_eq!(mix(a, b, 8), b);
         // every intermediate is a real palette color between the endpoints
@@ -168,5 +173,8 @@ fn mix_endpoints_and_rows_are_correct() {
     assert_eq!(mix(SKY, NAVY, 4), mix(SKY, NAVY, 4));
     let mid = rgb(mix(SKY, NAVY, 4));
     let mid2 = rgb(mix(NAVY, SKY, 4));
-    assert!(mid[2] > mid[0] && mid2[2] > mid2[0], "sky-navy midpoint must stay blue");
+    assert!(
+        mid[2] > mid[0] && mid2[2] > mid2[0],
+        "sky-navy midpoint must stay blue"
+    );
 }

@@ -49,7 +49,10 @@ fn popularity_discounts_recruits() {
     g.gold[0] = 500;
     // pop 0: full price
     g.bars[0].popularity = 0;
-    assert_eq!(g.effective_cost(PLAYER, UnitKind::Levy), UnitKind::Levy.cost());
+    assert_eq!(
+        g.effective_cost(PLAYER, UnitKind::Levy),
+        UnitKind::Levy.cost()
+    );
     // pop max: exactly half, and the charge is the discounted price
     g.bars[0].popularity = BAR_MAX;
     let half = UnitKind::Levy.cost() / 2;
@@ -81,12 +84,11 @@ fn hungry_armies_desert_and_loyalty_falls() {
     g.bars[1].provisions = 999; // keep the Normans fed for a clean read
     let before = g.troops_of(PLAYER);
     g.end_player_turn();
-    assert!(g
-        .log
-        .iter()
-        .any(|l| l.contains("HUNGER TAKES")),
+    assert!(
+        g.log.iter().any(|l| l.contains("HUNGER TAKES")),
         "no desertion log: {:?}",
-        g.log);
+        g.log
+    );
     assert!(g.troops_of(PLAYER) <= before);
     assert_eq!(g.bars_of(PLAYER).provisions, 0);
     assert!(g.bars_of(PLAYER).loyalty < 50);
@@ -151,7 +153,9 @@ fn failed_attack_sours_loyalty() {
     g.strongholds[target].owner = Faction::Norman;
     g.strongholds[target].garrison.clear();
     for _ in 0..32 {
-        g.strongholds[target].garrison.push(Unit::new(UnitKind::Knight));
+        g.strongholds[target]
+            .garrison
+            .push(Unit::new(UnitKind::Knight));
     }
     g.strongholds[home].garrison.clear();
     g.strongholds[home].garrison.push(Unit::new(UnitKind::Levy));

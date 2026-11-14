@@ -7,10 +7,7 @@ const S: u8 = TRANS;
 
 /// 4x4 checker-ish pattern with transparent corners.
 static PAT: [u8; 16] = [
-    S, BLOOD, BLOOD, S,
-    BLOOD, GREEN, GREEN, BLOOD,
-    BLOOD, GREEN, GREEN, BLOOD,
-    S, BLOOD, BLOOD, S,
+    S, BLOOD, BLOOD, S, BLOOD, GREEN, GREEN, BLOOD, BLOOD, GREEN, GREEN, BLOOD, S, BLOOD, BLOOD, S,
 ];
 
 #[test]

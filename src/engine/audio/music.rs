@@ -24,7 +24,10 @@ impl Default for Music {
 
 impl Music {
     pub fn new() -> Self {
-        Self { track: None, voices: Vec::new() }
+        Self {
+            track: None,
+            voices: Vec::new(),
+        }
     }
 
     /// Replace the looping background track (None stops it).

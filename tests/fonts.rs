@@ -9,11 +9,7 @@ fn lit(bits: &[u8; 8]) -> u32 {
 }
 
 fn is_lit(bits: &[u8; 8], col: i32, row: i32) -> bool {
-    col >= 0
-        && row >= 0
-        && col < 8
-        && row < 8
-        && bits[row as usize] & (0x80u8 >> col as u32) != 0
+    col >= 0 && row >= 0 && col < 8 && row < 8 && bits[row as usize] & (0x80u8 >> col as u32) != 0
 }
 
 #[test]
@@ -77,7 +73,11 @@ fn draw_text_at_origin_writes_exact_pixel_count_and_keeps_gaps() {
     draw_text(&mut fb, 0, 0, s, WHITE);
     let want: u32 = s.chars().map(|c| lit(&glyph(c))).sum();
     assert!(want > 0);
-    assert_eq!(fb.count(WHITE), want, "changed px must equal summed lit bits");
+    assert_eq!(
+        fb.count(WHITE),
+        want,
+        "changed px must equal summed lit bits"
+    );
     // nothing outside the 8px-cell band
     for y in 0..H {
         for x in 0..W {

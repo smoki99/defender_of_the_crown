@@ -1,7 +1,7 @@
 //! SPEC 5.3 fog: own eyes are truth, neighbours give "SEEN: ~N" ±50% scouts,
 //! spies (70%) buy exact reports of a castle and its ring, failure just costs
 //! gold, and battle reports outlive the eyes that saw them.
-use defender_of_the_crown::campaign::game::{GameState, Faction, View, PLAYER, SPY_COST};
+use defender_of_the_crown::campaign::game::{Faction, GameState, View, PLAYER, SPY_COST};
 use defender_of_the_crown::campaign::rng::Xor;
 use defender_of_the_crown::campaign::units::{Unit, UnitKind};
 
@@ -36,10 +36,15 @@ fn seed_where(pred: impl Fn(u32, u32) -> bool) -> u64 {
 #[test]
 fn own_castles_report_exact_truth() {
     let g = GameState::new(7);
-    let own = (0..g.strongholds.len()).find(|&i| g.strongholds[i].owner == PLAYER).unwrap();
+    let own = (0..g.strongholds.len())
+        .find(|&i| g.strongholds[i].owner == PLAYER)
+        .unwrap();
     match g.view(PLAYER, own) {
         View::Own(rep) => {
-            assert_eq!(rep.counts.iter().sum::<u32>(), g.strongholds[own].garrison.len() as u32);
+            assert_eq!(
+                rep.counts.iter().sum::<u32>(),
+                g.strongholds[own].garrison.len() as u32
+            );
             assert_eq!(rep.walls, g.strongholds[own].walls);
             assert_eq!(rep.seen, g.turn);
         }
@@ -57,8 +62,15 @@ fn neighbour_garrisons_are_rough_eyes_only() {
         v => panic!("expected a scout estimate, got {v:?}"),
     };
     // SPEC: "SEEN: ~N" is within ±50% of the truth and stable per view.
-    assert!((truth / 2..=truth / 2 + truth).contains(&est), "est {est} vs truth {truth}");
-    assert_eq!(g.view(PLAYER, t), g.view(PLAYER, t), "the lie must be stable");
+    assert!(
+        (truth / 2..=truth / 2 + truth).contains(&est),
+        "est {est} vs truth {truth}"
+    );
+    assert_eq!(
+        g.view(PLAYER, t),
+        g.view(PLAYER, t),
+        "the lie must be stable"
+    );
 }
 
 #[test]
@@ -82,7 +94,10 @@ fn a_successful_spy_reveals_the_castle_and_its_ring() {
         }
         match g.view(PLAYER, sid) {
             View::Spied(rep) => {
-                assert_eq!(rep.counts.iter().sum::<u32>(), g.strongholds[sid].garrison.len() as u32)
+                assert_eq!(
+                    rep.counts.iter().sum::<u32>(),
+                    g.strongholds[sid].garrison.len() as u32
+                )
             }
             v => panic!("spy should have cleared {sid}, got {v:?}"),
         }
@@ -98,7 +113,11 @@ fn a_caught_spy_only_costs_the_gold() {
     let gold = g.gi(PLAYER);
     assert_eq!(g.spy(PLAYER, t), Ok(false));
     assert_eq!(g.gi(PLAYER), gold - SPY_COST);
-    assert_eq!(g.view(PLAYER, t), View::Dark, "no intel survives the capture");
+    assert_eq!(
+        g.view(PLAYER, t),
+        View::Dark,
+        "no intel survives the capture"
+    );
     assert!(g.log.iter().any(|l| l.contains("CAUGHT")));
     // SPEC: failure is repeatable - the spy slot is open again.
     assert!(g.spy(PLAYER, t).is_ok());
@@ -116,7 +135,9 @@ fn lucky_spies_whisper_tomorrows_event() {
 #[test]
 fn spy_refusals_cost_nothing() {
     let mut g = GameState::new(7);
-    let own = (0..g.strongholds.len()).find(|&i| g.strongholds[i].owner == PLAYER).unwrap();
+    let own = (0..g.strongholds.len())
+        .find(|&i| g.strongholds[i].owner == PLAYER)
+        .unwrap();
     let gold = g.gi(PLAYER);
     assert!(g.spy(PLAYER, own).is_err());
     assert_eq!(g.gi(PLAYER), gold, "refusal must not bill you");
@@ -136,7 +157,11 @@ fn spied_reports_go_stale_but_never_lie_about_the_past() {
     g.strongholds[t].garrison = levy(3);
     match g.view(PLAYER, t) {
         View::Spied(rep) => {
-            assert_eq!(rep.counts.iter().sum::<u32>(), truth_at_spy, "the stamp must hold its value");
+            assert_eq!(
+                rep.counts.iter().sum::<u32>(),
+                truth_at_spy,
+                "the stamp must hold its value"
+            );
             assert_ne!(rep.counts.iter().sum::<u32>(), 3);
         }
         v => panic!("expected a stale report, got {v:?}"),
@@ -167,9 +192,14 @@ fn battle_reports_survive_losing_the_staging_castle() {
                 && g.adj(i).iter().any(|&a| g.strongholds[a].owner != PLAYER)
         })
         .unwrap();
-    let target = g.adj(home).iter().copied().find(|&a| g.strongholds[a].owner != PLAYER).unwrap();
+    let target = g
+        .adj(home)
+        .iter()
+        .copied()
+        .find(|&a| g.strongholds[a].owner != PLAYER)
+        .unwrap();
     assert!(g.march(PLAYER, home, target).is_ok()); // a battle was fought
-    // Normans retake it; Saxon eyes are gone everywhere nearby.
+                                                    // Normans retake it; Saxon eyes are gone everywhere nearby.
     g.strongholds[target].owner = Faction::Norman;
     let ring: Vec<usize> = g.adj(target).to_vec();
     for a in ring {
@@ -182,7 +212,10 @@ fn battle_reports_survive_losing_the_staging_castle() {
         v => panic!("the battle report must persist, got {v:?}"),
     };
     assert_eq!(rep.seen, g.turn);
-    assert!(rep.counts.iter().sum::<u32>() > 0, "a garrison was watched at combat time");
+    assert!(
+        rep.counts.iter().sum::<u32>() > 0,
+        "a garrison was watched at combat time"
+    );
 }
 
 #[test]
@@ -200,4 +233,3 @@ fn spy_fate_is_deterministic() {
     assert_eq!(a.1, b.1);
     assert_eq!(a.2, b.2);
 }
-

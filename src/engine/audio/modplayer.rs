@@ -43,7 +43,9 @@ impl Mod {
         if bytes.len() < 1084 || &bytes[1080..1084] != b"M.K." {
             return Err("not an M.K. module".into());
         }
-        let title = String::from_utf8_lossy(&bytes[0..20]).trim_end_matches(|c| c <= ' ').to_string();
+        let title = String::from_utf8_lossy(&bytes[0..20])
+            .trim_end_matches(|c| c <= ' ')
+            .to_string();
         let mut samples = Vec::with_capacity(31);
         let mut pcm_sizes = Vec::with_capacity(31);
         for s in 0..31 {
@@ -93,7 +95,13 @@ impl Mod {
             samples[s].data = bytes[pat_base..end].iter().map(|b| *b as i8).collect();
             pat_base = end;
         }
-        Ok(Mod { title, samples, patterns, order, song_len })
+        Ok(Mod {
+            title,
+            samples,
+            patterns,
+            order,
+            song_len,
+        })
     }
 }
 
@@ -108,8 +116,14 @@ struct Channel {
     vib_phase: u8,
 }
 
-const CH_INIT: Channel =
-    Channel { period: 0, vol: 64, sample: 0, pos: 0.0, active: false, vib_phase: 0 };
+const CH_INIT: Channel = Channel {
+    period: 0,
+    vol: 64,
+    sample: 0,
+    pos: 0.0,
+    active: false,
+    vib_phase: 0,
+};
 
 static VIB_SIN: [f32; 32] = [
     0.0, 0.195, 0.383, 0.556, 0.707, 0.831, 0.924, 0.981, 1.0, 0.981, 0.924, 0.831, 0.707, 0.556,
@@ -217,7 +231,11 @@ impl Player {
                     _ => {}
                 }
                 if cell.period != 0 {
-                    let start = if cell.fx == 0x09 { (cell.fp as f32) * 256.0 } else { 0.0 };
+                    let start = if cell.fx == 0x09 {
+                        (cell.fp as f32) * 256.0
+                    } else {
+                        0.0
+                    };
                     let ch = &mut self.ch[c];
                     ch.period = cell.period;
                     ch.pos = start;
