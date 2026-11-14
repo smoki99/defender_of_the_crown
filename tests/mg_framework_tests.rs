@@ -236,3 +236,29 @@ fn mg_trait_runner_and_outcome_roundtrip() {
     };
     assert_eq!(resolve(dud.score(), spec), MgState::Lost);
 }
+
+/// The UI draws with the turn packed into the HIGH seed word only. Raw
+/// xorshift made that degenerate — low output bits never saw the turn, and
+/// some sports could never be drawn. Over 400 seasons every unlocked sport
+/// must actually surface.
+#[test]
+fn draw_covers_every_sport() {
+    let mut seen: Vec<&'static str> = Vec::new();
+    for t in 0..400u32 {
+        let seed = ((t as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+        if let Some(s) = pick(t, seed) {
+            if !seen.contains(&s.id) {
+                seen.push(s.id);
+            }
+        }
+    }
+    for s in SPORTS {
+        if s.unlock_turn != u32::MAX {
+            assert!(
+                seen.contains(&s.id),
+                "{} never drawn in 400 seasons",
+                s.id
+            );
+        }
+    }
+}

@@ -887,7 +887,7 @@ impl GameState {
         self.capital_watch();
         self.coronation_check();
         self.check_over();
-        if self.turn >= 90 && (self.turn - 90) % 10 == 0 {
+        if self.turn >= 90 && (self.turn - 90).is_multiple_of(10) {
             self.chronicle_judgment();
         }
         for s in self.strongholds.iter_mut() {

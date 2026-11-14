@@ -1,8 +1,8 @@
 // tools/alpha1-loop.ts — GATE ALPHA 1 proof: one unbroken play session in a
 // real browser. Title -> difficulty -> campaign crawl -> all three shipped
-// sports played to their results plate (joust turn 5, sword turn 1, catapult
-// turn 9, ?autoplay=1 auto-resolves the run) -> End Turn clicks drive the
-// war -> the AI conquests and the chronicle verdict at turn 90 close the
+// sports played to their results plate (sword turn 1, catapult turn 2,
+// joust turn 22, ?autoplay=1 auto-resolves the run) -> End Turn clicks drive
+// the war -> the AI conquests and the chronicle verdict at turn 90 close the
 // loop on the victory banner. Screenshots per stage in tmp/crown-a1/.
 import { chromium, type Browser, type Page } from "playwright-core";
 import { mkdirSync } from "node:fs";
@@ -302,10 +302,10 @@ try {
     played.add(label);
   };
   await playSport("sword"); // turn 1
-  for (let t = 2; t <= 5; t++) await advance();
-  await playSport("joust"); // turn 5
-  for (let t = 6; t <= 9; t++) await advance();
-  await playSport("catapult"); // turn 9
+  await advance(); // -> turn 2: the catapult draw
+  await playSport("catapult");
+  for (let t = 3; t <= 22; t++) await advance();
+  await playSport("joust"); // turn 22 (splitmix-scrambled draw)
 
   const hofFinal = await hof();
   ok(/(GOLD|SILVER|BRONZE) LAUREL|GOLD - SCORE|CROWNED/.test(hofFinal), `hall of fame chronicles the run ("${hofFinal.slice(0, 46)}")`);

@@ -118,6 +118,10 @@ export function tap(x, y) {
   const c = canvas();
   for (const type of ["pointerdown", "pointerup"]) c.dispatchEvent(new window.MouseEvent(type, { clientX: x, clientY: y, bubbles: true }));
 }
+/// Aim helper: the engine mouse only tracks pointermove.
+export function move_to(x, y) {
+  canvas().dispatchEvent(new window.MouseEvent("pointermove", { clientX: x, clientY: y, bubbles: true }));
+}
 /// Semantic key press: the app maps KeyboardEvent.key on window.
 export function key(k) {
   window.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true }));

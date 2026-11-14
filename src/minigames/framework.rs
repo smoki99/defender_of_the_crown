@@ -190,13 +190,20 @@ pub fn unlocked(turn: u32) -> Vec<&'static SportSpec> {
 
 /// Deterministic SPORTS draw: same `seed` + `turn` always yields the same
 /// sport. `None` only if nothing is unlocked (never happens today: games
-/// 1-4 unlock at turn 0).
+/// 1-4 unlock at turn 0). The seed gets a splitmix64 scramble first: the
+/// UI packs the turn into the HIGH word only, and xorshift's low output
+/// bits are a pure function of the low seed bits — drawn raw, some sports
+/// (e.g. rampart, index 4 of nine) could never be picked.
 pub fn pick(turn: u32, seed: u64) -> Option<&'static SportSpec> {
     let pool = unlocked(turn);
     if pool.is_empty() {
         return None;
     }
-    let mut rng = Xor::new(seed);
+    let mut z = seed;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    let mut rng = Xor::new(z);
     pool[rng.below(pool.len() as u32) as usize].into()
 }
 

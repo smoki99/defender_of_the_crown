@@ -1,9 +1,11 @@
-// T602 browser proof: the GALLERY drawn at TURN 129 shoots GOLD from pixels
-// only. Boot deep-links scene=play&turn=128 (season pick = archery there),
+// T601 browser proof: the GALLERY drawn at TURN 14 shoots GOLD from pixels
+// only. Boot deep-links scene=play&turn=14 (season pick = archery under the
+// splitmix-scrambled draw),
 // the script steers the shaft with the arrow keys reading the GOLD bullseye
 // and RED sight pixel off the framebuffer, looses with SPACE, and finally
 // clips the apple. Score plate + purse delta close the proof.
-import { coords, tap, key, keyDown, keyUp, px, snap, decodeTurn, regionDiff, shot, ok, finish, problems } from "./jsdom-harness.mjs";
+process.env.CROWN_QS ??= "scene=play&seed=7&turn=14&mute=1";
+const { coords, tap, key, keyDown, keyUp, px, snap, decodeTurn, regionDiff, shot, ok, finish, problems } = await import("./jsdom-harness.mjs");
 const GOLD = [204, 170, 0];
 const RED = [187, 17, 17];
 const WHITE = [255, 255, 255];
@@ -65,24 +67,24 @@ const adv = async (n) => { await Bun.sleep(Math.max(16, Math.round((n * 1000) / 
 // stray turn ends the war before the meet. FakeAudioCtx needs no gesture.
 // Boot is NOT a wall-clock bet: the wasm only starts after the coords
 // helper's cargo build resolves, so a cold compile would outrun any fixed
-// sleep. Poll the deep-linked HUD (TURN 128) instead.
+// sleep. Poll the deep-linked HUD (TURN 14) instead.
 // Campaign tell: the map's cyan sky at (160,44) - the title intro crown
 // and the yellow menu lettering never paint pure cyan there. decodeTurn
-// reads only the first two glyphs, so the deep-linked TURN 128 arrives
-// as 12 (the meet may already have turned it to 129+ = 13.. within 25).
+// reads only the first two glyphs, so the deep-linked TURN 14 arrives
+// as 14 (the meet may already have turned it to 15 or so).
 let booted = false;
 for (let i = 0; i < 600 && !booted; i++) {
   await Bun.sleep(200);
   const sky = px(160, 44);
   if (sky[0] === 128 && sky[1] === 224 && sky[2] === 224) {
     const t = decodeTurn(snap());
-    if (t !== null && t >= 12 && t < 26) booted = true;
+    if (t !== null && t >= 14 && t < 26) booted = true;
   } else if (i > 150) {
     problems.push("no campaign map within 30s - the war ended before we arrived");
     break;
   }
 }
-ok(booted, "the deep-linked campaign answered at turn 128");
+ok(booted, "the deep-linked campaign answered at turn 14");
 await Bun.sleep(120);
 const linAt = (x, y) => { const f = snap(); const i = (y * 320 + x) * 4; return f[i] === 204 && f[i + 1] === 204 && f[i + 2] === 153; };
 // dismiss any campaign modal that covers the plate area (linen title at the
@@ -126,7 +128,7 @@ for (let round = 0; round < 3 && !opened; round++) {
   }
 }
 shot("launch-state");
-ok(opened, "SPORTS launched the GALLERY at the turn-129 season meet");
+ok(opened, "SPORTS launched the GALLERY at the turn-14 season meet");
 if (!opened) { await finish(); process.exit(1); }
 shot("archery-present");
 await adv(45); // let the "NOCK ARROWS" banner run down
