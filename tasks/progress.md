@@ -312,3 +312,31 @@ herald's cry is public knowledge.
   purse line (4,204..212) repainted->`doc.hof = "TOURNAMENT GOLD - SCORE
   97"`. 8/8 asserts, 0 errors, frame-deterministic; full cargo suite +
   clippy 0 warnings (2026-11-14).
+- T601 — mg-archery (commit 9523056): THE GALLERY — pop-up gallery with
+  rising targets and a crossing jester bonus; scripted point-and-shoot run
+  takes GOLD (tests/mg_archery.rs 5/5) and plays GOLD in the browser SPORTS
+  meet; host arm + mg_host_tests wired.
+- T602 — mg-rampart (commit 99b2b78): the DEFEND wall siege — ladders scale
+  per wave, rock-fall special, breach counter; survived-every-wave script
+  takes GOLD (tests/mg_rampart.rs 4/4). Same commit welds the SPORTS draw:
+  splitmix64 scramble of (turn,seed) before xorshift — raw xorshift left
+  low bits a pure fn of the turn-only seed, making some sports unpickable;
+  determinism + reachability tests added.
+- ALPHA 1 loop (commit 4ba0c50): real Chromium plays the whole war end to
+  end — title→difficulty→campaign→SPORTS meet→minigame→purse→END TURN→AI
+  march→omen→conquest→crowned end screen, 0 console errors.
+- T603 — mg-maze (commit 56eab72): RESCUE the baron — corridors clamp the
+  runner, four gaolers ping-pong the streets, two lit torches freeze the
+  watch, the freed baron walks the runner's footprints (90-tick trail) to
+  the postern. The first layout dead-locked the east side behind the
+  bottom-lane patrol — the y13 street is the only link in a 1-wide maze and
+  crossing it under strict prediction is capture — so the dungeon got a y11
+  bridge street at (8,11), torch I moved onto the right column (17,7), and
+  the column gaoler re-clocked to the upper middle street. The scripted
+  runner predicts every gaoler's folded beat position per tick (11 px
+  clearance) and rides one fright dash up the column: 20 + 60 escape + 2×5
+  torches = 90 = GOLD (tests/mg_maze.rs 5/5 incl. catch, torch-route,
+  clamp). Whole cargo suite + clippy -D warnings green; wasm rebuilt; real
+  Chromium smoke: turn-30 SPORTS draw lands on RESCUE, the dungeon paints
+  bridge + new torch spots, runner answers arrows, torch II grabs (score
+  0→5, flame gone, watch frozen), 0 console errors. (2026-11-14)

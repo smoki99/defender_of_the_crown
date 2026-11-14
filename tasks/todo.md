@@ -193,9 +193,14 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 6 — Minigames 4–9 (T6xx) — each MG-QA Q1–Q6, own baseline
 
-- [ ] **T601 mg-archery**: gallery, pop-ups + moving jester, apple bonus.
-- [ ] **T602 mg-rampart**: wall defense, ladders, rock-fall special.
-- [ ] **T603 mg-maze**: dungeon rescue, guard patrol, torch fright power.
+- [x] **T601 mg-archery**: gallery, pop-ups + moving jester, apple bonus.
+  **2026-11-14:** GOLD scripted in tests + browser; see progress.md.
+- [x] **T602 mg-rampart**: wall defense, ladders, rock-fall special.
+  **2026-11-14:** GOLD scripted; SPORTS draw got the splitmix scramble
+  fix (unpickable sports). See progress.md.
+- [x] **T603 mg-maze**: dungeon rescue, guard patrol, torch fright power.
+  **2026-11-14:** GOLD scripted (90 pts via y11 bridge + fright column
+  dash); real-Chromium smoke green. See progress.md.
 - [ ] **T604 mg-river**: canoe pole-vault, rocks, enemy pike boats.
 - [ ] **T605 mg-cloak**: 5 cells, sight cones, alarm-bell escalation.
 - [ ] **T606 mg-forge**: 3-tempo rhythm hammering, sword-quality tiers.
