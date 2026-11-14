@@ -204,3 +204,5 @@ for (let cyc = 1; cyc <= 5; cyc++) {
 ok(frameCount - before > 10, `frame loop alive through five cycles (${frameCount - before} frames)`);
 ok(problems.length === 0, `no errors (${problems.slice(0, 3).join(" | ") || "clean"})`);
 console.log(`DONE frames=${frameCount} shots=${shotN} assertsFailed=${asserts.length} problems=${problems.length}`);
+// jsdom's rAF keeps the event loop alive; exit so a caller sees the verdict.
+process.exit(asserts.length === 0 ? 0 : 1);

@@ -16,7 +16,9 @@ ensure_stage() {
 
 CMD="${1:-all}"
 if [ "$#" -gt 0 ]; then shift; fi
-ensure_stage
+# pull-pkg only copies built output back; re-staging would clobber the fresh
+# bindgen result with the stale host tree.
+if [ "$CMD" != pull-pkg ]; then ensure_stage; fi
 BASE="docker run --rm -v crown-src:/work -v crown-target:/work/target -w /work $IMAGE cargo"
 # .git-less stage: exclude by not copying (docker cp whole dir incl .git is fine)
 case "$CMD" in
@@ -30,5 +32,6 @@ case "$CMD" in
   bindgen) docker run --rm -v crown-src:/work -v crown-target:/work/target -w /work "$IMAGE" \
       tools/bin/wasm-bindgen --target web --out-dir /work/web/pkg \
       /work/target/wasm32-unknown-unknown/release/defender_of_the_crown.wasm ;;
+  pull-pkg) docker cp crown-stage:/work/web/pkg/. "$ROOT/web/pkg/" ;;
   *) echo "unknown: $CMD" && exit 2 ;;
 esac

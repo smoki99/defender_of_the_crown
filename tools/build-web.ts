@@ -26,7 +26,7 @@ async function run(...args: string[]) {
 await run("./test.sh", "wasm-build");
 await run("./test.sh", "bindgen");
 await Bun.write("web/pkg/.keep", "");
-await run("docker", "cp", "crown-stage:/work/web/pkg/.", "web/pkg/");
+await run("./test.sh", "pull-pkg");
 const files = Array.from(
   new Bun.Glob("web/pkg/*").scanSync(),
 ).map((f) => f.split("/").pop());
