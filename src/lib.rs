@@ -3,6 +3,7 @@
 
 pub mod campaign;
 pub mod engine;
+pub mod ui;
 
 #[cfg(target_arch = "wasm32")]
 mod web;

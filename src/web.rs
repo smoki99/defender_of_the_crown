@@ -22,8 +22,15 @@ use crate::engine::gfx::{
 use crate::engine::input::{
     Gesture, Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP,
 };
+
+use crate::campaign::game::Difficulty;
 use crate::engine::scene::{AppCtx, Scene, SceneEvent, SceneStack, Transition};
 use crate::engine::sprite::{blit_anim, Sprite, TRANS};
+use crate::ui::PlayScene;
+
+/// Difficulty picked on the title screen (single-threaded wasm; 0 easy, 1
+/// normal, 2 hard).
+static PICK: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(1);
 
 fn w() -> web_sys::Window {
     web_sys::window().expect("no window")
@@ -49,6 +56,7 @@ enum Mode {
     Title,
     Test,
     Demo,
+    Play { diff: Difficulty, seed: u64 },
 }
 
 struct App {
@@ -517,15 +525,32 @@ impl Scene for DemoScene {
     }
 }
 
-/// Entry scene: title card; any tap/key dissolves into the test scene.
+/// Entry scene: title card with a difficulty pick; tapping a banner (or
+/// anywhere else - Normal) dissolves into the campaign.
 pub struct TitleScene {
     ticks: u32,
     touched: bool,
 }
+
+fn diff_rect(i: usize) -> (i32, i32, u32, u32) {
+    (46 + i as i32 * 80, 170, 72, 14)
+}
+
+const DIFF_NAMES: [&str; 3] = ["EASY", "NORMAL", "HARD"];
+
 impl Scene for TitleScene {
     fn event(&mut self, ev: &SceneEvent) {
         match ev {
-            SceneEvent::Tap { .. } | SceneEvent::Key { pressed: true, .. } => {
+            SceneEvent::Tap { x, y } => {
+                for (i, d) in [0u8, 1, 2].iter().enumerate() {
+                    let (dx, dy, dw, dh) = diff_rect(i);
+                    if *x >= dx && *x < dx + dw as i32 && *y >= dy && *y < dy + dh as i32 {
+                        PICK.store(*d, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+                self.touched = true;
+            }
+            SceneEvent::Key { pressed: true, .. } => {
                 self.touched = true;
             }
             _ => {}
@@ -538,10 +563,25 @@ impl Scene for TitleScene {
         fb.clear(NAVY);
         fb.gradient_v(0, 90, W, 40, SAXON_BLUE, BLOOD);
         fb.fill_rect(0, 128, W, 2, GOLD);
-        draw_text_shadow(fb, 60, 64, "THE CROWN ENDURES", YELLOW, DARKGRAY);
-        draw_text_shadow(fb, 84, 140, "A SAXON LIBERATION", WHITE, DARKGRAY);
+        draw_text_shadow(fb, 60, 56, "THE CROWN ENDURES", YELLOW, DARKGRAY);
+        draw_text_shadow(fb, 84, 120, "A SAXON LIBERATION", WHITE, DARKGRAY);
+        draw_text_shadow(fb, 115, 156, "CHOOSE YOUR FOE", GRAY, DARKGRAY);
+        for i in 0..3 {
+            let (dx, dy, dw, dh) = diff_rect(i);
+            fb.fill_rect(dx, dy, dw, dh, BLOOD);
+            fb.rect(dx, dy, dw, dh, GOLD);
+            let n = DIFF_NAMES[i];
+            draw_text_shadow(
+                fb,
+                dx + (dw as i32 - n.len() as i32 * 6) / 2,
+                dy + 4,
+                n,
+                WHITE,
+                BLACK,
+            );
+        }
         if self.ticks / 20 % 2 == 0 {
-            draw_text_shadow(fb, 92, 190, "CLICK OR PRESS A KEY", WHITE, DARKGRAY);
+            draw_text_shadow(fb, 85, 196, "OR PRESS A KEY FOR NORMAL", WHITE, DARKGRAY);
         }
         draw_text_shadow(fb, 4, 246, "RUST + WASM + 320X256", DARKGRAY, BLACK);
     }
@@ -588,6 +628,15 @@ pub fn main() -> Result<(), JsValue> {
     let want_test = query_has("scene=test");
     let shot_at: u64 = query_get("shot").and_then(|v| v.parse().ok()).unwrap_or(0);
     let want_demo = query_has("scene=demo");
+    let want_play = query_has("scene=play");
+    let play_seed: u64 = query_get("seed").and_then(|v| v.parse().ok()).unwrap_or(7);
+    let play_diff = if query_has("easy=1") {
+        Difficulty::Easy
+    } else if query_has("hard=1") {
+        Difficulty::Hard
+    } else {
+        Difficulty::Normal
+    };
     let first: Box<dyn Scene> = if want_test {
         Box::new(TestScene::new("TEST SCENE"))
     } else if want_demo {
@@ -595,6 +644,8 @@ pub fn main() -> Result<(), JsValue> {
             ticks: 0,
             want_leave: false,
         })
+    } else if want_play {
+        Box::new(PlayScene::new(play_seed, play_diff))
     } else {
         Box::new(TitleScene {
             ticks: 0,
@@ -610,6 +661,11 @@ pub fn main() -> Result<(), JsValue> {
             Mode::Test
         } else if want_demo {
             Mode::Demo
+        } else if want_play {
+            Mode::Play {
+                diff: play_diff,
+                seed: play_seed,
+            }
         } else {
             Mode::Title
         },
@@ -697,14 +753,24 @@ pub fn main() -> Result<(), JsValue> {
                 if st.stack.top_wants_leave() {
                     let next = match st.mode {
                         Mode::Title => {
-                            st.mode = Mode::Test;
-                            Box::new(TestScene::new("TEST SCENE")) as Box<dyn Scene>
+                            let diff = match PICK.load(std::sync::atomic::Ordering::Relaxed) {
+                                0 => Difficulty::Easy,
+                                2 => Difficulty::Hard,
+                                _ => Difficulty::Normal,
+                            };
+                            st.mode = Mode::Play { diff, seed: 7 };
+                            Box::new(PlayScene::new(7, diff)) as Box<dyn Scene>
                         }
                         Mode::Test => Box::new(TestScene::new("FADE CYCLE COMPLETE")),
                         Mode::Demo => Box::new(DemoScene {
                             ticks: 0,
                             want_leave: false,
                         }),
+                        Mode::Play { diff, seed } => {
+                            let seed = seed + 1;
+                            st.mode = Mode::Play { diff, seed };
+                            Box::new(PlayScene::new(seed, diff)) as Box<dyn Scene>
+                        }
                     };
                     st.stack.replace(next, Transition::Fade);
                 }
