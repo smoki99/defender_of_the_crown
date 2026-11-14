@@ -116,8 +116,15 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   keep (visible through fog - heralds are public). tests/event_modals.rs (3)
   + headless (OK-dismiss + omen shot). "screenshot each": one modal per
   omen, same plate - shot 07-omen proves the render. See progress.md.
-- [ ] **T308 End-turn sequence**: player→AI turns with `norman.mod` sting,
-  AI move animation pacing ≤2 s; event roll; screenshots.
+- [x] **T308 End-turn sequence**: player→AI turns with `norman.mod` sting,
+  AI move animation pacing ≤2 s; event roll; screenshots. **2026-11-14:**
+  march replays recorded `ai_moves` as NORMAN_RED banner dots for 1 s
+  (map+HUD deaf while marching); horn = 1-bar `norman.mod` sting, exactly
+  once per dawn, riding the campaign bed; report + omen wait for the last
+  banner to land. ALSO fixed T301-era double-round bug: one END click ran
+  `end_player_turn()` twice (Norman AI 3×, turn +2, double payday/hunger).
+  tests/dawn_march.rs (4) + mod_roundtrip (6) + live Chromium (TURN 1→2,
+  dots mid-march, omen after, RMS 0.400→0.424 horn). See progress.md.
 - [x] **Checkpoint T3xx**: scripted playwright turn loop (click castle→
   recruit→march→end turn→AI moves) with 0 console errors. **2026-11-14:**
   loop green 17/17 via `bun run check:headless` (real wasm in jsdom — native

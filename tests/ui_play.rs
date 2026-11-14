@@ -87,7 +87,7 @@ fn distant_taps_select_and_end_turn_leteth_the_ai_answer() {
     let e = end_turn_rect();
     let (ex, ey) = center(&e);
     ui.event(&tap(ex, ey), true);
-    assert_eq!(ui.g.turn, turn0 + 2, "AI turn missing");
+    assert_eq!(ui.g.turn, turn0 + 1, "one click must be one round");
 }
 
 #[test]

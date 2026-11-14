@@ -207,11 +207,43 @@ function toneSong(): Song {
   };
 }
 
+// The Norman turn-call (T308): a war-horn fanfare D-F-A-D over a
+// war-drum, then silence - played as a one-shot stinger when the AI
+// turn begins. Rows 32..63 rest so the 2 s stinger render ends clean.
+function normanSong(): Song {
+  const p: Pattern = rows([]);
+  const s = (r: number, ch: number, cell: Cell) => { p[r][ch] = cell; };
+  s(0, 3, C(null, 0, 0, 15, 1)); // F01: one tick per row (40 ms) - fast sting
+  // horn calls, rising
+  s(0, 0, C("D-3", 1, 54)); s(6, 0, C("D-3", 1, 54)); s(12, 0, C("F-3", 1, 56));
+  s(18, 0, C("A-3", 1, 56)); s(24, 0, C("D-4", 1, 60));
+  // fifth harmony under the last two calls
+  s(18, 1, C("E-3", 1, 44)); s(24, 1, C("A-3", 1, 48));
+  // war drum
+  s(0, 2, C("C-2", 2, 64)); s(6, 2, C("C-2", 2, 56)); s(12, 2, C("C-2", 2, 64));
+  s(18, 2, C("C-2", 2, 56)); s(21, 2, C("C-2", 2, 48)); s(24, 2, C("C-2", 2, 64));
+  // C00 volume-off: the looped horn has no natural release (row 36 = 1.44 s)
+  s(36, 0, C(null, 0, 0, 12, 0));
+  s(36, 1, C(null, 0, 0, 12, 0));
+  return {
+    title: "NORMAN STING",
+    samples: [
+      { name: "HORN", data: cycle("square", 128, 100, 0.3), volume: 56, loopStart: 0, loopLen: 128 },
+      { name: "DRUM", data: kick(128, 118), volume: 64, loopStart: 0, loopLen: 0 },
+    ],
+    patterns: [p],
+    order: [0],
+  };
+}
 // ---------------------------------------------------------------- cli
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const out = args[0] ?? "/tmp/test.mod";
-  const song = args.includes("tone") ? toneSong() : demoSong();
+  const song = args.includes("norman")
+    ? normanSong()
+    : args.includes("tone")
+      ? toneSong()
+      : demoSong();
   const buf = buildMod(song);
   await Bun.write(out, buf);
   const back = readMod(buf);

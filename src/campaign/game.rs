@@ -243,6 +243,10 @@ pub struct GameState {
     pub over: Option<Faction>,
     /// AI rig per faction seat (tests pit one difficulty against another).
     pub difficulty: [Difficulty; 3],
+    /// Enemy marches recorded during the last AI turn (T308); the UI
+    /// replays them as moving banners. Only filled while recording.
+    pub ai_moves: Vec<(usize, usize)>,
+    recording_ai: bool,
 }
 
 impl GameState {
@@ -306,6 +310,8 @@ impl GameState {
             known: vec![[None, None]; n],
             log: Vec::new(),
             over: None,
+            ai_moves: Vec::new(),
+            recording_ai: false,
         };
         g.push_log("1066. THE NORMANS HAVE LANDED.");
         g.push_log("RECLAIM ENGLAND, LORD OF THE SAXONS!");
@@ -656,6 +662,9 @@ impl GameState {
         to: usize,
         army: Vec<Unit>,
     ) -> Result<(), String> {
+        if self.recording_ai {
+            self.ai_moves.push((from, to));
+        }
         if self.strongholds[to].owner == f {
             let n = army.len();
             self.strongholds[to].garrison.extend(army);
@@ -810,6 +819,16 @@ impl GameState {
                 return;
             }
         }
+    }
+
+    /// UI hook (T308): start/stop capturing AI-turn marches so the
+    /// end-turn animation can replay them.
+    pub fn begin_ai_recording(&mut self) {
+        self.ai_moves.clear();
+        self.recording_ai = true;
+    }
+    pub fn end_ai_recording(&mut self) {
+        self.recording_ai = false;
     }
 
     /// Player ends their turn: the Normans act, then the new round begins

@@ -53,7 +53,7 @@ impl Scene for S {
     fn event(&mut self, ev: &SceneEvent) {
         self.log.borrow_mut().events.push(*ev);
     }
-    fn tick(&mut self) {
+    fn tick(&mut self, _app: &mut dyn AppCtx) {
         self.log.borrow_mut().ticks += 1;
     }
     fn draw(&mut self, fb: &mut Framebuffer) {

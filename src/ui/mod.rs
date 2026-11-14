@@ -12,7 +12,7 @@ use crate::campaign::game::{
 use crate::campaign::units::UnitKind;
 use crate::engine::gfx::{
     BLACK, BLOOD, CREAM, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, GOLD, GRASS, GRAY, GREEN, LINEN,
-    NAVY, SAXON_BLUE, SILVER, SKY, STONE, TEAL, W, WHITE, YELLOW,
+    NAVY, NORMAN_RED, SAXON_BLUE, SILVER, SKY, STONE, TEAL, W, WHITE, YELLOW,
 };
 pub use crate::engine::scene::SceneEvent;
 
@@ -226,6 +226,13 @@ fn tip(id: &str) -> &'static str {
     }
 }
 
+/// One enemy-march replay in 60 Hz ticks - a second, never longer
+/// than the SPEC's 2 s (T308).
+pub const AI_ANIM_TICKS: u32 = 60;
+
+/// The Norman turn-call, played once per AI dawn (T308).
+pub const NORMAN_STING: &[u8] = include_bytes!("../../assets/music/norman.mod");
+
 /// The whole in-game screen: map, panel, HUD, endgame overlay.
 pub struct CampaignUi {
     pub g: GameState,
@@ -250,6 +257,12 @@ pub struct CampaignUi {
     pub event_kind: Option<EventKind>,
     pub event_open: bool,
     event_turn: u32,
+    /// Dawn march animation (T308): ticks left, overlays deferred behind
+    /// it, and the horn flag the scene hands to `AppCtx::sting`.
+    pub ai_anim: u32,
+    pub report_pending: bool,
+    pending_event: Option<EventKind>,
+    pub sting_armed: bool,
 }
 
 impl CampaignUi {
@@ -274,6 +287,10 @@ impl CampaignUi {
             event_kind: None,
             event_open: false,
             event_turn: u32::MAX,
+            ai_anim: 0,
+            report_pending: false,
+            pending_event: None,
+            sting_armed: false,
         }
     }
 
@@ -288,6 +305,13 @@ impl CampaignUi {
                 *d = (*d + (t - *d).div_ceil(8)).min(t);
             } else if *d > t {
                 *d = (*d - (*d - t).div_ceil(8)).max(t);
+            }
+        }
+        // The enemy dawn marches for a second; report and omen wait (T308).
+        if self.ai_anim > 0 {
+            self.ai_anim -= 1;
+            if self.ai_anim == 0 {
+                self.open_dawn();
             }
         }
         if self.report_open && self.report_shown < self.report.len() && self.anim.is_multiple_of(4)
@@ -346,6 +370,10 @@ impl CampaignUi {
         }
         let SceneEvent::Tap { x, y } = ev else { return };
         let (x, y) = (*x, *y);
+        if self.ai_anim > 0 {
+            // enemy banners are crossing England: none hearken (T308)
+            return;
+        }
         if self.report_open {
             // any tap: first reveals all lines (skip), next closes (T306)
             if self.report_shown < self.report.len() {
@@ -403,7 +431,7 @@ impl CampaignUi {
                             Ok(()) => format!("THE HOST MARCHES ON {name}"),
                             Err(e) => e,
                         };
-                        self.capture_report(before);
+                        self.capture_report(before, false);
                         self.say(&msg);
                     } else {
                         self.say("NO ROAD FROM YOUR HOST TO YONDER KEEP");
@@ -423,8 +451,9 @@ impl CampaignUi {
     }
 
     /// Any battle log lines spawned by the action that began at log index
-    /// `before` open the animated report overlay (T306).
-    fn capture_report(&mut self, before: usize) {
+    /// `before` open the animated report overlay (T306); `defer` waits for
+    /// the dawn march animation to end (T308).
+    fn capture_report(&mut self, before: usize, defer: bool) {
         if self.g.over.is_some() {
             return;
         }
@@ -432,7 +461,11 @@ impl CampaignUi {
         if fresh.iter().any(|l| l.contains("ROUNDS.")) {
             self.report = fresh.to_vec();
             self.report_shown = 0;
-            self.report_open = true;
+            if defer {
+                self.report_pending = true;
+            } else {
+                self.report_open = true;
+            }
         }
     }
 
@@ -524,22 +557,40 @@ impl CampaignUi {
     fn end_turn(&mut self) {
         self.sel = None;
         let before = self.g.log.len();
+        // One click = one round: end_player_turn already lets the Normans
+        // act, rolls the omen, and pays both sides (T308 found the old
+        // double-call skipping a whole round per click).
+        self.g.begin_ai_recording();
         self.g.end_player_turn();
-        if self.g.over.is_none() {
-            crate::campaign::ai::take_turn(&mut self.g, PLAYER.other());
-        }
-        self.g.end_player_turn();
-        self.capture_report(before);
+        self.g.end_ai_recording();
+        self.capture_report(before, true);
         let tail = self.g.log.last().cloned().unwrap_or_default();
         self.say(&tail);
         if self.g.over.is_none() {
             if let Some(e) = self.g.event {
                 if self.event_turn != self.g.turn {
                     self.event_turn = self.g.turn;
-                    self.event_kind = Some(e);
-                    self.event_open = true;
+                    self.pending_event = Some(e);
                 }
             }
+        }
+        if self.g.over.is_none() && !self.g.ai_moves.is_empty() {
+            // The enemy host marches first; report and omen follow (T308).
+            self.ai_anim = AI_ANIM_TICKS;
+            self.sting_armed = true;
+        } else {
+            self.open_dawn();
+        }
+    }
+
+    /// Reveal whatever the dawn unlocked once the march animation ends.
+    fn open_dawn(&mut self) {
+        if std::mem::take(&mut self.report_pending) {
+            self.report_open = true;
+        }
+        if let Some(e) = self.pending_event.take() {
+            self.event_kind = Some(e);
+            self.event_open = true;
         }
     }
 
@@ -636,6 +687,19 @@ impl CampaignUi {
                 };
                 let t = n.to_string();
                 draw_text_shadow(fb, cx - t.len() as i32 * 3 + 1, cy - 16, &t, YELLOW, BLACK);
+            }
+        }
+        // Enemy host on the march (T308): black-bordered red dots replay
+        // every Norman move of the dawn, in one second, over the map.
+        if self.ai_anim > 0 {
+            let t = (AI_ANIM_TICKS - self.ai_anim) as f32 / AI_ANIM_TICKS as f32;
+            for &(a, b) in &self.g.ai_moves {
+                let (ax, ay) = castle_screen(&self.g.strongholds[a]);
+                let (bx, by) = castle_screen(&self.g.strongholds[b]);
+                let x = (ax as f32 + (bx - ax) as f32 * t).round() as i32;
+                let y = (ay as f32 + (by - ay) as f32 * t).round() as i32;
+                fb.fill_rect(x - 1, y - 1, 3, 3, NORMAN_RED);
+                fb.rect(x - 2, y - 2, 5, 5, BLACK);
             }
         }
         self.draw_hud(fb);
@@ -997,8 +1061,13 @@ impl crate::engine::scene::Scene for PlayScene {
     fn event(&mut self, ev: &SceneEvent) {
         self.ui.event(ev, true);
     }
-    fn tick(&mut self) {
+    fn tick(&mut self, app: &mut dyn crate::engine::scene::AppCtx) {
         self.ui.tick();
+        if self.ui.sting_armed {
+            // the Norman war-horn calls across the channel (T308)
+            self.ui.sting_armed = false;
+            app.sting(NORMAN_STING);
+        }
     }
     fn draw(&mut self, fb: &mut crate::engine::gfx::Framebuffer) {
         self.ui.draw(fb);

@@ -147,6 +147,9 @@ pub struct Player {
     spt: f32,
     sr: f32,
     jmp: Option<(u8, usize)>,
+    /// One-shot sting: stop after one pass through the order list.
+    once: bool,
+    done: bool,
 }
 
 impl Player {
@@ -164,6 +167,8 @@ impl Player {
             spt: 1.0,
             sr: 0.0,
             jmp: None,
+            once: false,
+            done: false,
         }
     }
 
@@ -172,6 +177,14 @@ impl Player {
     }
     pub fn position(&self) -> (usize, usize, usize) {
         (self.pos, self.row, self.tick.wrapping_sub(1))
+    }
+    /// Fire-and-forget: render silence once the order list has passed (T308).
+    pub fn once(mut self) -> Self {
+        self.once = true;
+        self
+    }
+    pub fn done(&self) -> bool {
+        self.done
     }
 
     /// Render stereo-interleaved f32 into `out` at `sr` Hz.
@@ -182,6 +195,11 @@ impl Player {
             self.frame_acc = self.spt; // fire the first tick at frame 0
         }
         for frame in out.as_chunks_mut::<2>().0 {
+            if self.done {
+                frame[0] = 0.0;
+                frame[1] = 0.0;
+                continue;
+            }
             if self.frame_acc >= self.spt {
                 self.frame_acc -= self.spt;
                 self.do_tick();
@@ -250,7 +268,13 @@ impl Player {
             self.row += 1;
             if self.row >= 64 {
                 self.row = 0;
-                self.pos = (self.pos + 1) % self.m.song_len.max(1); // v1: loop forever
+                self.pos += 1;
+                if self.once && self.pos >= self.m.song_len {
+                    self.done = true;
+                    self.pos = self.m.song_len - 1;
+                } else {
+                    self.pos %= self.m.song_len.max(1); // v1: loop forever
+                }
             }
         }
     }

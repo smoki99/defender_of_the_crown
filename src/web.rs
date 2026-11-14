@@ -97,6 +97,11 @@ impl AppCtx for Ctx {
     fn sfx(&mut self, kind: Sfx) {
         self.music.borrow_mut().sfx(kind);
     }
+    fn sting(&mut self, track: &'static [u8]) {
+        if let Ok(m) = Mod::parse(track) {
+            self.music.borrow_mut().sting(Player::new(m).once());
+        }
+    }
 }
 
 /// T108: pull-based audio sink. The worklet asks for N samples whenever its
@@ -351,7 +356,7 @@ impl Scene for TestScene {
             _ => {}
         }
     }
-    fn tick(&mut self) {
+    fn tick(&mut self, _app: &mut dyn AppCtx) {
         let (x, y, vx, vy) = self.circle;
         let (tx, ty) = self.target;
         let vx = (vx + (tx * 256 - x) / 120) * 60 / 64;
@@ -454,7 +459,7 @@ impl Scene for DemoScene {
             _ => {}
         }
     }
-    fn tick(&mut self) {
+    fn tick(&mut self, _app: &mut dyn AppCtx) {
         self.ticks += 1;
     }
     fn draw(&mut self, fb: &mut Framebuffer) {
@@ -556,7 +561,7 @@ impl Scene for TitleScene {
             _ => {}
         }
     }
-    fn tick(&mut self) {
+    fn tick(&mut self, _app: &mut dyn AppCtx) {
         self.ticks += 1;
     }
     fn draw(&mut self, fb: &mut Framebuffer) {

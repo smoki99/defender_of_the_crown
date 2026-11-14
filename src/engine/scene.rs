@@ -16,6 +16,10 @@ pub trait AppCtx {
     fn mute(&self) -> bool;
     fn play_music(&mut self, track: Option<&'static str>);
     fn sfx(&mut self, kind: crate::engine::audio::Sfx);
+    /// One-shot sting from a .MOD payload (T308); default: silence.
+    fn sting(&mut self, track: &'static [u8]) {
+        let _ = track;
+    }
 }
 
 /// Semantic events scenes receive (raw input already transformed).
@@ -64,7 +68,8 @@ pub trait Scene {
     fn init(&mut self, _app: &mut dyn AppCtx) {}
     fn event(&mut self, _ev: &SceneEvent) {}
     /// Fixed-step logic tick (60 Hz), only when no transition runs.
-    fn tick(&mut self) {}
+    /// `app` lets a tick fire audio (e.g. the Norman turn-call, T308).
+    fn tick(&mut self, _app: &mut dyn AppCtx) {}
     fn draw(&mut self, fb: &mut Framebuffer);
     /// Driver asks each frame; the app decides what a leave means.
     fn wants_leave(&self) -> bool {
@@ -198,7 +203,7 @@ impl SceneStack {
             for e in &evs {
                 top.event(e);
             }
-            top.tick();
+            top.tick(app);
         }
     }
 

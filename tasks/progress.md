@@ -214,3 +214,38 @@ herald's cry is public knowledge.
   template, per-omen icon+text (all 7 kinds); "screenshot each" -> one
   representative omen shot + host pixel tests per kind stay in the
   shared painter.
+
+## T308 end-turn march + war-horn - done 2026-11-14
+- Enemy dawn replay: `game.ai_moves` records every Norman march during the
+  AI turn (Vec<(usize,usize)>, cleared at end_turn start, begin/end
+  recording brackets). CampaignUi freezes on `ai_anim = AI_ANIM_TICKS (60)`;
+  draw interpolates each move to `t = (60-ai_anim)/60` and stamps a 3x3
+  NORMAN_RED banner dot at the marching position, after the castle loop so
+  hosts ride above the map. While `ai_anim > 0` the whole HUD is deaf
+  (castle taps, action buttons, END, report AND omen open all deferred);
+  tick() counts down and `open_dawn()` then releases report -> omen in
+  order.
+- `norman.mod`: 1-bar 4-step war-horn (D4-A4-F4-D5 saw-ish duty, per-pat
+  volume fall 2A->40) + trailing echo pat, title "NORMAN STING". Added to
+  compose.ts (`norman` target, WAV -> `bun tools/compose.ts norman`),
+  committed as assets/music/norman.mod.
+- Horn plumbing: AppCtx::sting(track) -> web Ctx drives Horn (once-player
+  over the bed via ModPlayer::set_sting; silence when idle). Sting fires
+  exactly once per dawn from PlayScene::tick while `sting_armed` (armed in
+  end_turn, never re-armed while the host marches). Native tests render the
+  sting channel (tone pitch/PCM, once-player silence, demo mixture).
+- tests/dawn_march.rs (4): march recorded + map deaf mid-march + reachable
+  after; banner dots proven by NORMAN_RED pixel delta (drawn frame vs
+  ai_anim=0 frame); omen/report stay closed until the last dot lands; horn
+  bytes ("NORMAN STING" title) bled exactly once per dawn.
+- **BUGFIX (found live in Chromium, one-click audit):** ui.end_turn() had
+  called g.end_player_turn() twice + a stray take_turn ever since T301 -
+  every END click skipped a whole round (turn +2, Normans acted 3x, double
+  payday & double hunger). One click is now one round; the "+2" pins in
+  tests/event_modals.rs + tests/ui_play.rs encoded the bug and were
+  corrected. T307's seed-13 probe note in the log above is moot (spy tip
+  now seeds the only roll).
+- Live proof (Chromium via CDP): TURN 1 -> 2, gold +26 once, hunger once;
+  mid-march frame shows marching dots, no modal; BAD HARVEST plate opens
+  only after the last banner lands; window.__rms 0.400 bed -> 0.424 peak
+  with the horn over the campaign track. 25/25 test groups, clippy clean.

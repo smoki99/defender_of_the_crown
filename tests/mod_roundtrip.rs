@@ -65,3 +65,21 @@ fn demo_song_renders_mixture() {
     let peak = out.iter().fold(0.0f32, |a, &v| a.max(v.abs()));
     assert!(peak > 0.05, "demo peak {peak}");
 }
+
+#[test]
+fn the_once_player_falleth_silent() {
+    const STING: &[u8] = include_bytes!("../assets/music/norman.mod");
+    let m = Mod::parse(STING).expect("parse sting");
+    let mut p = Player::new(m).once();
+    let mut buf = vec![0.0f32; 2048 * 2];
+    let mut chunks = 0;
+    while !p.done() && chunks < 900 {
+        p.render(&mut buf, 44100);
+        chunks += 1;
+    }
+    assert!(p.done(), "the once-player looped forever");
+    for _ in 0..8 {
+        p.render(&mut buf, 44100);
+        assert!(buf.iter().all(|&s| s == 0.0), "not silent after done");
+    }
+}

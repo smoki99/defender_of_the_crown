@@ -13,6 +13,8 @@ struct Voice {
 
 pub struct Music {
     track: Option<Player>,
+    /// One-shot MOD payload over the bed, dropped when done (T308).
+    sting: Option<Player>,
     voices: Vec<Voice>,
 }
 
@@ -26,6 +28,7 @@ impl Music {
     pub fn new() -> Self {
         Self {
             track: None,
+            sting: None,
             voices: Vec::new(),
         }
     }
@@ -37,6 +40,13 @@ impl Music {
 
     pub fn track(&self) -> Option<&Player> {
         self.track.as_ref()
+    }
+    /// Fire a parsed one-shot module (Norman turn-call, T308).
+    pub fn sting(&mut self, p: Player) {
+        self.sting = Some(p);
+    }
+    pub fn sting_playing(&self) -> bool {
+        self.sting.is_some()
     }
 
     /// Fire a generated effect.
@@ -62,6 +72,18 @@ impl Music {
         out.fill(0.0);
         if let Some(p) = self.track.as_mut() {
             p.render(out, sr);
+        }
+        if self.sting.is_some() {
+            let mut tmp = vec![0.0f32; out.len()];
+            if let Some(p) = self.sting.as_mut() {
+                p.render(&mut tmp, sr);
+            }
+            for (o, t) in out.iter_mut().zip(tmp) {
+                *o += t;
+            }
+            if self.sting.as_ref().is_some_and(|p| p.done()) {
+                self.sting = None;
+            }
         }
         for v in self.voices.iter_mut() {
             let mut i = 0;
