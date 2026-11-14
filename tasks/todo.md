@@ -5,29 +5,29 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 0 — Toolchain (T0xx)
 
-- [ ] **T001 Chromium runtime libs**: run `bun tools/fetch-chrome-libs.ts` →
+- [x] **T001 Chromium runtime libs**: run `bun tools/fetch-chrome-libs.ts` →
   `~/pw-libs`; `LD_LIBRARY_PATH=~/pw-libs/... chrome-headless-shell --version`
   prints version; playwright screenshot of `example.com` lands `/tmp/pw-test.png`.
   *Verify: PNG exists, >10 KB, no console errors.*
-- [ ] **T002 LSP wiring**: `.omp/lsp.json` → rust-analyzer with absolute
+- [x] **T002 LSP wiring**: `.omp/lsp.json` → rust-analyzer with absolute
   command + `--stdio`, rootMarker `Cargo.toml`; server starts. *Verify:
   hover/references work on a src symbol.*
-- [ ] **T003 audio pipeline proof**: host decode of one generated test `.mod`
-  (xmrs in cargo test via docker) + WebAudio sine-RMS>0 in headless Chromium
-  (`--autoplay-policy=no-user-gesture-required`). *Verify both logs.*
-- [ ] **T004 compose.ts skeleton**: DSL synthesizes 4 samples (square, pulse,
+- [x] **T003 audio pipeline proof**: host decode of one generated test `.mod`
+  (own modplayer in cargo test via docker) + WebAudio sine-RMS>0 in headless
+  Chromium (`--autoplay-policy=no-user-gesture-required`). *Verify both logs.*
+- [x] **T004 compose.ts skeleton**: DSL synthesizes 4 samples (square, pulse,
   noise, kick) + 4-row pattern → valid `.MOD` bytes; decoder round-trip test
   (cargo test parses header/sample-count). *Verify: file + test green.*
-- [ ] **T005 test harness**: docker alias `./test.sh [filter]` (rust:1.90-slim-
+- [x] **T005 test harness**: docker alias `./test.sh [filter]` (rust:1.90-slim-
   bookworm, cargo test --release, mounted). *Verify: trivial test passes.*
-- [ ] **T006 docs/TOOLS.md**: installed inventory + commands + debugging
+- [x] **T006 docs/TOOLS.md**: installed inventory + commands + debugging
   workflow (DevTools wasm, panic hook, playwright, docker, fallbacks).
 
 ## Phase 1 — Engine (T1xx)
 
-- [ ] **T101 Cargo project reset**: lib crate `defender`, feature-free deps
-  (wasm-bindgen, js-sys, web-sys exact features, xmrs, console_error_panic_hook);
-  old drafted src/ modules moved under `src/campaign/legacy.rs` for absorption;
+- [x] **T101 Cargo project reset**: lib crate `defender`, feature-free deps
+  (wasm-bindgen, js-sys, web-sys exact features, console_error_panic_hook);
+  old drafted src/ modules moved under `src/campaign/` for absorption;
   `cargo check` on wasm32 target green (docker). *Verify: check + test green.*
 - [ ] **T102 Palette + framebuffer**: 32-color palette (Amiga-like, table in
   code w/ names), `Framebuffer` u8-indexed 320×256, blit-to-RGBA (ImageData)
@@ -46,7 +46,7 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [ ] **T107 Scene stack**: `Scene` trait (init/ event/draw/tick), push/pop/
   replace, fade + dither-dissolve transitions, RAF driver w/ fixed logic step;
   test scene runs in browser (`?scene=test`) screenshot + 60fps probe.
-- [ ] **T108 Audio engine**: xmrs→f32 PCM → WebAudio (AudioWorklet,
+- [ ] **T108 Audio engine**: modplayer→f32 PCM → WebAudio (AudioWorklet,
   ScriptProcessor fallback), music manager (play/loop/stinger/mixdown),
   mute-persist localStorage; SFX synth module (blip/coin/sword/crowd/hoof/
   boom/etc. factory) — RMS gate test in Chromium. *Verify: module loops audibly.*

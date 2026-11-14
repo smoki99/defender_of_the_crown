@@ -20,8 +20,9 @@ testable build:
 
 - Own software renderer: 320×256 indexed framebuffer → ImageData; 32-color
   palette; Bayer 4×4 dither; 8×8 bitmap font; no game engine crates.
-- `xmrs` (MOD playback) + wasm-bindgen/web-sys/js-sys only; hand-rolled
-  WebAudio SFX; `tools/compose.ts` synthesizes samples + emits real `.mod`.
+- Own `modplayer` (M.K. MOD playback, dep-free) + wasm-bindgen/web-sys/js-sys
+  only; hand-rolled WebAudio SFX; `tools/compose.ts` synthesizes samples +
+  emits real `.mod`.
 - Pure deterministic cores (`campaign`, minigame logic, engine math) testable
   with plain `cargo test` in docker `rust:1.90-slim-bookworm` (host lacks cc);
   thin wasm adapters; `Xor` seeded RNG everywhere, no wall-clock in sim.
@@ -89,7 +90,7 @@ A minigame task is Done only when Q1–Q6 green; recorded in `tasks/progress.md`
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| `xmrs` won't build/run on wasm32 | High (music) | Fallback: hand-rolled 4-ch MOD player (~500 lines, format public) — T012 proves the choice early |
+| ~~`xmrs` won't build/run on wasm32~~ materialized differently: xmrs = model lib, no turnkey render | High (music) | **Taken 2026-11-14:** own `modplayer` shipped + round-trip tested (T003/T004 green) |
 | Chromium can't run (missing libs) | High (all browser QA) | T001 `fetch-chrome-libs.ts` (deb mirror verified); fallback: docker-side chrome + CDP attach |
 | Autoplay policy blocks audio proof | Med | launch `--autoplay-policy=no-user-gesture-required` (verified flag) + AnalyserNode RMS gate in T012 |
 | Hand-crafted pixel art quality | Med | MG-QA Q3 loop + presentation-bible checklist + a fresh-context judge subagent pass per screen at BETA1 |

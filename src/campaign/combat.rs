@@ -56,12 +56,12 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
         round += 1;
 
         // Attacker phase
-        for i in 0..atk.len() {
-            if atk[i].hp == 0 {
+        for a in atk.iter() {
+            if a.hp == 0 {
                 continue;
             }
-            let dmg = atk[i].kind.atk();
-            let is_siege = atk[i].kind == UnitKind::Siege;
+            let dmg = a.kind.atk();
+            let is_siege = a.kind == UnitKind::Siege;
             if walls_hp > 0 {
                 let wall_dmg = if is_siege { dmg * 3 } else { (dmg / 2).max(1) };
                 if wall_dmg >= walls_hp {
@@ -87,11 +87,11 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
         }
 
         // Defender phase
-        for i in 0..def.len() {
-            if def[i].hp == 0 {
+        for d in def.iter() {
+            if d.hp == 0 {
                 continue;
             }
-            let dmg = def[i].kind.atk();
+            let dmg = d.kind.atk();
             let n = alive_count(&atk);
             if n == 0 {
                 break;
@@ -114,8 +114,8 @@ pub fn simulate(attacker: &[Unit], defender: &[Unit], walls: u32, rng: &mut Xor)
     let mut def_survivors: Vec<Unit> = def.into_iter().filter(|u| u.hp > 0).collect();
     // Stable order for reports and reproducibility.
     let ord = |u: &Unit| u.kind.index();
-    atk_survivors.sort_by_key(|u| ord(u));
-    def_survivors.sort_by_key(|u| ord(u));
+    atk_survivors.sort_by_key(ord);
+    def_survivors.sort_by_key(ord);
 
     let atk_end = counts(&atk_survivors);
     let def_end = counts(&def_survivors);

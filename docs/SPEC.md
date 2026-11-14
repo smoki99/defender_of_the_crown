@@ -50,12 +50,13 @@ workflow (screenshot per scene, pixel-diff vs baseline).
 
 **Amiga sound = ProTracker modules.** Decisions verified by research:
 
-- Playback: **`xmrs` v0.15** (pure-Rust MOD/XM tracker player, verified on
-  crates.io) renders PCM → WebAudio via AudioWorklet (fallback:
-  ScriptProcessor). 4 channels, 8-bit sample warmth, native vibrato/
-  arpeggio/portamento/volume effects — the real deal, not "chiptune-ish".
-  Fallback if wasm build fights us: hand-rolled MOD player (~500 lines,
-  format is public) — same output, more work.
+- Playback: **own ProTracker player** (`src/engine/audio/modplayer.rs`,
+  dependency-free Rust) renders PCM → WebAudio via AudioWorklet (fallback:
+  ScriptProcessor). 4 channels, 8-bit sample warmth, vibrato/arpeggio/
+  portamento/set-volume effects — the real deal, not "chiptune-ish".
+  (Original plan `xmrs` 0.15 was rejected 2026-11-14: it is a module
+  *model/import* library with manual mixer plumbing, not a turnkey
+  renderer; the §3 fallback is the boring-better path.)
 - Composition: **`tools/compose.ts`** — our own tiny tracker DSL in Bun:
   synthesize 8-bit samples (square 50%/25% pulse, noise, envelopes: kick,
   snare, hat, pluck bass, lead) + pattern tables → real `.MOD` (ProTracker
@@ -187,10 +188,10 @@ one test file; built independently per capability map.
 |---|---|---|
 | Language/target | Rust 2021 → `wasm32-unknown-unknown` (rustc 1.100 installed) | requirement; zero-JS game code |
 | Glue | `wasm-bindgen =0.2.130` + `web-sys` (CLI 0.2.130 pinned, matches) | versions verified |
-| Music | `xmrs` 0.15 (MOD/XM) → WebAudio worklet; `.mod` as include_bytes! | pure-Rust tracker player verified; fallback plan §3 |
+| Music | own `modplayer` (M.K. 4-ch) → WebAudio worklet; `.mod` as include_bytes! | xmrs 0.15 = model lib, no turnkey render (verified from source); fallback §3 taken |
 | SFX | hand-rolled WebAudio synth (web-sys AudioContext/Oscillator/Noise) | no sample licensing, tiny |
 | Engine | **own software renderer** (indexed framebuffer → ImageData) + scene stack; no macroquad/ggez | pixel-perfect control, no engine fights wasm |
-| Deps total | wasm-bindgen, js-sys, web-sys, xmrs (+console_error_panic_hook dev) | audit surface stays tiny |
+| Deps total | wasm-bindgen, js-sys, web-sys (+console_error_panic_hook) | audit surface stays tiny |
 | Tests | pure-logic `cargo test` via docker `rust:1.90-slim-bookworm` (host lacks C linker) | verified pullable |
 | Browser QA | Playwright CLI 1.65.1 + chromium-1255 (installed); runtime libs bootstrap `tools/fetch-chrome-libs.ts` (deb.debian.org verified) | screenshot + audio-RMS + console-error gates |
 | IDE | rust-analyzer 0.3.3113 installed; `.omp/lsp.json` | wasm debug via DevTools + panic hook |
@@ -248,7 +249,8 @@ pub trait Minigame {
   catapults breach, repel, champion bonus, same seed ⇒ same battle), AI
   (beats idle ≤100 turns; AI-vs-AI terminates ≤400; difficulty monotonic),
   each minigame's pure logic (scoring, timers, spawn patterns), MOD encode
-  decode round-trip (`compose.ts` output parseable by xmrs logic test),
+  round-trip (`compose.ts` output parsed + rendered by `modplayer`, pitch
+  verified ±4 %),
   kingdom-bar clamp invariants (provision starvation deserts, revolt at 0).
 - `tools/shot.ts`: every scene screenshot; pixel-diff vs baselines (drift =
   fail); console-error count must be 0.

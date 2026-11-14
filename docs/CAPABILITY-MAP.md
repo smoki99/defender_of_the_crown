@@ -6,7 +6,7 @@ for per-module specs (`docs/specs/<id>.md`). Module ids are stable kebab-case.
 | Module id | Responsibility | Depends on |
 |---|---|---|
 | engine-gfx | 320×256 indexed framebuffer, 32-color palette, Bayer dithering, bitmap font, sprite/text/shape blit, transitions | — |
-| engine-audio | MOD music playback (xmrs→PCM→WebAudio), chiptune SFX synth, music manager, autoplay unlock | — |
+| engine-audio | MOD music playback (own modplayer → PCM → WebAudio), chiptune SFX synth, music manager, autoplay unlock | — |
 | engine-input | unified mouse/keyboard/touch event queue with tap/sweep semantics | — |
 | scene-core | scene stack + RAF loop + input routing + fade/dissolve transitions | engine-gfx, engine-input |
 | campaign-core | pure game rules: castle graph, kingdom stats (riches/provisions/loyalty/popularity), units, marches, battles, events, spies, win/lose, RNG | — |
