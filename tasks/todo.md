@@ -81,7 +81,7 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 3 — Campaign view (T3xx)
 
-- [ ] **T301 Map renderer**: coastline/forest/hills shading, castle sprites
+- [x] **T301 Map renderer**: coastline/forest/hills shading, castle sprites
   (2 frames banner), roads, ownership colors, selected pulse; screenshot.
 - [ ] **T302 Panel UI kit**: pixel buttons/lists/scrollbar/tooltip, 3-tone
   shading, ALL-CAPS text; hit-testing; screenshot sheet.

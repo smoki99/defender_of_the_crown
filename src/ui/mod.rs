@@ -8,8 +8,8 @@ use crate::campaign::game::{
 };
 use crate::campaign::units::UnitKind;
 use crate::engine::gfx::{
-    BLACK, BLOOD, CREAM, DARKGRAY, DARKRED, GOLD, GRASS, GRAY, GREEN, NAVY, SAXON_BLUE, SILVER,
-    SKY, STONE, TAN, W, WHITE, YELLOW,
+    BLACK, BLOOD, CREAM, DARKGREEN, DARKGRAY, DARKRED, DEEPWATER, GOLD, GRASS, GRAY, GREEN,
+    NAVY, SAXON_BLUE, SILVER, SKY, STONE, TAN, TEAL, W, WHITE, YELLOW,
 };
 pub use crate::engine::scene::SceneEvent;
 
@@ -150,6 +150,7 @@ pub struct CampaignUi {
     pub sel: Option<usize>,
     pub msg: String,
     msg_ticks: u32,
+    pub anim: u32,
     pub want_restart: bool,
 }
 
@@ -163,11 +164,43 @@ impl CampaignUi {
             msg: String::new(),
             msg_ticks: 0,
             want_restart: false,
+            anim: 0,
         }
     }
 
     pub fn tick(&mut self) {
         self.msg_ticks = self.msg_ticks.saturating_sub(1);
+        self.anim = self.anim.wrapping_add(1);
+    }
+
+    /// North Sea + Channel: hatched shoreline, deep-water fill and teal
+    /// wave dashes drifting at anim cadence (T301 coast shading).
+    fn draw_sea(&self, fb: &mut crate::engine::gfx::Framebuffer) {
+        let drift = (self.anim / 9) % 11;
+        for y in 0..MAP_BOTTOM {
+            let xe = coast_edge(y);
+            fb.fill_rect(xe + 2, y, W - xe as u32 - 2, 1, DEEPWATER);
+            for x in xe..xe + 2 {
+                if ((x + y) & 1) == 0 {
+                    fb.set(x, y, SKY);
+                }
+            }
+            if (y as u32) % 11 == drift {
+                fb.hline(xe + 6, xe + 13, y, TEAL);
+            }
+        }
+    }
+
+    /// Static forest and hill sprites (T301).
+    fn draw_scenery(&self, fb: &mut crate::engine::gfx::Framebuffer) {
+        for (x, y) in HILLS {
+            fb.fill_circle(x, y, 4, GRAY);
+            fb.fill_circle(x - 1, y - 2, 2, SILVER);
+        }
+        for (x, y) in TREES {
+            fb.tri([(x - 3, y + 3), (x + 3, y + 3), (x, y - 4)], DARKGREEN);
+            fb.tri([(x - 2, y + 1), (x + 2, y + 1), (x, y - 5)], GREEN);
+        }
     }
 
     /// One semantic event. `own_gesture` marks real user input (the web
@@ -283,6 +316,8 @@ impl CampaignUi {
         use crate::engine::fonts::draw_text_shadow;
         fb.clear(SKY);
         fb.gradient_v(0, 0, W, MAP_BOTTOM as u32, SKY, GRASS);
+        self.draw_sea(fb);
+        self.draw_scenery(fb);
         // roads
         for (a, b) in crate::campaign::map::roads() {
             let (ax, ay) = castle_screen(&self.g.strongholds[a]);
@@ -310,8 +345,30 @@ impl CampaignUi {
                 fb.set(cx - 2, cy - 8, GOLD);
                 fb.set(cx + 2, cy - 8, GOLD);
             }
+            if !hidden {
+                // two-frame banner fluttering from the left crenel (T301).
+                fb.vline(cx - 5, cy - 13, cy - 8, BLACK);
+                if ((self.anim / 8) & 1) == 0 {
+                    fb.fill_rect(cx - 4, cy - 13, 3, 2, body);
+                } else {
+                    fb.fill_rect(cx - 4, cy - 12, 3, 2, body);
+                }
+            }
+            if s.port && !hidden {
+                fb.set(cx + 9, cy + 1, GOLD);
+                fb.set(cx + 9, cy + 2, GOLD);
+            }
             if self.sel == Some(s.id) {
-                fb.rect(cx - 9, cy - 9, 18, 16, YELLOW);
+                // two-frame pulse: the ring breathes yellow -> gold (T301).
+                let p = ((self.anim / 8) & 1) == 0;
+                let d: i32 = if p { 0 } else { 1 };
+                fb.rect(
+                    cx - 9 - d,
+                    cy - 9 - d,
+                    (20 + 2 * d) as u32,
+                    (18 + 2 * d) as u32,
+                    if p { YELLOW } else { GOLD },
+                );
             }
             let label = if hidden {
                 "??".to_string()
@@ -440,6 +497,33 @@ impl CampaignUi {
 }
 
 const NORMAN_KEEP: u8 = DARKRED;
+
+/// East/south coastline as screen-space x per y: piecewise linear through
+/// the Norfolk bulge, the London bight, Dover and the sweep into the
+/// Channel corner (T301).
+fn coast_edge(y: i32) -> i32 {
+    const P: [(i32, i32); 10] = [
+        (0, 226), (40, 224), (70, 208), (95, 206), (110, 216), (135, 222), (150, 210),
+        (170, 194), (190, 176), (201, 168),
+    ];
+    for w in P.windows(2) {
+        if y <= w[1].0 {
+            let (ya, xa) = w[0];
+            let (yb, xb) = w[1];
+            return xa + (y - ya) * (xb - xa) / (yb - ya);
+        }
+    }
+    P[P.len() - 1].1
+}
+
+/// Forest clusters: Sherwood, New Forest, Essex, far southwest.
+const TREES: [(i32, i32); 10] = [
+    (150, 30), (159, 36), (151, 43), (55, 146), (64, 150), (73, 146), (196, 50), (204, 57),
+    (18, 162), (28, 168),
+];
+
+/// Hills: Midlands knolls plus the Kent/Channel ridge.
+const HILLS: [(i32, i32); 5] = [(120, 58), (130, 52), (185, 135), (195, 143), (188, 166)];
 
 fn bar(fb: &mut crate::engine::gfx::Framebuffer, x: i32, y: i32, label: &str, v: u32, c: u8) {
     use crate::engine::fonts::draw_text_shadow;

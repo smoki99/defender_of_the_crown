@@ -89,3 +89,24 @@ Format: `T<id> — <what ran> — <result> (<date>)`. Append only.
   example build + polls). PNG baselines in /tmp only for now; commit vs-diff
   baselines when native Chromium returns (T001 libs lost in container
   recreate; restore via setup-gitea-env.sh is out of scope for the game).
+
+## T301 map renderer - done 2026-11-14
+- Coastline: piecewise-linear `coast_edge(y)` (Norfolk bulge -> London
+  bight -> Dover -> Channel corner), DEEPWATER fill, 2px checkerboard SKY
+  hatch at the shore, TEAL wave dashes drifting one row per 9 anim ticks.
+- Scenery: 10 tree canopies (Sherwood/New Forest/Essex/SW) + 5 hills with
+  SILVER highlights, static tables in src/ui/mod.rs.
+- Keeps: two-frame fluttering banner from the left crenel (owner color,
+  skipped on fog-hidden keeps), gold port marker on Dover, selection ring
+  breathes yellow->gold and expands 1px every 8 ticks (CampaignUi.anim,
+  advanced in tick()).
+- Verification: tests/map_render.rs (4 pixel-pinned tests: sea/shore/wave
+  drift, scenery pixels, banner frame A/B, pulse ring) - two initial
+  failures were real collisions (Dover crenel over the shore pixel,
+  Lincoln label over the hill highlight), retargeted. `./test.sh all`
+  green (suite + clippy -D warnings + wasm32 check; two clippy lints
+  fixed: is_multiple_of -> explicit-paren & 1). check:headless 17/17 on
+  the rebuilt bundle, 0 console errors; screenshots /tmp/crown-shots/
+  01-campaign.png (full map: coast, trees, hills, banners) and
+  03-levy.png (panel open over new terrain). Baselines commit with the
+  T3xx checkpoint follow-up once native Chromium libs are restored.
