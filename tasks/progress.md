@@ -357,6 +357,28 @@ herald's cry is public knowledge.
   banner + swim-back live, autoplay resolves through results → campaign pop,
   0 console errors. Full cargo suite green, clippy 0 warnings (2 own hits
   fixed). (2026-11-14)
+
+- T605 — mg-cloak (commit b15e366): STEALTH in the KEEP — douse all five
+  lanterns and escape through the postern: WASD one-cell steps on a 20×16
+  keep plan, four gaolers pace 20-23-tick beats with 4-deep side cones, a
+  sighting burns a cloak and re-sends the thief to the postern behind a
+  90-tick freeze (irons at zero), stepping an alarm bell quickens every
+  beat forever (-4 ticks, floor 12), and the north nook torch waits behind
+  a portcullis the lever draws; 900 ticks end the night. Scoring 5×15 + 10
+  escape + 15 clean sweep, tiers 45/75/95. predicted_sight(ahead) publishes
+  the safety contract (cones + gaoler cells at t+ahead): the gold-sweep
+  test is a wait-for-clear bot, honest on every seed - seed 42's beat-4
+  cone covers the fourth torch at boot and punished the naive script
+  before the loop existed. tests/mg_cloak.rs 10/10: geometry floodcheck,
+  WASD + portcullis gating, bell escalation, prediction tracks the beats,
+  catch→freeze→irons chain, time-up, determinism, needs-all-torches
+  escape, 100-point GOLD sweep. QA: cloak added to baseline-sports.sh -
+  play frame 0 px, plate frame GOLD LAUREL, all 16 sport frames green.
+  Real Chromium smoke via deep link: scene boots, W-walk renders, honest
+  cone misses (no false catches), HUD cloaks + bell pips live, 0 console
+  errors; title regression unharmed. Full cargo suite green, clippy 0
+  warnings (6 own hits fixed), wasm32 check green, 507 KB bundle rebuilt.
+  (2026-11-14)
 - T4xx CHECKPOINT (2026-11-14): entry sequence = THREE inputs from load -
   boot key (audio unlock), BEGIN CAMPAIGN, difficulty; the intro crawl now
   AUTO-ROLLS (CRAWL_DWELL 300 ticks = 5 s per leaf, dwell resets on NEXT /
