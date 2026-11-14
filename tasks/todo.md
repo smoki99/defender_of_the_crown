@@ -38,7 +38,7 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [x] **T104 Bitmap font**: original 8×8 glyph set (A–Z 0–9 punctuation,
   lowercase) drawn in code; `text()` + `text_center()`; renders in tests
   (pixel fingerprints); screenshot of glyph sheet.
-- [ ] **T105 Sprite layer**: 8/16/32px sprites (indexed, mask), blit/scaled×N,
+- [x] **T105 Sprite layer**: 8/16/32px sprites (indexed, mask), blit/scaled×N,
   palette-swap flash, 2-frame anim helper; tests.
 - [x] **T106 Input**: event queue (pointer down/move/up w/ canvas→internal
   coords, keys, wheel), tap/swipe semantics, no-gesture audio-unlock flag;

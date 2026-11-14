@@ -11,11 +11,12 @@ use wasm_bindgen::Clamped;
 use crate::engine::audio::{Mod, Player};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, DARKGRAY, GOLD, GREEN, LIGHTBLUE, NAVY, SAXON_BLUE, WHITE, YELLOW,
-    H, W,
+    Framebuffer, BLACK, BLOOD, DARKGRAY, GOLD, GRAY, GREEN, LIGHTBLUE, NAVY, SAXON_BLUE, TAN,
+    WHITE, YELLOW, H, W,
 };
 use crate::engine::input::{Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP};
 use crate::engine::scene::{AppCtx, Scene, SceneEvent, SceneStack, Transition};
+use crate::engine::sprite::{blit_anim, Sprite, TRANS};
 
 fn w() -> web_sys::Window {
     web_sys::window().expect("no window")
@@ -122,6 +123,42 @@ impl AudioState {
 
 // ---------------------------------------------------------------- scenes
 
+/// T105 demo troops: two-frame marching, 8x8, palette-indexed.
+const T: u8 = TRANS;
+static FOOT_A: [u8; 64] = [
+    T, T, GRAY, GRAY, GRAY, GRAY, T, T,
+    T, GRAY, GRAY, GRAY, GRAY, GRAY, GRAY, T,
+    T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T,
+    T, SAXON_BLUE, SAXON_BLUE, WHITE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T,
+    T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T,
+    T, T, TAN, T, T, TAN, T, T,
+    T, TAN, TAN, T, T, TAN, TAN, T,
+    T, T, T, T, T, T, T, T,
+];
+static FOOT_B: [u8; 64] = [
+    T, T, GRAY, GRAY, GRAY, GRAY, T, T,
+    T, GRAY, GRAY, GRAY, GRAY, GRAY, GRAY, T,
+    T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T,
+    T, SAXON_BLUE, SAXON_BLUE, WHITE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T,
+    T, T, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, SAXON_BLUE, T, T,
+    T, T, TAN, TAN, TAN, TAN, T, T,
+    T, T, TAN, T, T, TAN, T, T,
+    T, T, T, T, T, T, T, T,
+];
+static FOOT_SOLDIER: Sprite = Sprite::square(8, &FOOT_A);
+static FOOT_SOLDIER_B: Sprite = Sprite::square(8, &FOOT_B);
+static BANNER: [u8; 64] = [
+    TAN, BLOOD, BLOOD, BLOOD, BLOOD, T, T, T,
+    TAN, BLOOD, GOLD, GOLD, BLOOD, T, T, T,
+    TAN, BLOOD, GOLD, GOLD, BLOOD, T, T, T,
+    TAN, BLOOD, BLOOD, BLOOD, BLOOD, T, T, T,
+    TAN, T, T, T, T, T, T, T,
+    TAN, T, T, T, T, T, T, T,
+    TAN, T, T, T, T, T, T, T,
+    TAN, T, T, T, T, T, T, T,
+];
+static BANNER_SPRITE: Sprite = Sprite::square(8, &BANNER);
+
 /// T107 proof scene: gfx primitives, fonts, all input channels, transitions.
 pub struct TestScene {
     pan: (i32, i32),
@@ -212,6 +249,17 @@ impl Scene for TestScene {
             fb.fill_rect(cx + 4, 88, 6, 8, BLOOD);
             fb.fill_rect(cx + 14, 88, 6, 8, BLOOD);
         }
+        // T105: two marching soldiers (anim + periodic hit-flash), x2 banner
+        let march = (self.scroll / 3) % (W as i32 + 24) - 12;
+        let frame = (self.scroll.max(0) / 12) as u32;
+        if self.scroll % 90 < 4 {
+            FOOT_SOLDIER.blit(fb, march, 148, true);
+        } else {
+            blit_anim(&FOOT_SOLDIER, &FOOT_SOLDIER_B, fb, march, 148, frame);
+        }
+        blit_anim(&FOOT_SOLDIER_B, &FOOT_SOLDIER, fb, march - 20, 150, frame + 1);
+        FOOT_SOLDIER.blit_scaled(fb, 4, 232, 2, false);
+        BANNER_SPRITE.blit_scaled(fb, 302, 72, 2, false);
         let (cx, cy) = (self.circle.0 / 256, self.circle.1 / 256);
         fb.fill_circle(cx, cy, self.radius, YELLOW);
         draw_text_shadow(fb, 4, 4, self.msg, WHITE, DARKGRAY);

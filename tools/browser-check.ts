@@ -8,6 +8,7 @@ const PW_LIBS = "/home/omp/pw-libs/usr/lib/x86_64-linux-gnu";
 
 const YELLOW = [255, 238, 68];
 const GREEN = [34, 136, 34];
+const TAN = [187, 153, 102];
 const BLOOD = [153, 0, 34];
 
 const fails: string[] = [];
@@ -77,6 +78,7 @@ try {
   ok(fps >= 45, `fps=${fps} >= 45`);
   ok((await countPix(YELLOW)) > 300, "circle visible (yellow px)");
   ok((await countPix(GREEN)) > 5000, "ground visible (green px)");
+  ok((await countPix(TAN)) > 20, "sprites drawn (tan px)");
   await page.screenshot({ path: "/tmp/crown-test.png" });
 
   // tap moves the aim target; the spring circle converges onto it.
