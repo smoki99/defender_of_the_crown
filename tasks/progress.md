@@ -270,3 +270,11 @@ herald's cry is public knowledge.
   saxon bed on init, battle bed brackets the report overlay, victory/defeat
   sting + record_feat exactly once (tests/music_flow.rs 4/4). Screenshots
   /tmp/crown-title k1-k9 + 01-06 (2026-11-14)
+- T404/T405 — difficulty pick (GOLD fill on chosen row, y181 interior probes),
+  3-leaf intro crawl (flame border 3-sample diff, crown vignette 240 gold px,
+  NEXT -> PlayScene), illustrated HowTo x3, Options CRT row wired to the
+  whole-frame scanline darkening + doc.crt. Harness split: jsdom-harness.mjs
+  (boot+helpers+decodeTurn, CRT-agnostic >150 glyph threshold) + scenarios
+  headless-check.mjs (click campaign: turn +1/cycle proven 1..6) and
+  title-flow-check.mjs (T404/T405 keyboard flow, LS_SEED CRT-off variant).
+  3 scenarios 0 fails; 27 cargo suites green; clippy -D warnings clean (2026-11-14)

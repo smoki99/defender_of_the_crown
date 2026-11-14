@@ -148,10 +148,17 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   **2026-11-14:** flame border, bobbing crown, flanking banners; arrows/Enter
   + click nav, HowTo 3 pages, Hall of Fame (empty + persisted entries),
   OPTIONS sound toggle round-trips `doc.mute`; screenshots in /tmp/crown-title.
-- [ ] **T404 Difficulty + intro crawl**: EASY/NORMAL/HARD pick → 3-screen
+- [x] **T404 Difficulty + intro crawl**: EASY/NORMAL/HARD pick → 3-screen
   pixel crawl → campaign; screenshot.
-- [ ] **T405 How-to pages + options**: illustrated pixel how-to (3 pages),
+  **2026-11-14:** gold-fill highlight, arrows/Enter + click; three illustrated
+  crawl leaves with animated flame border, final crown vignette, NEXT commits
+  the campaign. Keyboard-only flow proven by tools/title-flow-check.mjs
+  (default + `doc.crt=0` seed runs, 19/19 pixel asserts, 0 errors).
+- [x] **T405 How-to pages + options**: illustrated pixel how-to (3 pages),
   sound/CRT toggles persisted; screenshots.
+  **2026-11-14:** castle/road + shield + crown pages, arrow-key paging;
+  Options SOUND/CRT rows; `doc.crt` survives boot (seed run shows OFF at
+  boot, flip persists "1"); CRT filter visibly darkens every scanline row.
 - [ ] **Checkpoint T4xx**: entry sequence playable ≤3 inputs from load,
   music audible (RMS), screenshots approved.
 

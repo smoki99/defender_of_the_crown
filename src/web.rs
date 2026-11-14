@@ -16,8 +16,8 @@ extern "C" {
 use crate::engine::audio::{Mod, Music, Player, Sfx};
 use crate::engine::fonts::{draw_text, draw_text_shadow};
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, DARKGRAY, DARKGREEN, GOLD, GRAY, GREEN, H, LIGHTBLUE, LINEN, NAVY,
-    SAXON_BLUE, TAN, W, WHITE, YELLOW,
+    Framebuffer, BLACK, BLOOD, BROWN, DARKGRAY, DARKGREEN, EMBER, GOLD, GRASS, GRAY, GREEN, H,
+    LIGHTBLUE, LINEN, NAVY, OLIVE, ORANGE, SAXON_BLUE, SILVER, SKY, STONE, TAN, W, WHITE, YELLOW,
 };
 use crate::engine::input::{
     Gesture, Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP,
@@ -77,10 +77,12 @@ struct App {
     shot_done: bool,
     perf_acc: f64,
     perf_n: u32,
+    crt: Rc<Cell<bool>>,
 }
 
 struct Ctx {
     muted: Rc<Cell<bool>>,
+    crt: Rc<Cell<bool>>,
     music: Rc<RefCell<Music>>,
     audio: AudioState,
 }
@@ -103,6 +105,13 @@ impl AppCtx for Ctx {
     fn set_mute(&mut self, muted: bool) {
         self.muted.set(muted);
         ls_set("doc.mute", if muted { "1" } else { "0" });
+    }
+    fn crt(&self) -> bool {
+        self.crt.get()
+    }
+    fn set_crt(&mut self, on: bool) {
+        self.crt.set(on);
+        ls_set("doc.crt", if on { "1" } else { "0" });
     }
     fn play_music(&mut self, track: Option<&'static str>) {
         let p = track
@@ -558,14 +567,35 @@ impl Scene for DemoScene {
     }
 }
 
+/// T404 intro crawl: heading + two story lines per screen.
+const CRAWL: [(&str, &str, &str); 3] = [
+    (
+        "1066 - THE CROWN IS LOST",
+        "HASTINGS HAS CLAIMED KING HAROLD.",
+        "NORMAN BANNERS BLACKEN EVERY SHIRE.",
+    ),
+    (
+        "BERIC OF CHELTENHAM",
+        "A SAXON EARL REMEMBERS THE OATH.",
+        "HE LEVIES THE FIRST KEEP FROM THE YOKE.",
+    ),
+    (
+        "REIGN - OR RUIN",
+        "WIN THE EARLS. STARVE THE GARRISONS.",
+        "TAKE YOUR CROWN IN LONDON.",
+    ),
+];
+
 /// Entry sequence (T402/T403): black screen + unfurling heraldic banner,
 /// then an animated title card with a real menu: campaign start (difficulty
 /// pick), how-to pages, hall of fame, sound options. Mouse/keyboard equal.
+
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum Stage {
     Boot,
     Menu,
     Difficulty,
+    Crawl,
     HowTo,
     Fame,
     Options,
@@ -577,8 +607,10 @@ pub struct TitleScene {
     stage: Stage,
     item: usize, // menu/difficulty highlight (keyboard)
     page: usize, // how-to page
+    crawl: usize, // intro crawl screen (T404)
     pending: Option<usize>, // activation deferred to tick (needs AppCtx)
     sound: bool, // OPTIONS mirror of the persisted mute flag
+    crt: bool,   // OPTIONS mirror of the persisted scanline flag (T405)
 }
 
 impl TitleScene {
@@ -589,8 +621,10 @@ impl TitleScene {
             stage: Stage::Boot,
             item: 0,
             page: 0,
+            crawl: 0,
             pending: None,
             sound: initial_sound(),
+            crt: ls_get("doc.crt").as_deref() != Some("0"),
         }
     }
 }
@@ -692,18 +726,41 @@ impl TitleScene {
             }
             Stage::Difficulty => {
                 PICK.store(i as u8, std::sync::atomic::Ordering::Relaxed);
-                self.touched = true;
+                self.crawl = 0;
+                self.stage = Stage::Crawl;
             }
             Stage::Options => {
-                app.set_mute(!app.mute());
-                self.sound = !app.mute();
+                if i == 0 {
+                    app.set_mute(!app.mute());
+                    self.sound = !app.mute();
+                } else {
+                    app.set_crt(!app.crt());
+                    self.crt = app.crt();
+                }
             }
             _ => {}
         }
     }
     fn back(&mut self) {
+        if self.stage == Stage::Crawl {
+            self.stage = if self.crawl > 0 {
+                self.crawl -= 1;
+                Stage::Crawl
+            } else {
+                Stage::Difficulty
+            };
+            return;
+        }
         self.stage = Stage::Menu;
         self.item = 0;
+    }
+    /// NEXT on the crawl: last screen commits the campaign start.
+    fn crawl_forward(&mut self) {
+        if self.crawl + 1 < CRAWL.len() {
+            self.crawl += 1;
+        } else {
+            self.touched = true;
+        }
     }
     /// Flame-licked border: 2px cycling fire on all four edges.
     fn draw_flames(&self, fb: &mut Framebuffer) {
@@ -743,6 +800,57 @@ impl TitleScene {
         }
         self.draw_back(fb);
     }
+    /// T405: a pixel vignette for each how-to page.
+    fn howto_art(&self, fb: &mut Framebuffer) {
+        match self.page {
+            0 => {
+                // three keeps on a road, the picked one pulsing
+                for (cx, cy) in [(56, 126), (152, 118), (248, 128)] {
+                    fb.fill_rect(cx, cy, 16, 12, STONE);
+                    for b in (cx..cx + 16).step_by(4) {
+                        fb.fill_rect(b, cy - 3, 3, 3, STONE);
+                    }
+                    fb.fill_rect(cx + 6, cy + 5, 4, 7, DARKGRAY);
+                }
+                for rx in [84, 96, 108, 120, 176, 188, 200, 212] {
+                    fb.fill_rect(rx, 132, 4, 2, DARKGRAY);
+                }
+                if self.ticks / 16 % 2 == 0 {
+                    fb.rect(52, 113, 24, 28, GOLD);
+                }
+            }
+            1 => {
+                // shield + sword, a coin and a spy-eye
+                fb.fill_rect(70, 112, 18, 16, BLOOD);
+                fb.tri([(70, 128), (88, 128), (79, 138)], BLOOD);
+                fb.fill_rect(77, 112, 4, 20, GOLD);
+                fb.fill_rect(70, 118, 18, 4, GOLD);
+                fb.tri([(104, 138), (108, 138), (122, 110)], SILVER);
+                fb.fill_rect(106, 126, 10, 3, GOLD);
+                fb.fill_circle(170, 124, 7, GOLD);
+                fb.fill_circle(170, 124, 4, YELLOW);
+                fb.fill_rect(169, 120, 3, 8, BLOOD);
+                fb.fill_rect(216, 118, 26, 12, LINEN);
+                fb.fill_circle(229, 124, 4, NAVY);
+                fb.fill_circle(229, 124, 2, BLACK);
+            }
+            _ => {
+                // crown between two waving banners
+                let wob = (self.ticks / 12 % 2) as i32;
+                for (bx, col) in [(96, BLOOD), (216, SAXON_BLUE)] {
+                    fb.fill_rect(bx, 108, 2, 34, SILVER);
+                    fb.fill_rect(bx + 2, 108 + wob, 14, 10, col);
+                    fb.fill_rect(bx + 7, 108 + wob, 2, 10, GOLD);
+                }
+                fb.fill_rect(146, 126, 28, 8, GOLD);
+                for px in [146, 158, 170] {
+                    fb.fill_rect(px, 120, 4, 6, GOLD);
+                }
+                fb.fill_rect(152, 128, 3, 3, BLOOD);
+                fb.fill_rect(163, 128, 3, 3, SAXON_BLUE);
+            }
+        }
+    }
     fn draw_fame(&self, fb: &mut Framebuffer) {
         fb.fill_rect(16, 96, 288, 116, BLACK);
         fb.rect(16, 96, 288, 116, GOLD);
@@ -758,6 +866,120 @@ impl TitleScene {
             }
         }
         self.draw_back(fb);
+    }
+    /// T404: one crawl screen - heading, pixel vignette, two story lines.
+    fn draw_crawl(&mut self, fb: &mut Framebuffer) {
+        let (head, l1, l2) = CRAWL[self.crawl];
+        fb.fill_rect(16, 96, 288, 140, BLACK);
+        fb.rect(16, 96, 288, 140, GOLD);
+        let hx = (W as i32 - head.len() as i32 * 6) / 2;
+        draw_text_shadow(fb, hx, 102, head, GOLD, BLACK);
+        match self.crawl {
+            0 => self.crawl_fire(fb),
+            1 => self.crawl_arms(fb),
+            _ => self.crawl_keep(fb),
+        }
+        for (i, l) in [l1, l2].into_iter().enumerate() {
+            let lx = (W as i32 - l.len() as i32 * 6) / 2;
+            draw_text_shadow(fb, lx, 178 + i as i32 * 13, l, WHITE, BLACK);
+        }
+        let pg = format!("{}/{}", self.crawl + 1, CRAWL.len());
+        draw_text_shadow(fb, 152, 204, &pg, GRAY, BLACK);
+        if self.crawl + 1 == CRAWL.len() {
+            draw_text_shadow(fb, 88, 214, "ENTER MARCHES TO WAR", GOLD, BLACK);
+        }
+        self.draw_nav(fb);
+    }
+    /// Screen 1: a shire ablaze under the Norman banner.
+    fn crawl_fire(&self, fb: &mut Framebuffer) {
+        fb.fill_rect_dither(20, 112, 276, 46, BLACK, BLOOD, 20);
+        fb.fill_rect(20, 158, 276, 8, BLACK);
+        for (hx, hw) in [(56i32, 30i32), (100, 22)] {
+            fb.fill_rect(hx, 142, hw as u32, 16, BROWN);
+            fb.tri([(hx - 4, 144), (hx + hw + 4, 144), (hx + hw / 2, 128)], OLIVE);
+            fb.fill_rect(hx + hw / 2 - 3, 148, 6, 10, DARKGRAY);
+        }
+        // flame flicker riding the rooftops
+        for k in 0..14i32 {
+            let fx = 54 + k * 6 + ((self.ticks as i32 / 3 + k) % 3 - 1);
+            let fy = 128 - (self.ticks as i32 + k * 7) % 6;
+            fb.fill_rect(
+                fx,
+                fy,
+                3,
+                14,
+                [EMBER, ORANGE, YELLOW][((k + (self.ticks / 4) as i32) % 3) as usize],
+            );
+        }
+        for k in 0..5i32 {
+            let sy = 122 - k * 9 - (self.ticks as i32 % 8);
+            fb.fill_circle(70 + k * 12, sy, 3 + k as u32 / 2, DARKGRAY);
+        }
+        // Norman war banner planted right of the ruin
+        fb.fill_rect(226, 114, 2, 46, SILVER);
+        fb.fill_rect(230, 116, 34, 26, BLOOD);
+        fb.rect(230, 116, 34, 26, GOLD);
+        fb.fill_rect(236, 126, 16, 8, GOLD); // lion
+        fb.fill_circle(254, 128, 3, GOLD);
+        fb.fill_rect(238, 134, 3, 6, GOLD);
+        fb.fill_rect(247, 134, 3, 6, GOLD);
+    }
+    /// Screen 2: axe and sword crossed over the forgotten crown.
+    fn crawl_arms(&self, fb: &mut Framebuffer) {
+        fb.fill_rect_dither(20, 112, 276, 56, NAVY, BLACK, 40);
+        // axe: upright haft, silver crescent head left
+        fb.fill_rect(158, 114, 4, 52, BROWN);
+        fb.tri([(158, 116), (158, 134), (140, 125)], SILVER);
+        fb.tri([(158, 120), (158, 130), (148, 125)], NAVY);
+        // sword crossed right, gold guard
+        fb.tri([(166, 164), (171, 164), (190, 114)], SILVER);
+        fb.fill_rect(178, 128, 14, 4, GOLD);
+        fb.fill_circle(190, 116, 2, GOLD);
+        // the Saxon crown, buried but gold
+        fb.fill_rect(146, 156, 28, 8, GOLD);
+        for px in [146, 158, 170] {
+            fb.fill_rect(px, 150, 4, 6, GOLD);
+        }
+        fb.fill_rect(152, 158, 3, 3, BLOOD);
+        fb.fill_rect(163, 158, 3, 3, SAXON_BLUE);
+        for k in 0..6i32 {
+            if (self.ticks as usize / 8 + k as usize) % 4 == 0 {
+                fb.fill_rect(60 + k * 42, 120 + (k * 13) % 40, 2, 2, WHITE);
+            }
+        }
+    }
+    /// Screen 3: the keep awaiteth its rightful lord.
+    fn crawl_keep(&self, fb: &mut Framebuffer) {
+        fb.gradient_v(20, 112, 276, 48, SKY, NAVY);
+        fb.fill_rect(20, 160, 276, 8, GRASS);
+        // keep + towers with crenels and blood roofs
+        fb.fill_rect(120, 128, 80, 32, STONE);
+        fb.fill_rect(110, 120, 18, 40, STONE);
+        fb.fill_rect(192, 120, 18, 40, STONE);
+        for cx in (120..200).step_by(8) {
+            fb.fill_rect(cx, 124, 4, 4, NAVY);
+        }
+        fb.tri([(108, 120), (130, 120), (119, 106)], BLOOD);
+        fb.tri([(190, 120), (212, 120), (201, 106)], BLOOD);
+        fb.fill_rect(152, 142, 16, 18, DARKGRAY); // gate
+        fb.rect(152, 142, 16, 18, GOLD);
+        // Saxon banner over the gate, waving
+        let wob = (self.ticks / 10 % 2) as i32;
+        fb.fill_rect(159, 100, 2, 12, SILVER);
+        fb.fill_rect(161, 100 + wob, 12, 8, SAXON_BLUE);
+        fb.fill_rect(165, 100 + wob, 2, 8, GOLD);
+        fb.fill_rect(161, 103 + wob, 12, 2, GOLD);
+        // crown before the gate, dawn rays blinking
+        fb.fill_rect(148, 164, 24, 6, GOLD);
+        for px in [148, 158, 168] {
+            fb.fill_rect(px, 159, 4, 5, GOLD);
+        }
+        if self.ticks / 12 % 2 == 0 {
+            for k in 1..4 {
+                fb.hline(150 - 8 * k, 156, 158 - 6 * k, YELLOW);
+                fb.hline(164, 170 + 8 * k, 158 - 6 * k, YELLOW);
+            }
+        }
     }
 }
 
@@ -786,11 +1008,19 @@ impl Scene for TitleScene {
                     Stage::Difficulty => {
                         for i in 0..3 {
                             if in_rect(diff_rect(i), x, y) {
-                                PICK.store(i as u8, std::sync::atomic::Ordering::Relaxed);
-                                self.touched = true;
+                                self.item = i;
+                                self.pending = Some(i);
                             }
                         }
                         if in_rect(back_rect(), x, y) {
+                            self.back();
+                        }
+                    }
+                    Stage::Crawl => {
+                        if in_rect((264, 226, 44, 14), x, y) {
+                            self.crawl_forward();
+                        }
+                        if in_rect((12, 226, 44, 14), x, y) || in_rect(back_rect(), x, y) {
                             self.back();
                         }
                     }
@@ -814,6 +1044,9 @@ impl Scene for TitleScene {
                         if in_rect((100, 118, 120, 14), x, y) {
                             self.pending = Some(0);
                         }
+                        if in_rect((100, 138, 120, 14), x, y) {
+                            self.pending = Some(1);
+                        }
                         if in_rect(back_rect(), x, y) {
                             self.back();
                         }
@@ -828,17 +1061,21 @@ impl Scene for TitleScene {
                 let n = match self.stage {
                     Stage::Menu => MENU.len(),
                     Stage::Difficulty => 3,
-                    Stage::Options => 1,
+                    Stage::Options => 2,
                     _ => 0,
                 };
                 match *code {
                     KEY_UP if n > 0 => self.item = (self.item + n - 1) % n,
                     KEY_DOWN if n > 0 => self.item = (self.item + 1) % n,
+                    KEY_LEFT if self.stage == Stage::Crawl => self.back(),
                     KEY_LEFT if self.stage == Stage::HowTo => {
                         self.page = self.page.saturating_sub(1)
                     }
                     KEY_RIGHT if self.stage == Stage::HowTo => {
                         self.page = (self.page + 1).min(HOWTO.len() - 1)
+                    }
+                    KEY_RIGHT | KEY_ENTER | KEY_SPACE if self.stage == Stage::Crawl => {
+                        self.crawl_forward()
                     }
                     KEY_ENTER | KEY_SPACE if self.stage == Stage::HowTo => {
                         if self.page + 1 >= HOWTO.len() {
@@ -949,25 +1186,31 @@ impl Scene for TitleScene {
             }
             Stage::HowTo => {
                 let (head, lines) = HOWTO[self.page];
-                fb.fill_rect(16, 96, 288, 116, BLACK);
-                fb.rect(16, 96, 288, 116, GOLD);
+                fb.fill_rect(16, 96, 288, 120, BLACK);
+                fb.rect(16, 96, 288, 120, GOLD);
                 let hx = (W as i32 - head.len() as i32 * 6) / 2;
-                draw_text_shadow(fb, hx, 104, head, GOLD, BLACK);
+                draw_text_shadow(fb, hx, 101, head, GOLD, BLACK);
+                self.howto_art(fb);
                 for (i, l) in lines.iter().enumerate() {
                     let lx = (W as i32 - l.len() as i32 * 6) / 2;
-                    draw_text_shadow(fb, lx, 126 + i as i32 * 13, l, WHITE, BLACK);
+                    draw_text_shadow(fb, lx, 146 + i as i32 * 12, l, WHITE, BLACK);
                 }
                 let pg = format!("{}/{}", self.page + 1, HOWTO.len());
-                draw_text_shadow(fb, 152, 196, &pg, GRAY, BLACK);
+                draw_text_shadow(fb, 292 - pg.len() as i32 * 6, 204, &pg, GRAY, BLACK);
                 self.draw_nav(fb);
             }
+            Stage::Crawl => self.draw_crawl(fb),
             Stage::Fame => self.draw_fame(fb),
             Stage::Options => {
                 let t = format!("SOUND: {}", if self.sound { "ON" } else { "OFF" });
                 fb.fill_rect(100, 118, 120, 14, if self.item == 0 { BLOOD } else { NAVY });
                 fb.rect(100, 118, 120, 14, GOLD);
                 draw_text_shadow(fb, 118, 121, &t, WHITE, BLACK);
-                draw_text_shadow(fb, 78, 146, "M TOGGLES THE SOUND ANYTIME", GRAY, BLACK);
+                let c = format!("CRT FILTER: {}", if self.crt { "ON" } else { "OFF" });
+                fb.fill_rect(100, 138, 120, 14, if self.item == 1 { BLOOD } else { NAVY });
+                fb.rect(100, 138, 120, 14, GOLD);
+                draw_text_shadow(fb, 106, 141, &c, WHITE, BLACK);
+                draw_text_shadow(fb, 78, 166, "M TOGGLES THE SOUND ANYTIME", GRAY, BLACK);
                 self.draw_back(fb);
             }
             _ => {}
@@ -1006,6 +1249,8 @@ pub fn main() -> Result<(), JsValue> {
         Some("0") => false,
         _ => query_has("mute=1"),
     }));
+    // T405: scanline filter, on unless the player turned it off.
+    let crt = Rc::new(Cell::new(ls_get("doc.crt").as_deref() != Some("0")));
     let music = Rc::new(RefCell::new(Music::new()));
     // T402: the overture is queued pre-gesture but silent; the first click or
     // key unlocks the AudioContext and the fanfare starts from bar one.
@@ -1069,10 +1314,12 @@ pub fn main() -> Result<(), JsValue> {
         shot_done: false,
         perf_acc: 0.0,
         perf_n: 0,
+        crt: crt.clone(),
     };
     let state = Rc::new(RefCell::new(app));
     let ctxrc = Rc::new(RefCell::new(Ctx {
         muted,
+        crt,
         music,
         audio,
     }));
@@ -1166,6 +1413,17 @@ pub fn main() -> Result<(), JsValue> {
             }
             st.stack.paint(&mut st.fb, &mut st.scratch);
             st.fb.to_rgba(&mut st.rgba);
+            if st.crt.get() {
+                // every third scanline darkened: the tube breathes
+                for y in (0..H).step_by(3) {
+                    let base = (y * W * 4) as usize;
+                    for row in st.rgba[base..base + (W * 4) as usize].chunks_exact_mut(4) {
+                        for c in row[..3].iter_mut() {
+                            *c = (*c as u16 * 2 / 3) as u8;
+                        }
+                    }
+                }
+            }
             if let Ok(img) = web_sys::ImageData::new_with_u8_clamped_array(Clamped(&st.rgba), W) {
                 let _ = st.ctx2d.put_image_data(&img, 0.0, 0.0);
             }
