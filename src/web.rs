@@ -1285,6 +1285,19 @@ pub fn main() -> Result<(), JsValue> {
     } else {
         Difficulty::Normal
     };
+    // dev deep link: ?scene=mg&mg=<id> boots straight into one sport
+    let mg_sport = query_get("scene")
+        .filter(|s| s == "mg")
+        .and_then(|_| query_get("mg"))
+        .and_then(|id| {
+            crate::minigames::framework::SPORTS
+                .iter()
+                .position(|s| s.id == id)
+                .and_then(|sid| {
+                    crate::ui::host::make_game(crate::minigames::framework::SPORTS[sid].id, play_seed)
+                        .map(|g| (sid, g))
+                })
+        });
     let first: Box<dyn Scene> = if want_test {
         Box::new(TestScene::new("TEST SCENE"))
     } else if want_demo {
@@ -1298,6 +1311,14 @@ pub fn main() -> Result<(), JsValue> {
                 .with_autoplay(query_has("autoplay=1"))
                 .with_turn(query_get("turn").and_then(|v| v.parse().ok()).unwrap_or(0)),
         )
+    } else if let Some((sid, game)) = mg_sport {
+        Box::new(crate::ui::host::MgHost::new(
+            &crate::minigames::framework::SPORTS[sid],
+            crate::ui::host::SportMode::Sports { sid },
+            game,
+            Rc::new(RefCell::new(None)),
+            query_has("autoplay=1"),
+        ))
     } else {
         Box::new(TitleScene::new())
     };
