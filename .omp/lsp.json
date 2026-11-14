@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "rust-analyzer": {
+      "command": "/home/omp/.local/bin/rust-analyzer",
+      "args": ["--stdio"],
+      "fileTypes": [".rs"],
+      "rootMarkers": ["Cargo.toml"]
+    }
+  }
+}

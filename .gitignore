@@ -1,0 +1,6 @@
+/target
+/pkg
+/web/pkg
+node_modules
+/tmp
+*.png.debug

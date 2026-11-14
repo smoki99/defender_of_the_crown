@@ -1,0 +1,49 @@
+[package]
+name = "defender_of_the_crown"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A Defender of the Crown style strategy game for the web, in Rust + WebAssembly"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "=0.2.130"
+js-sys = "0.3"
+console-error-panic-hook = { package = "console_error_panic_hook", version = "0.1" }
+# music: xmrs sits behind a feature until T003 proves wasm playback;
+# fallback plan (SPEC §3) replaces it without touching callers.
+xmrs = { version = "0.15", optional = true, default-features = false }
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "Location",
+    "Element",
+    "HtmlElement",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "ImageData",
+    "EventTarget",
+    "Event",
+    "MouseEvent",
+    "KeyboardEvent",
+    "TouchEvent",
+    "Touch",
+    "TouchList",
+    "WheelEvent",
+    "CssStyleDeclaration",
+    "DomRect",
+    "Performance",
+    "Storage",
+    "console",
+] }
+
+[features]
+default = []
+music = ["dep:xmrs"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

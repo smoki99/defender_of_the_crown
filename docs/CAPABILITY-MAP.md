@@ -1,0 +1,37 @@
+# Capability Map: Defender of the Crown 2.0 (Web/Rust/WASM)
+
+One initiative, many independently testable capabilities → this map is the index
+for per-module specs (`docs/specs/<id>.md`). Module ids are stable kebab-case.
+
+| Module id | Responsibility | Depends on |
+|---|---|---|
+| engine-gfx | 320×256 indexed framebuffer, 32-color palette, Bayer dithering, bitmap font, sprite/text/shape blit, transitions | — |
+| engine-audio | MOD music playback (xmrs→PCM→WebAudio), chiptune SFX synth, music manager, autoplay unlock | — |
+| engine-input | unified mouse/keyboard/touch event queue with tap/sweep semantics | — |
+| scene-core | scene stack + RAF loop + input routing + fade/dissolve transitions | engine-gfx, engine-input |
+| campaign-core | pure game rules: castle graph, kingdom stats (riches/provisions/loyalty/popularity), units, marches, battles, events, spies, win/lose, RNG | — |
+| campaign-ai | Norman AI (recruit/attack/reinforce/spy, difficulty knobs) | campaign-core |
+| campaign-view | map render, pixel panel UI, battle reports, event banners, coronation/revolt UI | campaign-core, engine-gfx |
+| mg-framework | Minigame trait + registry + reward tiers + unlock schedule + HALL OF FAME (localStorage) + shared HUD/results screen | scene-core, engine-audio |
+| mg-joust, mg-catapult, mg-sword, mg-archery, mg-rampart, mg-maze, mg-river, mg-cloak, mg-forge, mg-herbs, mg-falcon, mg-tavern, mg-dragon | 13 individual minigames | mg-framework, engine-* |
+| title-flow | boot herald, animated title card, overture music sequencing, menu, difficulty pick, how-to, mute | scene-core, engine-audio, mg-framework |
+| web-shell | HTML/CSS page, wasm bootstrap, canvas scaling, audio gesture unlock, page metadata | scene-core |
+| tooling | build.sh, serve.ts, compose.ts (tracker→.MOD), sprite2rs.ts, shot.ts (playwright), fetch-chrome-libs.ts | — |
+
+Dependency direction is acyclic. `campaign-core` and `engine-*` are leaf
+modules with no web coupling except `engine-audio`'s WebAudio adapter and
+`web-shell` (both thin adapters over pure cores).
+
+**Build order**
+
+```
+engine-gfx ─┬─→ scene-core ─→ title-flow ─┐
+engine-input┘         │                   │
+engine-audio ─────────┼───────────────────┼──→ web-shell polish → CI
+campaign-core ─┬─→ campaign-ai            │
+               └─→ campaign-view ─────────┤
+mg-framework (after scene-core) ─→ mg-*  (13, each independent) ─→ title-flow "HALL OF FAME"
+```
+
+Parallelizable: `engine-*` ∥ `campaign-core` ∥ `tooling`. Each minigame is an
+independent slice testable alone (its own logic tests + screenshot check).
