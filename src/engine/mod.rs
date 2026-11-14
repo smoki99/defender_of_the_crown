@@ -3,3 +3,9 @@
 pub mod audio;
 
 pub mod gfx;
+
+pub mod fonts;
+
+pub mod input;
+
+pub mod scene;
