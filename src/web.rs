@@ -1293,7 +1293,11 @@ pub fn main() -> Result<(), JsValue> {
             want_leave: false,
         })
     } else if want_play {
-        Box::new(PlayScene::new(play_seed, play_diff).with_autoplay(query_has("autoplay=1")))
+        Box::new(
+            PlayScene::new(play_seed, play_diff)
+                .with_autoplay(query_has("autoplay=1"))
+                .with_turn(query_get("turn").and_then(|v| v.parse().ok()).unwrap_or(0)),
+        )
     } else {
         Box::new(TitleScene::new())
     };

@@ -240,6 +240,7 @@ pub fn make_game(id: &str, seed: u64) -> Option<Box<dyn Minigame>> {
         "sword" => Some(Box::new(crate::minigames::sword::Sword::new(seed))),
         "joust" => Some(Box::new(crate::minigames::joust::Joust::new(seed))),
         "catapult" => Some(Box::new(crate::minigames::catapult::Catapult::new(seed))),
+        "archery" => Some(Box::new(crate::minigames::archery::Archery::new(seed))),
         _ => None,
     }
 }

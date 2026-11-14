@@ -45,7 +45,7 @@ const vc = new VirtualConsole();
 vc.on("jsdomError", (e) => { if (!/Could not parse CSS/.test(String(e.message))) problems.push("jsdom: " + e.message); });
 vc.on("error", (...a) => problems.push("console.error: " + a.join(" ")));
 export const dom = new JSDOM(`<!doctype html><html><body><canvas id="screen"></canvas></body></html>`, {
-  url: "http://127.0.0.1:8123/index.html", pretendToBeVisual: true, virtualConsole: vc,
+  url: `http://127.0.0.1:8123/index.html${process.env.CROWN_QS ? "?" + process.env.CROWN_QS : ""}`, pretendToBeVisual: true, virtualConsole: vc,
 });
 export const { window } = dom;
 window.addEventListener("error", (e) => problems.push("window: " + (e.error?.stack ?? e.message)));
@@ -121,6 +121,12 @@ export function tap(x, y) {
 /// Semantic key press: the app maps KeyboardEvent.key on window.
 export function key(k) {
   window.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true }));
+  window.dispatchEvent(new window.KeyboardEvent("keyup", { key: k, bubbles: true }));
+}
+export function keyDown(k) {
+  window.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true }));
+}
+export function keyUp(k) {
   window.dispatchEvent(new window.KeyboardEvent("keyup", { key: k, bubbles: true }));
 }
 export const getFrame = () => frame;

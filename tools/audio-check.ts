@@ -113,6 +113,15 @@ try {
     `unmute restores music (samples ${back.map((x) => x.toFixed(3)).join(" ")})`,
   );
 
+  // A4: the title must stay audible through the loop - the overture ends
+  // at the A-section restart byte, so sample a window that straddles it.
+  await page.waitForTimeout(6000);
+  const looped = await sampleRms(10);
+  ok(
+    looped.filter((x) => x > 0.002).length >= 5,
+    `title loop audible at +6 s (samples ${looped.map((x) => x.toFixed(3)).join(" ")})`,
+  );
+
   ok(errors.length === 0, `no console/page errors${errors.length ? ": " + errors.join(" | ") : ""}`);
 } finally {
   await browser?.close();

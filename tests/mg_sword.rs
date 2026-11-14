@@ -368,8 +368,6 @@ fn factory_arms_sword_too() {
     use defender_of_the_crown::ui::host::make_game;
     let g = make_game("sword", 42).expect("sword is armed");
     assert_eq!(g.id(), "sword");
-    assert!(
-        make_game("archery", 1).is_none(),
-        "T601 sports stay unarmed"
-    );
+    let a = make_game("archery", 7).expect("archery shipped with T601");
+    assert_eq!(a.id(), "archery");
 }

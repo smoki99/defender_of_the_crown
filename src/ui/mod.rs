@@ -1112,6 +1112,15 @@ impl PlayScene {
         self
     }
 
+    /// Harness/debug path: open the campaign already at turn N (?turn=N),
+    /// so late-season draws are reachable without replaying nine turns.
+    pub fn with_turn(mut self, n: u32) -> Self {
+        if n > 0 {
+            self.ui.g.turn = n;
+        }
+        self
+    }
+
     /// Layer/collect the minigame host around the campaign screen (T501).
     fn sports_flow(&mut self, app: &mut dyn crate::engine::scene::AppCtx) {
         if let Some((spec, mode)) = self.ui.launch_req.take() {

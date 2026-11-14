@@ -1,26 +1,27 @@
-// tools/serve.ts — tiny static file server for web/ (dev testing).
-const port = Number(process.argv[2] ?? Bun.env.PORT ?? 8080);
-const root = new URL("../web/", import.meta.url).pathname;
+// Minimal static host for the wasm build (web/). `bun tools/serve.ts [port]`.
+// application/wasm is required or browsers refuse to compile the module.
+import { serve, file } from "bun";
+
+const port = Number(process.argv[2] ?? 8123);
 const MIME: Record<string, string> = {
-  ".html": "text/html",
+  ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
+  ".mjs": "text/javascript",
   ".wasm": "application/wasm",
-  ".css": "text/css",
   ".png": "image/png",
-  ".mod": "application/octet-stream",
+  ".css": "text/css",
+  ".json": "application/json",
 };
-Bun.serve({
+serve({
   port,
   async fetch(req) {
-    const url = new URL(req.url);
-    let p = decodeURIComponent(url.pathname);
-    if (p === "/") p = "/index.html";
-    const file = Bun.file(root + p.replace(/^\/+/, ""));
-    if (!(await file.exists())) return new Response("404", { status: 404 });
-    const ext = p.slice(p.lastIndexOf("."));
-    return new Response(file, {
-      headers: { "Content-Type": MIME[ext] ?? "application/octet-stream" },
-    });
+    const path = new URL(req.url).pathname;
+    const rel = path === "/" ? "index.html" : path.slice(1);
+    if (rel.includes("..")) return new Response("no", { status: 400 });
+    const f = file(new URL(`../web/${rel}`, import.meta.url).pathname);
+    if (!(await f.exists())) return new Response("not found", { status: 404 });
+    const ext = rel.slice(rel.lastIndexOf("."));
+    return new Response(f.body, { headers: { "content-type": MIME[ext] ?? "application/octet-stream", "cache-control": "no-cache" } });
   },
 });
-console.log(`serving ${root} on http://127.0.0.1:${port}`);
+console.log(`serving web/ on http://127.0.0.1:${port}`);
