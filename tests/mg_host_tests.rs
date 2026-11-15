@@ -8,7 +8,8 @@ use defender_of_the_crown::engine::scene::{AppCtx, Scene, SceneEvent};
 use defender_of_the_crown::minigames::framework::{
     MgOutcome, MgState, Minigame, SportSpec, SPORTS,
 };
-use defender_of_the_crown::ui::host::{MgHost, OutcomeCell, SportMode};
+use defender_of_the_crown::minigames::pick;
+use defender_of_the_crown::ui::host::{make_game, MgHost, OutcomeCell, SportMode};
 use defender_of_the_crown::ui::{CampaignUi, PlayScene};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -195,8 +196,16 @@ fn autoplay_resolves_immediately_and_exits() {
     pump(&mut h, &mut fb, 1);
     let b = cell.borrow();
     let o = b.as_ref().expect("autoplay resolves at once");
-    assert_eq!(o.score, spec_win().gold_at, "outcome must carry the gold line score, not the unplayed core's 0");
-    assert_eq!(o.tier, Some(Tier::Gold), "resolving at the gold line is a gold tier");
+    assert_eq!(
+        o.score,
+        spec_win().gold_at,
+        "outcome must carry the gold line score, not the unplayed core's 0"
+    );
+    assert_eq!(
+        o.tier,
+        Some(Tier::Gold),
+        "resolving at the gold line is a gold tier"
+    );
     pump(&mut h, &mut fb, 95);
     assert!(h.wants_leave(), "autoplay leaves the results screen itself");
 }
@@ -253,11 +262,18 @@ fn failed_meet_charges_nothing() {
 
 #[test]
 fn sports_button_click_without_a_shipped_game_stays_honest() {
+    // Any season whose posted meet still has no shipped game; the meet
+    // pool shifts as sports land, so scan for a closed gate instead of
+    // pinning one turn. The day all 13 sports ship, this gate - and its
+    // test - retire together.
+    let seed_of = |t: u32| ((t as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+    let turn = (0..120u32)
+        .find(|&t| pick(t, seed_of(t)).is_some_and(|s| make_game(s.id, 1).is_none()))
+        .expect("a closed meet exists while any sport stays unshipped");
     let mut ui = CampaignUi::new(11, Difficulty::Easy);
     let sid = owned_castle(&ui);
     ui.sel = Some(sid);
-    // season whose posted meet (falconry) still has no shipped game
-    ui.g.turn = 11;
+    ui.g.turn = turn;
     ui.act("sports", sid);
     assert!(ui.launch_req.is_none(), "nothing to launch yet");
     assert!(

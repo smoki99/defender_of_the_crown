@@ -6,6 +6,7 @@ use defender_of_the_crown::engine::gfx::{
     Framebuffer, BLACK, DARKGRAY, DARKRED, EMBER, GRAY, LINEN, ORANGE, SILVER, TAN,
 };
 use defender_of_the_crown::minigames::framework::pick as sport_pick;
+use defender_of_the_crown::ui::host::make_game;
 use defender_of_the_crown::ui::{action_rects, end_turn_rect, kit, Btn, CampaignUi, SceneEvent};
 
 fn tap(x: i32, y: i32) -> SceneEvent {
@@ -127,15 +128,21 @@ fn garrison_roll_scroll_when_it_overflows() {
 
 #[test]
 fn sports_gate_is_the_meet_and_the_fee() {
+    // Season where the posted meet still has no shipped game; since the
+    // meet pool shifts as sports are finalized, don't fix one turn,
+    // scan instead.
+    let seed_of = |t: u32| ((t as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+    let turn = (0..120u32)
+        .find(|&t| sport_pick(t, seed_of(t)).is_some_and(|s| make_game(s.id, 1).is_none()))
+        .expect("While there are still unshipped sports, a closed meet exists");
     let mut ui = CampaignUi::new(7, Difficulty::Normal);
     select(&mut ui, "Buckingham");
-    // season whose posted meet (falconry) still has no shipped game
-    ui.g.turn = 11;
+    ui.g.turn = turn;
     let sports = btn(&action_rects(true), "sports").clone();
     let (cx, cy) = center(&sports);
     let mut fb = Framebuffer::new();
-    // fee affordable -> the tone follows the season meet
-    let season_seed = ((ui.g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+    // If the entry fee is payable -> the tone follows the season's meet
+    let season_seed = seed_of(ui.g.turn);
     let held = sport_pick(ui.g.turn, season_seed).is_some();
     ui.draw(&mut fb);
     assert_eq!(
