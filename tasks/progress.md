@@ -570,3 +570,36 @@ looks like the harness, it is not); the idle animation pair for the
 smoke must be sampled before the scripted death plate (a static plate
 fakes a frozen scene); and weight/gaze tests must spawn x<42, inside
 the beam's shadow - mid-room spawns get swept mid-assert. (2026-11-15)
+
+## T705 HALL OF FAME - done 2026-11-15
+
+The Fame panel now reads every persisted record: a two-column grid of
+all thirteen sports (left seven, right six, SPORTS-table order, so the
+header row is TOURNAMENT - the joust sits at index 0) with each best
+pulled live from `doc.mg.<id>`, tier-coloured by the sport's own
+bronze/silver/gold thresholds (white label, yellow under silver, silver,
+gold, gray dash while unset) and a right-aligned score computed with the
+engine's real 8 px glyph advance - the first cut used 6 px and silently
+drifted multi-digit scores left of their column. Records are written by
+the host on every finish (`mg_best` keeps the max, `doc.mg.` namespace),
+so the panel needs no game-side cooperation. Reset is two-step and
+visible: ENTER arms (panel frame flips to blood 153,0,34 with the
+ERASES prompt), ENTER again wipes all `doc.mg.*` keys plus `doc.hof`, a
+third press only re-arms - no confirm dialog, no way to nuke the hall
+with a stray keypress. Verification: cargo suite green (323) with
+clippy 0; title-flow-check drives the whole path in both modes - clean
+boot stays green and, seeded (`doc.mg.joust=57;doc.hof=...`), the
+TOURNAMENT row scans 28 px of tier-yellow at (116,82), the armed frame
+scans the blood border, and the second ENTER leaves every key null with
+a clean console. Persistence across reload ran in real Chromium, not a
+mock: the wasm write path banked `doc.mg.joust=95` via autoplay, a fresh
+document on the same origin still read 95, and the menu walk to HALL OF
+FAME rendered it gold (23 warm px in the score cell;
+`10-reload-fame.png`). Three traps for whoever extends this: the
+jsdom harness seeds localStorage *before* init and that part works -
+what burned a full hour here was scanning SPORTS row i=1 for the joust
+(SPORTS[0] is TOURNAMENT, row y=82, not y=93) and then chasing a ghost;
+every CRT-darkened scanline sits at 2/3 intensity, so colour filters
+must accept both (170,170,0) and (255,255,0) for yellow; and
+`tab.screenshot({path})` from the harness writes nowhere - pull the
+base64 from `page.screenshot` inside `tab.run` and write the buffer.

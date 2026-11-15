@@ -627,6 +627,7 @@ pub struct TitleScene {
     crawl: usize, // intro crawl screen (T404)
     dwell: u32,   // ticks the current crawl leaf has stood (T4xx auto-roll)
     pending: Option<usize>, // activation deferred to tick (needs AppCtx)
+    reset_armed: bool, // HOF erase needs a second ENTER (T705)
     sound: bool, // OPTIONS mirror of the persisted mute flag
     crt: bool,   // OPTIONS mirror of the persisted scanline flag (T405)
 }
@@ -642,6 +643,7 @@ impl TitleScene {
             crawl: 0,
             dwell: 0,
             pending: None,
+            reset_armed: false,
             sound: initial_sound(),
             crt: ls_get("doc.crt").as_deref() != Some("0"),
         }
@@ -738,7 +740,10 @@ impl TitleScene {
                         self.page = 0;
                         Stage::HowTo
                     }
-                    2 => Stage::Fame,
+                    2 => {
+                        self.reset_armed = false;
+                        Stage::Fame
+                    }
                     _ => Stage::Options,
                 };
                 self.item = 0;
@@ -756,6 +761,15 @@ impl TitleScene {
                 } else {
                     app.set_crt(!app.crt());
                     self.crt = app.crt();
+                }
+            }
+            Stage::Fame => {
+                // two-step erase: first ENTER arms, second wipes the vault
+                if self.reset_armed {
+                    Self::erase_records();
+                    self.reset_armed = false;
+                } else {
+                    self.reset_armed = true;
                 }
             }
             _ => {}
@@ -873,21 +887,62 @@ impl TitleScene {
             }
         }
     }
+    /// T705: the hall shows one row per sport (best score, tier by the
+    /// spec's own cut lines), the feat ticker underneath, and an eraser.
+    fn fame_rect() -> (i32, i32, u32, u32) {
+        (98, 196, 124, 12)
+    }
     fn draw_fame(&self, fb: &mut Framebuffer) {
-        fb.fill_rect(16, 96, 288, 116, BLACK);
-        fb.rect(16, 96, 288, 116, GOLD);
-        draw_text_shadow(fb, 100, 104, "HALL OF FAME", GOLD, BLACK);
+        fb.fill_rect(16, 60, 288, 150, BLACK);
+        fb.rect(16, 60, 288, 150, GOLD);
+        draw_text_shadow(fb, 100, 66, "HALL OF FAME", GOLD, BLACK);
+        for (i, spec) in crate::minigames::framework::SPORTS.iter().enumerate() {
+            let col = i / 7; // 7 left, rest right
+            let x = 26 + col as i32 * 146;
+            let y = 82 + (i % 7) as i32 * 11;
+            let best = ls_get(&format!("doc.mg.{}", spec.id))
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
+            let tc = if best >= spec.gold_at {
+                GOLD
+            } else if best >= spec.silver_at {
+                SILVER
+            } else if best > 0 {
+                YELLOW
+            } else {
+                GRAY
+            };
+            draw_text_shadow(fb, x, y, spec.label, if best > 0 { WHITE } else { GRAY }, BLACK);
+            let s = if best > 0 { best.to_string() } else { "-".into() };
+            draw_text_shadow(fb, x + 108 - s.len() as i32 * 8, y, &s, tc, BLACK);
+        }
         match ls_get("doc.hof") {
             Some(s) if !s.is_empty() => {
-                for (i, e) in s.split(';').take(5).enumerate() {
-                    draw_text_shadow(fb, 28, 124 + i as i32 * 14, e, WHITE, BLACK);
+                draw_text_shadow(fb, 26, 162, "FEATS", GOLD, BLACK);
+                for (i, e) in s.split(';').take(3).enumerate() {
+                    draw_text_shadow(fb, 90, 162 + i as i32 * 10, e, WHITE, BLACK);
                 }
             }
             _ => {
-                draw_text_shadow(fb, 64, 130, "NO FEATS RECORDED - WIN A WAR", GRAY, BLACK);
+                draw_text_shadow(fb, 26, 162, "NO FEATS RECORDED - WIN A WAR", GRAY, BLACK);
             }
         }
+        let msg = if self.reset_armed {
+            "SURE? ENTER ERASES"
+        } else {
+            "ENTER ERASES RECORDS"
+        };
+        let r = Self::fame_rect();
+        fb.rect(r.0, r.1, r.2, r.3, if self.reset_armed { BLOOD } else { STONE });
+        draw_text_shadow(fb, r.0 + 6, r.1 + 3, msg, if self.reset_armed { BLOOD } else { GRAY }, BLACK);
         self.draw_back(fb);
+    }
+    /// Wipe every persisted record: all sport bests and the feat ticker.
+    fn erase_records() {
+        for spec in crate::minigames::framework::SPORTS.iter() {
+            ls_del(&format!("doc.mg.{}", spec.id));
+        }
+        ls_del("doc.hof");
     }
     /// T404: one crawl screen - heading, pixel vignette, two story lines.
     fn draw_crawl(&mut self, fb: &mut Framebuffer) {
@@ -1058,6 +1113,9 @@ impl Scene for TitleScene {
                         }
                     }
                     Stage::Fame => {
+                        if in_rect(Self::fame_rect(), x, y) {
+                            self.pending = Some(0);
+                        }
                         if in_rect(back_rect(), x, y) {
                             self.back();
                         }
@@ -1084,6 +1142,7 @@ impl Scene for TitleScene {
                     Stage::Menu => MENU.len(),
                     Stage::Difficulty => 3,
                     Stage::Options => 2,
+                    Stage::Fame => 1, // the eraser row
                     _ => 0,
                 };
                 match *code {
@@ -1675,5 +1734,11 @@ fn ls_get(k: &str) -> Option<String> {
 fn ls_set(k: &str, v: &str) {
     if let Some(s) = w().local_storage().ok().flatten() {
         let _ = s.set_item(k, v);
+    }
+}
+
+fn ls_del(k: &str) {
+    if let Some(s) = w().local_storage().ok().flatten() {
+        let _ = s.remove_item(k);
     }
 }

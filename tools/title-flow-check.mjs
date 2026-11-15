@@ -62,6 +62,23 @@ await Bun.sleep(150);
 shot("fame");
 const fameBorder = px(16, 120);
 ok(near(fameBorder, GOLD_ON) || near(fameBorder, GOLD_OFF), `fame panel frame rgb=${fameBorder}`);
+// --- T705: per-sport records from localStorage, two-step erase
+const pre = window.localStorage.getItem("doc.mg.joust");
+if (pre) {
+  let tcol = 0; // joust is SPORTS[0]: first row, left column
+  for (let y = 82; y < 90; y++) for (let x = 116; x < 136; x++) { const p = px(x, y); if (p[0] > 150 && p[1] > 140 && p[2] < 90) tcol++; }
+  ok(tcol > 12, `TOURNAMENT best 57 drawn in tier color (${tcol} px)`);
+}
+key("Enter"); // arms the eraser
+await Bun.sleep(150);
+shot("fame-armed");
+const arm = px(98, 196);
+ok(arm[0] > 80 && arm[1] < 45 && arm[2] < 50, `armed frame turns blood red rgb=${arm}`);
+ok(window.localStorage.getItem("doc.mg.joust") === pre, "one ENTER only arms - vault intact");
+key("Enter"); // wipes
+await Bun.sleep(150);
+ok(window.localStorage.getItem("doc.mg.joust") === null && window.localStorage.getItem("doc.hof") === null, "second ENTER erases every record");
+shot("fame-erased");
 key("Escape");
 await Bun.sleep(120);
 // Escape landed back on the menu top (BEGIN CAMPAIGN)

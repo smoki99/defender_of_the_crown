@@ -242,7 +242,7 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [x] **T704 dragon host/baseline/ship**: factory alias + registry sync
   test (13 sports boot by id), 13-sport PLAY/PLATE baselines x2 sweeps
   52/52 + new dragon pair, Chromium live smoke, suite+clippy green.
-- [ ] **T705 HALL OF FAME screen**: per-game records (localStorage), title
+- [x] **T705 HALL OF FAME screen**: per-game records (localStorage), title
   menu entry, reset option; playwright verify persistence across reload.
 - [ ] **T706 Unlock pacing integration**: 1–4 start / 5–9 t5 / 10–12 t10 /
   dragon rare; campaign tests + SPORTS list screenshot per era.
