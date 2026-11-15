@@ -439,8 +439,8 @@ impl Minigame for Dragon {
         match self.phase {
             Phase::Present => {
                 fb.fill_rect(0, 0, 320, 256, BLACK);
-                draw_text_shadow(fb, 82, 116, "THE DRAGON'S HOARD", GOLD, BLACK);
-                draw_text_shadow(fb, 78, 136, "SNEAK IN. GRAB. GET OUT.", WHITE, BLACK);
+                crate::ui::kit::centered(fb, 116, "THE DRAGON'S HOARD", GOLD, BLACK);
+                crate::ui::kit::centered(fb, 136, "SNEAK IN. GRAB. GET OUT.", WHITE, BLACK);
                 if self.tick_n >= PRESENT {
                     self.phase = Phase::Run;
                 }

@@ -659,7 +659,7 @@ impl Cloak {
         match self.phase {
             Phase::Present => {
                 if self.phase_t % 24 < 16 {
-                    draw_text_shadow(fb, 88, 128, "THE KEEP AT NIGHT", WHITE, BLACK);
+                    crate::ui::kit::centered(fb, 128, "THE KEEP AT NIGHT", WHITE, BLACK);
                 }
             }
             Phase::Board | Phase::Done => {

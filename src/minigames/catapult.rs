@@ -12,7 +12,7 @@ use super::framework::{resolve, MgState, Minigame, SportSpec, SPORTS};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
     Framebuffer, BLACK, BROWN, CREAM, DARKGRAY, DEEPWATER, GOLD, GRASS, GRAY, LINEN, NAVY, ORANGE,
-    RED, STONE, TAN, WHITE, YELLOW,
+    RED, SILVER, STONE, TAN, WHITE, YELLOW,
 };
 use crate::engine::input::{Input, KEY_LEFT, KEY_RIGHT, KEY_SPACE};
 
@@ -547,16 +547,25 @@ impl Catapult {
         // HUD -------------------------------------------------------------------
         draw_text_shadow(fb, 4, 2, "SIEGE", GOLD, BLACK);
         draw_text_shadow(fb, 64, 2, &format!("STONES {}", 6 - self.shot.min(6)), CREAM, BLACK);
-        fb.fill_rect(296, 2, 1, 14, WHITE); // wind pole
+        // Wind gauge (T410): pennant on the pole points downwind, a flag
+        // per pip below it - readable at a glance, not a dash soup.
+        fb.fill_rect(296, 2, 1, 16, WHITE);
+        if self.wind > 0 {
+            fb.fill_rect(297, 3, 7, 4, YELLOW);
+        } else if self.wind < 0 {
+            fb.fill_rect(288, 3, 7, 4, YELLOW);
+        } else {
+            fb.fill_rect(297, 3, 4, 2, YELLOW); // limp in a dead calm
+        }
         for i in 0..self.wind.abs() {
-            let y = 3 + i * 5;
+            let y = 9 + i * 3;
             if self.wind > 0 {
-                fb.fill_rect(299, y, 4, 3, YELLOW);
+                fb.fill_rect(299, y, 3, 2, SILVER);
             } else if self.wind < 0 {
-                fb.fill_rect(291, y, 4, 3, YELLOW);
+                fb.fill_rect(291, y, 3, 2, SILVER);
             }
         }
-        draw_text_shadow(fb, 258, 18, "WIND", GRAY, BLACK);
+        draw_text_shadow(fb, 258, 18, "WIND", SILVER, BLACK);
         if self.charging || self.drag.is_some() {
             fb.fill_rect(8, 246, 64, 6, DARKGRAY);
             let w = (self.power.clamp(0.0, 100.0) as u32 * 62 / 100).max(1);
@@ -566,10 +575,10 @@ impl Catapult {
             Phase::Present => {
                 fb.fill_rect(36, 100, 248, 52, BLACK);
                 fb.rect(36, 100, 248, 52, GOLD);
-                draw_text_shadow(fb, 116, 108, "THE SIEGE", GOLD, BLACK);
-                draw_text_shadow(fb, 60, 122, "DRAG BACK FROM THE ARM, OR", LINEN, BLACK);
-                draw_text_shadow(fb, 72, 132, "ARROWS SET ANGLE - SPACE PUMP", LINEN, BLACK);
-                draw_text_shadow(fb, 120, 143, "RELEASE TO LOOSE", CREAM, BLACK);
+                crate::ui::kit::centered(fb, 108, "THE SIEGE", GOLD, BLACK);
+                crate::ui::kit::centered(fb, 122, "DRAG BACK FROM THE ARM, OR", LINEN, BLACK);
+                crate::ui::kit::centered(fb, 132, "ARROWS SET ANGLE - SPACE PUMP", LINEN, BLACK);
+                crate::ui::kit::centered(fb, 143, "RELEASE TO LOOSE", CREAM, BLACK);
             }
             Phase::Aim => {
                 let tip =

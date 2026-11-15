@@ -250,8 +250,8 @@ impl Minigame for Forge {
         match self.phase {
             Phase::Present => {
                 fb.fill_rect(0, 0, 320, 256, BLACK);
-                draw_text_shadow(fb, 112, 116, "THE SMITHY", GOLD, BLACK);
-                draw_text_shadow(fb, 88, 136, "HAMMER THE BEAT", WHITE, BLACK);
+                crate::ui::kit::centered(fb, 116, "THE SMITHY", GOLD, BLACK);
+                crate::ui::kit::centered(fb, 136, "HAMMER THE BEAT", WHITE, BLACK);
                 if self.tick_n >= PRESENT {
                     self.phase = Phase::Run;
                 }

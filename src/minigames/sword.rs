@@ -634,11 +634,11 @@ impl Sword {
             Phase::Present => {
                 fb.fill_rect(36, 92, 248, 68, BLACK);
                 fb.rect(36, 92, 248, 68, GOLD);
-                draw_text_shadow(fb, 112, 100, "THE DUEL", GOLD, BLACK);
-                draw_text_shadow(fb, 52, 114, "MATCH HIS GUARD: UP HIGH,", LINEN, BLACK);
-                draw_text_shadow(fb, 80, 124, "RIGHT MID, DOWN LOW -", LINEN, BLACK);
-                draw_text_shadow(fb, 56, 134, "OR CLICK YOUR BANDED HALF.", LINEN, BLACK);
-                draw_text_shadow(fb, 64, 146, "SPACE STRIKES THE RIPOSTE", CREAM, BLACK);
+                crate::ui::kit::centered(fb, 100, "THE DUEL", GOLD, BLACK);
+                crate::ui::kit::centered(fb, 114, "MATCH HIS GUARD: UP HIGH,", LINEN, BLACK);
+                crate::ui::kit::centered(fb, 124, "RIGHT MID, DOWN LOW -", LINEN, BLACK);
+                crate::ui::kit::centered(fb, 134, "OR CLICK YOUR BANDED HALF.", LINEN, BLACK);
+                crate::ui::kit::centered(fb, 146, "SPACE STRIKES THE RIPOSTE", CREAM, BLACK);
             }
             Phase::Done => {
                 fb.fill_rect(52, 84, 216, 84, BLACK);

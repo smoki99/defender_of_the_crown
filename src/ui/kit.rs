@@ -7,6 +7,12 @@ use crate::engine::gfx::{
     Framebuffer, BLACK, DARKGRAY, DARKRED, EMBER, GRAY, H, LINEN, ORANGE, SILVER, TAN, W,
 };
 
+/// Centered single-line text (font advances 8 px per char).
+pub fn centered(fb: &mut crate::engine::gfx::Framebuffer, y: i32, s: &str, fg: u8, sh: u8) {
+    let w = s.chars().count() as i32 * 8;
+    crate::engine::fonts::draw_text_shadow(fb, (320 - w) / 2, y, s, fg, sh);
+}
+
 /// Bevelled panel: TAN rim, DARKGRAY face, light inner top/left edge and
 /// dark inner bottom/right edge (Amiga three-tone).
 pub fn panel(fb: &mut Framebuffer, x: i32, y: i32, w: u32, h: u32) {

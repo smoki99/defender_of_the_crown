@@ -271,8 +271,8 @@ impl Minigame for Herbs {
         match self.phase {
             Phase::Present => {
                 fb.fill_rect(0, 0, 320, 256, BLACK);
-                draw_text_shadow(fb, 104, 116, "THE HERB SALVE", GOLD, BLACK);
-                draw_text_shadow(fb, 96, 136, "CLICK THE PAIRS", WHITE, BLACK);
+                crate::ui::kit::centered(fb, 116, "THE HERB SALVE", GOLD, BLACK);
+                crate::ui::kit::centered(fb, 136, "CLICK THE PAIRS", WHITE, BLACK);
                 if self.tick_n >= PRESENT {
                     self.phase = Phase::Run;
                 }

@@ -597,8 +597,8 @@ impl Minigame for Tavern {
         match self.phase {
             Phase::Present => {
                 fb.fill_rect(0, 0, 320, 256, BLACK);
-                draw_text_shadow(fb, 94, 116, "THE TAVERN BRAWL", GOLD, BLACK);
-                draw_text_shadow(fb, 80, 136, "DON'T HIT THE BARMAID", WHITE, BLACK);
+                crate::ui::kit::centered(fb, 116, "THE TAVERN BRAWL", GOLD, BLACK);
+                crate::ui::kit::centered(fb, 136, "DON'T HIT THE BARMAID", WHITE, BLACK);
                 if self.tick_n >= PRESENT {
                     self.phase = Phase::Run;
                 }

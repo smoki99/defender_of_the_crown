@@ -366,7 +366,7 @@ impl Joust {
 }
 
 fn banner(fb: &mut Framebuffer, s: &str) {
-    let w = s.len() as i32 * 7 + 12;
+    let w = s.len() as i32 * 8 + 12;
     let x = (320 - w) / 2;
     fb.fill_rect(x, 96, w as u32, 16, BLACK);
     fb.rect(x, 96, w as u32, 16, GOLD);
@@ -374,7 +374,7 @@ fn banner(fb: &mut Framebuffer, s: &str) {
 }
 
 fn banner2(fb: &mut Framebuffer, s: &str) {
-    let w = s.len() as i32 * 7 + 12;
+    let w = s.len() as i32 * 8 + 12;
     let x = (320 - w) / 2;
     fb.fill_rect(x, 116, w as u32, 14, BLACK);
     draw_text_shadow(fb, x + 6, 119, s, WHITE, BLACK);

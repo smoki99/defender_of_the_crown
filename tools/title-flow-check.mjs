@@ -17,7 +17,7 @@ ok(px(160, 60)[2] > 90 && px(160, 60)[0] < 60, `boot banner unfurled rgb=${px(16
 // ENTER lifts the herald and the menu appears with a keyboard selection
 key("Enter");
 await Bun.sleep(120);
-ok(px(160, 124)[0] > 100 && px(160, 124)[1] < 60, `menu highlight on BEGIN rgb=${px(160, 124)}`);
+ok(px(102, 124)[0] > 100 && px(102, 124)[1] < 60, `menu highlight on BEGIN rgb=${px(102, 124)}`);
 
 // --- Options by keyboard only (index 3)
 key("ArrowDown"); key("ArrowDown"); key("ArrowDown");

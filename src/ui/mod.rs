@@ -153,7 +153,7 @@ fn btn_label(g: &GameState, id: &str) -> String {
     match id {
         "rec:0" => format!("LEVY {}", UnitKind::Levy.cost()),
         "rec:1" => format!("BOW {}", UnitKind::Bowman.cost()),
-        "rec:2" => format!("KNIGHT {}", UnitKind::Knight.cost()),
+        "rec:2" => format!("KNI {}", UnitKind::Knight.cost()),
         "rec:3" => format!("SIEGE {}", UnitKind::Siege.cost()),
         "spy" => format!("SPY {SPY_COST}"),
         "close" => "CLOSE".to_string(),
@@ -285,6 +285,10 @@ pub struct CampaignUi {
     pub report: Vec<String>,
     pub report_shown: usize,
     pub report_open: bool,
+    /// Visual rows revealed per 4-tick slot (wrap-aware); usize::MAX on
+    /// skip. Advanced by tick, consumed by draw (T306).
+    report_anim: u32,
+    report_revealed: usize,
     /// Omen modal: announced event, open flag, last announced turn (T307).
     pub event_kind: Option<EventKind>,
     pub event_open: bool,
@@ -329,6 +333,8 @@ impl CampaignUi {
             report: Vec::new(),
             report_shown: 0,
             report_open: false,
+            report_anim: 0,
+            report_revealed: 0,
             event_kind: None,
             event_open: false,
             event_turn: u32::MAX,
@@ -363,9 +369,12 @@ impl CampaignUi {
                 self.open_dawn();
             }
         }
-        if self.report_open && self.report_shown < self.report.len() && self.anim.is_multiple_of(4)
-        {
-            self.report_shown += 1;
+        if self.report_open {
+            self.report_anim += 1;
+            self.report_revealed = (self.report_anim / 4) as usize;
+            if self.report_shown < self.report.len() && self.anim.is_multiple_of(4) {
+                self.report_shown += 1;
+            }
         }
     }
 
@@ -427,6 +436,7 @@ impl CampaignUi {
             // any tap: first reveals all lines (skip), next closes (T306)
             if self.report_shown < self.report.len() {
                 self.report_shown = self.report.len();
+                self.report_revealed = usize::MAX;
             } else {
                 self.report_open = false;
             }
@@ -521,6 +531,8 @@ impl CampaignUi {
         if fresh.iter().any(|l| l.contains("ROUNDS.")) {
             self.report = fresh.to_vec();
             self.report_shown = 0;
+            self.report_anim = 0;
+            self.report_revealed = 0;
             if defer {
                 self.report_pending = true;
             } else {
@@ -769,14 +781,7 @@ impl CampaignUi {
             } else {
                 s.name.to_string()
             };
-            draw_text_shadow(
-                fb,
-                cx - label.len() as i32 * 3,
-                cy + 8,
-                &label,
-                WHITE,
-                BLACK,
-            );
+            draw_text_shadow(fb, cx - label.len() as i32 * 3, cy + 8, &label, WHITE, BLACK);
             if !hidden {
                 let n = match &v {
                     View::Own(i) | View::Spied(i) => i.counts.iter().sum::<u32>(),
@@ -802,7 +807,9 @@ impl CampaignUi {
         }
         self.draw_hud(fb);
         if let Some(sel) = self.sel {
-            self.draw_panel(fb, sel);
+            if !self.report_open {
+                self.draw_panel(fb, sel);
+            }
         }
         if let Some(id) = self.hover {
             let text = tip(id);
@@ -847,7 +854,7 @@ impl CampaignUi {
             self.g.log.last().cloned().unwrap_or_default()
         };
         let line: String = line.chars().take(44).collect();
-        draw_text_shadow(fb, 4, 246, &line, CREAM, BLACK);
+        draw_text_shadow(fb, 4, 246, &line.to_uppercase(), CREAM, BLACK);
     }
 
     fn draw_panel(&mut self, fb: &mut crate::engine::gfx::Framebuffer, sel: usize) {
@@ -856,11 +863,11 @@ impl CampaignUi {
         let own = s.owner == PLAYER;
         let info = info_line(&self.g, PLAYER, s);
         kit::panel(fb, 4, 86, 292, if own { 86 } else { 52 });
-        draw_text_shadow(fb, 8, 90, &info, WHITE, BLACK);
+        draw_text_shadow(fb, 8, 90, &info.to_uppercase(), WHITE, BLACK);
         let rows = garrison_rows(&self.g, sel);
         let top = self.list_top.min(rows.len().saturating_sub(LIST_ROWS));
         for (i, row) in rows.iter().skip(top).take(LIST_ROWS).enumerate() {
-            draw_text_shadow(fb, 10, 100 + i as i32 * 9, row, CREAM, BLACK);
+            draw_text_shadow(fb, 10, 100 + i as i32 * 9, &row.to_uppercase(), CREAM, BLACK);
         }
         if own {
             let scr = self.scrollbar(sel);
@@ -892,7 +899,7 @@ impl CampaignUi {
         };
         draw_text_shadow(
             fb,
-            (W as i32 - head.len() as i32 * 6) / 2,
+            (W as i32 - head.len() as i32 * 8) / 2,
             100,
             head,
             c,
@@ -900,7 +907,7 @@ impl CampaignUi {
         );
         draw_text_shadow(
             fb,
-            (W as i32 - "A CHRONICLE OF SAXON ENGLAND".len() as i32 * 6) / 2,
+            (W as i32 - "A CHRONICLE OF SAXON ENGLAND".len() as i32 * 8) / 2,
             120,
             "A CHRONICLE OF SAXON ENGLAND",
             WHITE,
@@ -910,7 +917,7 @@ impl CampaignUi {
             let t = "CLICK FOR A NEW WAR";
             draw_text_shadow(
                 fb,
-                (W as i32 - t.len() as i32 * 6) / 2,
+                (W as i32 - t.len() as i32 * 8) / 2,
                 150,
                 t,
                 SILVER,
@@ -926,26 +933,38 @@ impl CampaignUi {
             return;
         }
         use crate::engine::fonts::draw_text_shadow;
-        let n = self.report.len().min(6);
-        let (bx, by) = (60i32, 82i32);
-        kit::panel(fb, bx, by, 200, 16 + (n as u32) * 10);
-        fb.fill_rect(bx + 2, by + 2, 196, 12 + (n as u32) * 10, LINEN);
-        draw_text_shadow(fb, bx + 8, by + 4, "BATTLE REPORT", NAVY, LINEN);
-        for (i, line) in self
-            .report
-            .iter()
-            .take(n)
-            .take(self.report_shown)
-            .enumerate()
-        {
-            let c = if line.contains("WON") {
+        const CHARS: usize = 22; // inner plate width fits 22 chars at 8 px
+        // Wrap every log line to the plate, uppercase (period-correct).
+        // The plate is sized to the whole wrapped report (it never jumps
+        // mid-scroll); lines appear in place, capped at 9 rows.
+        let mut rows: Vec<(String, u8)> = Vec::new();
+        for line in self.report.iter() {
+            let up = line.to_uppercase();
+            let c = if up.contains("WON") {
                 GREEN
-            } else if line.contains("REPULSED") || line.contains("CHAMPION") {
+            } else if up.contains("REPULSED") || up.contains("CHAMPION") {
                 NORMAN_KEEP
             } else {
                 BLACK
             };
-            draw_text_shadow(fb, bx + 8, by + 16 + (i as i32) * 10, line, c, LINEN);
+            let chars: Vec<char> = up.chars().collect();
+            if chars.is_empty() {
+                rows.push((String::new(), c));
+            }
+            for chunk in chars.chunks(CHARS) {
+                rows.push((chunk.iter().collect(), c));
+            }
+        }
+        let n = rows.len().clamp(1, 9);
+        let (bx, by) = (60i32, 82i32);
+        fb.fill_rect(bx - 2, by - 2, 204, 20 + (n as u32) * 10, BLACK);
+        kit::panel(fb, bx, by, 200, 16 + (n as u32) * 10);
+        fb.fill_rect(bx + 2, by + 2, 196, 12 + (n as u32) * 10, LINEN);
+        draw_text_shadow(fb, bx + 8, by + 4, "BATTLE REPORT", NAVY, LINEN);
+        for (i, (row, c)) in rows.iter().take(n).enumerate() {
+            if i < self.report_revealed {
+                draw_text_shadow(fb, bx + 8, by + 16 + (i as i32) * 10, row, *c, LINEN);
+            }
         }
     }
 

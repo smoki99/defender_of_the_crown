@@ -387,7 +387,7 @@ impl Archery {
         match self.phase {
             Phase::Present => {
                 if self.phase_t % 24 < 16 {
-                    draw_text_shadow(fb, 96, 128, "NOCK ARROWS", WHITE, BLACK);
+                    crate::ui::kit::centered(fb, 128, "NOCK ARROWS", WHITE, BLACK);
                 }
             }
             Phase::Board => {

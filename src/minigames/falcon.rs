@@ -312,8 +312,8 @@ impl Minigame for Falcon {
         match self.phase {
             Phase::Present => {
                 fb.fill_rect(0, 0, 320, 256, BLACK);
-                draw_text_shadow(fb, 100, 116, "THE FALCON'S CAST", GOLD, BLACK);
-                draw_text_shadow(fb, 100, 136, "CATCH THE CROWS", WHITE, BLACK);
+                crate::ui::kit::centered(fb, 116, "THE FALCON'S CAST", GOLD, BLACK);
+                crate::ui::kit::centered(fb, 136, "CATCH THE CROWS", WHITE, BLACK);
                 if self.tick_n >= PRESENT {
                     self.phase = Phase::Run;
                 }

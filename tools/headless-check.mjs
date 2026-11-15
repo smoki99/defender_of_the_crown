@@ -11,7 +11,7 @@ ok(px(160, 60)[2] > 90 && px(160, 60)[0] < 60, `boot banner unfurled rgb=${px(16
 // keyboard: one gesture lifts the boot herald, Enter starts the campaign
 key(" ");
 await Bun.sleep(120);
-ok(px(160, 124)[0] > 100 && px(160, 124)[1] < 60, `menu highlights BEGIN CAMPAIGN rgb=${px(160, 124)}`);
+ok(px(102, 124)[0] > 100 && px(102, 124)[1] < 60, `menu highlights BEGIN CAMPAIGN rgb=${px(102, 124)}`);
 key("Enter");
 await Bun.sleep(120);
 ok(px(82, 181)[0] > 120 && px(82, 181)[1] > 90 && px(82, 181)[2] < 40 && px(162, 181)[0] > 90 && px(162, 181)[1] < 60, `difficulty highlights EASY (gold fill) rgb=${px(82, 181)} vs rgb=${px(162, 181)}`);

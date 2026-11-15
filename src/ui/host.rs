@@ -121,16 +121,23 @@ impl MgHost {
         fb.fill_rect(0, 0, 320, 12, NAVY);
         draw_text_shadow(fb, 4, 2, self.spec.label, GOLD, BLACK);
         let s = format!("{}", self.game.score());
-        draw_text_shadow(fb, 160, 2, &s, WHITE, BLACK);
+        draw_text_shadow(fb, 120, 2, &s, WHITE, BLACK);
         let f = self.cheer.frac().clamp(0.0, 1.0);
         let w = ((1.0 - f) * 96.0) as u32;
-        fb.fill_rect(220, 4, 96, 5, DARKGRAY);
+        // Outlined cheer tube with a legend so it reads over any field.
+        draw_text_shadow(fb, 160, 2, "CHEER", SILVER, BLACK);
+        fb.rect(219, 2, 98, 8, BLACK);
+        fb.fill_rect(220, 3, 96, 6, DARKGRAY);
         fb.fill_rect(220, 4, w, 5, crate::engine::gfx::GREEN);
     }
 
     fn draw_results(&mut self, fb: &mut crate::engine::gfx::Framebuffer) {
+        use crate::ui::kit;
+        // Heraldic plate (T410): double gold frame, crown motif, centered rows.
+        fb.fill_rect(38, 54, 244, 148, BLACK);
         fb.fill_rect(40, 56, 240, 144, NAVY);
         fb.rect(40, 56, 240, 144, GOLD);
+        fb.rect(43, 59, 234, 138, GOLD);
         let head = match self.tier {
             Some(Tier::Gold) => "GOLD LAUREL!",
             Some(Tier::Silver) => "SILVER LAUREL",
@@ -143,12 +150,17 @@ impl MgHost {
             Some(Tier::Bronze) => BROWN,
             None => BLOOD,
         };
-        draw_text_shadow(fb, 104, 72, head, col, BLACK);
-        draw_text_shadow(fb, 88, 96, self.spec.label, WHITE, BLACK);
+        // small crown above the heading, tinted like the laurel
+        fb.fill_rect(152, 66, 16, 5, col);
+        for px in [152i32, 158, 164] {
+            fb.fill_rect(px, 62, 3, 4, col);
+        }
+        kit::centered(fb, 76, head, col, BLACK);
+        kit::centered(fb, 96, self.spec.label, WHITE, BLACK);
         // loot anim: score counts up over ~1 s, then the purse line settles
         let shown = ((self.res_ticks * self.final_score) / 60).min(self.final_score);
         let line = format!("SCORE {shown}");
-        draw_text_shadow(fb, 112, 120, &line, WHITE, BLACK);
+        kit::centered(fb, 120, &line, WHITE, BLACK);
         if self.res_ticks > 60 {
             let herald = matches!(self.mode, SportMode::Herald { .. });
             let purse = match self.tier {
@@ -160,8 +172,8 @@ impl MgHost {
                 Some(Tier::Bronze) => "PURSE BRONZE",
                 None => "NO PURSE - NO FEE",
             };
-            draw_text_shadow(fb, 88, 140, purse, GOLD, BLACK);
-            draw_text_shadow(fb, 96, 176, "ENTER CONTINUES", GRAY, BLACK);
+            kit::centered(fb, 140, purse, GOLD, BLACK);
+            kit::centered(fb, 176, "ENTER CONTINUES", SILVER, BLACK);
         }
     }
 }

@@ -916,7 +916,7 @@ impl TitleScene {
             } else {
                 GRAY
             };
-            draw_text_shadow(fb, x, y, spec.label, if best > 0 { WHITE } else { GRAY }, BLACK);
+            draw_text_shadow(fb, x, y, spec.label, if best > 0 { WHITE } else { SILVER }, BLACK);
             let s = if best > 0 { best.to_string() } else { "-".into() };
             draw_text_shadow(fb, x + 108 - s.len() as i32 * 8, y, &s, tc, BLACK);
         }
@@ -953,19 +953,17 @@ impl TitleScene {
         let (head, l1, l2) = CRAWL[self.crawl];
         fb.fill_rect(16, 96, 288, 140, BLACK);
         fb.rect(16, 96, 288, 140, GOLD);
-        let hx = (W as i32 - head.len() as i32 * 6) / 2;
-        draw_text_shadow(fb, hx, 102, head, GOLD, BLACK);
+        crate::ui::kit::centered(fb, 102, head, GOLD, BLACK);
         match self.crawl {
             0 => self.crawl_fire(fb),
             1 => self.crawl_arms(fb),
             _ => self.crawl_keep(fb),
         }
         for (i, l) in [l1, l2].into_iter().enumerate() {
-            let lx = (W as i32 - l.len() as i32 * 6) / 2;
-            draw_text_shadow(fb, lx, 178 + i as i32 * 13, l, WHITE, BLACK);
+            crate::ui::kit::centered(fb, 178 + i as i32 * 13, l, WHITE, BLACK);
         }
         let pg = format!("{}/{}", self.crawl + 1, CRAWL.len());
-        draw_text_shadow(fb, 152, 204, &pg, GRAY, BLACK);
+        crate::ui::kit::centered(fb, 204, &pg, GRAY, BLACK);
         if self.crawl + 1 == CRAWL.len() {
             draw_text_shadow(fb, 88, 214, "ENTER MARCHES TO WAR", GOLD, BLACK);
         }
@@ -994,7 +992,7 @@ impl TitleScene {
         }
         for k in 0..5i32 {
             let sy = 122 - k * 9 - (self.ticks as i32 % 8);
-            fb.fill_circle(70 + k * 12, sy, 3 + k as u32 / 2, DARKGRAY);
+            fb.fill_circle(70 + k * 12, sy, 3 + k as u32 / 2, GRAY);
         }
         // Norman war banner planted right of the ruin
         fb.fill_rect(226, 114, 2, 46, SILVER);
@@ -1245,20 +1243,21 @@ impl Scene for TitleScene {
                     let r = menu_rect(i);
                     let hi = self.item == i;
                     fb.fill_rect(r.0, r.1, r.2, r.3, if hi { BLOOD } else { NAVY });
-                    fb.rect(r.0, r.1, r.2, r.3, if hi { GOLD } else { DARKGRAY });
+                    fb.rect(r.0, r.1, r.2, r.3, if hi { GOLD } else { GRAY });
                     let t = MENU[i];
                     draw_text_shadow(
                         fb,
-                        r.0 + (r.2 as i32 - t.len() as i32 * 6) / 2,
+                        r.0 + (r.2 as i32 - t.len() as i32 * 8) / 2,
                         r.1 + 3,
                         t,
-                        if hi { WHITE } else { GRAY },
+                        if hi { WHITE } else { SILVER },
                         BLACK,
                     );
                 }
             }
             Stage::Difficulty => {
-                draw_text_shadow(fb, 108, 162, "CHOOSE YOUR FOE", GOLD, BLACK);
+                fb.fill_rect(88, 158, 144, 14, BLACK);
+                crate::ui::kit::centered(fb, 161, "CHOOSE YOUR FOE", GOLD, BLACK);
                 for i in 0..3 {
                     let r = diff_rect(i);
                     let hi = self.item == i;
@@ -1267,29 +1266,27 @@ impl Scene for TitleScene {
                     let n = DIFF_NAMES[i];
                     draw_text_shadow(
                         fb,
-                        r.0 + (r.2 as i32 - n.len() as i32 * 6) / 2,
+                        r.0 + (r.2 as i32 - n.len() as i32 * 8) / 2,
                         r.1 + 4,
                         n,
                         if hi { BLACK } else { WHITE },
                         BLACK,
                     );
                 }
-                draw_text_shadow(fb, 66, 200, "ENTER CHOOSES - ESC GOES BACK", GRAY, BLACK);
+                crate::ui::kit::centered(fb, 200, "ENTER CHOOSES - ESC GOES BACK", SILVER, BLACK);
                 self.draw_back(fb);
             }
             Stage::HowTo => {
                 let (head, lines) = HOWTO[self.page];
                 fb.fill_rect(16, 96, 288, 120, BLACK);
                 fb.rect(16, 96, 288, 120, GOLD);
-                let hx = (W as i32 - head.len() as i32 * 6) / 2;
-                draw_text_shadow(fb, hx, 101, head, GOLD, BLACK);
+                crate::ui::kit::centered(fb, 101, head, GOLD, BLACK);
                 self.howto_art(fb);
                 for (i, l) in lines.iter().enumerate() {
-                    let lx = (W as i32 - l.len() as i32 * 6) / 2;
-                    draw_text_shadow(fb, lx, 146 + i as i32 * 12, l, WHITE, BLACK);
+                    crate::ui::kit::centered(fb, 146 + i as i32 * 12, l, WHITE, BLACK);
                 }
                 let pg = format!("{}/{}", self.page + 1, HOWTO.len());
-                draw_text_shadow(fb, 292 - pg.len() as i32 * 6, 204, &pg, GRAY, BLACK);
+                draw_text_shadow(fb, 292 - pg.len() as i32 * 8, 204, &pg, GRAY, BLACK);
                 self.draw_nav(fb);
             }
             Stage::Crawl => self.draw_crawl(fb),
@@ -1298,17 +1295,16 @@ impl Scene for TitleScene {
                 let t = format!("SOUND: {}", if self.sound { "ON" } else { "OFF" });
                 fb.fill_rect(100, 118, 120, 14, if self.item == 0 { BLOOD } else { NAVY });
                 fb.rect(100, 118, 120, 14, GOLD);
-                draw_text_shadow(fb, 118, 121, &t, WHITE, BLACK);
+                crate::ui::kit::centered(fb, 121, &t, WHITE, BLACK);
                 let c = format!("CRT FILTER: {}", if self.crt { "ON" } else { "OFF" });
                 fb.fill_rect(100, 138, 120, 14, if self.item == 1 { BLOOD } else { NAVY });
                 fb.rect(100, 138, 120, 14, GOLD);
-                draw_text_shadow(fb, 106, 141, &c, WHITE, BLACK);
-                draw_text_shadow(fb, 78, 166, "M TOGGLES THE SOUND ANYTIME", GRAY, BLACK);
+                crate::ui::kit::centered(fb, 141, &c, WHITE, BLACK);
+                crate::ui::kit::centered(fb, 166, "M TOGGLES SOUND", SILVER, BLACK);
                 self.draw_back(fb);
             }
             _ => {}
         }
-        draw_text_shadow(fb, 4, 246, "RUST + WASM + 320X256", DARKGRAY, BLACK);
     }
     fn wants_leave(&self) -> bool {
         self.touched
@@ -1349,6 +1345,15 @@ pub fn main() -> Result<(), JsValue> {
     // key unlocks the AudioContext and the fanfare starts from bar one.
     if let Ok(m) = Mod::parse(TRACKS[0].1) {
         music.borrow_mut().set_track(Some(Player::new(m)));
+    }
+    // T902 dev hook: ?music=<bed> boots straight into that bed so the
+    // mix table can sample every track (and only that track).
+    if let Some(name) = query_get("music") {
+        if let Some((_, bytes)) = TRACKS.iter().find(|(n, _)| *n == name) {
+            if let Ok(m) = Mod::parse(bytes) {
+                music.borrow_mut().set_track(Some(Player::new(m)));
+            }
+        }
     }
     let audio = AudioState {
         ctx: None,

@@ -6,8 +6,10 @@
 #   UPDATE=1 ./tools/baseline-sports.sh     # recapture
 set -e
 cd "$(dirname "$0")/.."
+# The PLAY frame must land AFTER the 90-tick (1.5 s) intro/Present phase,
+# otherwise it captures a black title card instead of the field.
 for g in sword joust catapult archery rampart maze river cloak forge herbs falcon tavern dragon; do
-  STATE=sport-play-$g TOL=3000 SETTLE=250 \
+  STATE=sport-play-$g TOL=3000 SETTLE=1900 \
     CROWN_QS="scene=mg&mg=$g" bun tools/sports-baseline-one.mjs
   STATE=sport-plate-$g SETTLE=800 \
     CROWN_QS="scene=mg&mg=$g&autoplay=1" bun tools/sports-baseline-one.mjs

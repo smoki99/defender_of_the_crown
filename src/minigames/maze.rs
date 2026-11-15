@@ -514,7 +514,7 @@ impl Maze {
         match self.phase {
             Phase::Present => {
                 if self.phase_t % 24 < 16 {
-                    draw_text_shadow(fb, 100, 128, "TO THE DUNGEON", WHITE, BLACK);
+                    crate::ui::kit::centered(fb, 128, "TO THE DUNGEON", WHITE, BLACK);
                 }
             }
             Phase::Board | Phase::Done => {
