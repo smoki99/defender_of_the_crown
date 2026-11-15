@@ -93,16 +93,16 @@ pub fn action_rects(sel_own: bool, hoard: bool) -> Vec<Btn> {
                 id: "sports",
                 x: 150,
                 y: 158,
-                w: 68,
+                w: 84,
                 h: 14,
             },
         ];
         if hoard {
             v.push(Btn {
                 id: "hoard",
-                x: 222,
+                x: 238,
                 y: 158,
-                w: 68,
+                w: 54,
                 h: 14,
             });
         }
@@ -149,7 +149,7 @@ pub fn event_ok_rect() -> Btn {
     }
 }
 
-fn btn_label(id: &str) -> String {
+fn btn_label(g: &GameState, id: &str) -> String {
     match id {
         "rec:0" => format!("LEVY {}", UnitKind::Levy.cost()),
         "rec:1" => format!("BOW {}", UnitKind::Bowman.cost()),
@@ -157,7 +157,7 @@ fn btn_label(id: &str) -> String {
         "rec:3" => format!("SIEGE {}", UnitKind::Siege.cost()),
         "spy" => format!("SPY {SPY_COST}"),
         "close" => "CLOSE".to_string(),
-        "sports" => "SPORTS".to_string(),
+        "sports" => season_sport(g).map_or("NO MEET", |s| s.label).to_string(),
         "hoard" => "HOARD".to_string(),
         "end" => "END TURN".to_string(),
         other => other.to_string(),
@@ -215,6 +215,16 @@ fn garrison_rows(g: &GameState, sel: usize) -> Vec<String> {
     }
 }
 
+/// The sport this season's meet holds, or `None` when none is held. The
+/// draw is deterministic in the turn (T706 pacing): turns 1-4 see the four
+/// starter sports, 5-9 add the mid era, 10-12 the late trio; the hoard is
+/// rare-event only (`unlock_turn == u32::MAX`, never drawn). The button
+/// shows it so the era pacing is visible before the fee is spent.
+pub fn season_sport(g: &GameState) -> Option<&'static crate::minigames::framework::SportSpec> {
+    let seed = ((g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+    sport_pick(g.turn, seed)
+}
+
 /// Whether a control is operable with the current purse (greyed otherwise).
 fn btn_enabled(g: &GameState, id: &str) -> bool {
     let gold = g.gi(PLAYER);
@@ -223,12 +233,7 @@ fn btn_enabled(g: &GameState, id: &str) -> bool {
         "rec:1" => gold >= UnitKind::Bowman.cost(),
         "rec:2" => gold >= UnitKind::Knight.cost(),
         "rec:3" => gold >= UnitKind::Siege.cost(),
-        // once games land (T502) the real gate is: a meet this season and
-        // the entry fee in the purse.
-        "sports" => {
-            let seed = ((g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
-            sport_pick(g.turn, seed).is_some() && gold >= SPORTS_FEE
-        }
+        "sports" => season_sport(g).is_some() && gold >= SPORTS_FEE,
         _ => true,
     }
 }
@@ -594,11 +599,11 @@ impl CampaignUi {
             self.launch_req = Some((&SPORTS[12], SportMode::Hoard));
             return;
         } else if id == "sports" {
-            // The meet is a season-wide pick (same seed as `btn_enabled`);
-            // entry and purse differ when our own herald flies here.
-            let herald = self.g.tournament[PLAYER.index()] == Some(sel);
+            // The meet is a season-wide pick (same draw as the button
+            // label); entry and purse differ when our own herald flies here.
             let seed = ((self.g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
-            let Some(spec) = sport_pick(self.g.turn, seed) else {
+            let herald = self.g.tournament[PLAYER.index()] == Some(sel);
+            let Some(spec) = season_sport(&self.g) else {
                 self.say("NO SPORT IS HELD THIS SEASON");
                 return;
             };
@@ -848,10 +853,10 @@ impl CampaignUi {
         for b in action_rects(own, self.g.dragon_offer) {
             let enabled = btn_enabled(&self.g, b.id);
             kit::button(fb, &b, self.hover == Some(b.id), enabled);
-            let label = btn_label(b.id);
+            let label = btn_label(&self.g, b.id);
             draw_text_shadow(
                 fb,
-                b.x + (b.w as i32 - label.len() as i32 * 6) / 2,
+                b.x + (b.w as i32 - label.len() as i32 * 8) / 2,
                 b.y + 4,
                 &label,
                 if enabled { WHITE } else { BLACK },
