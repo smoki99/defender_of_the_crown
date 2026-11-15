@@ -251,7 +251,7 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 8 — ALPHA 2 passes (T8xx) → ALPHA 2
 
-- [ ] **T801 Soak**: 500 AI-vs-AI games 0 panics; 100 % terminate ≤90;
+- [ ] **T801 Soak**: 500 AI-vs-AI games 0 panics; 100 % terminate ≤100 (X+ tie-break);
   invariants clean; reward-economy cap test (minigames can't break income).
 - [ ] **T802 Balance sweep**: every game Q6 thresholds on final scores;
   champion pacing sane; HARD≥EASY 8/10 re-run.
