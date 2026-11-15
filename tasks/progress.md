@@ -794,5 +794,14 @@ the hover bevel (kbd_btn) so keyboard focus is visible on-plate.
 6. Minigames: 13 mg_* targets + T805 26/26 autoplay captures on the
    shipped binary; HALL OF FAME reload persistence (T705).
 7. README controls + MIT LICENSE + CHANGELOG.md; ci.yml (test+clippy+
-   wasm+budget+headless gate+artifact+Pages) - build job green on run
-   #1; Pages enabled, deploy job live from this push.
+   wasm+budget+headless gate+artifact+Pages) - run #3 FULLY GREEN on
+   cb97ce6 (build + pages jobs); Pages live: index + pkg wasm 200 at
+   https://smoki99.github.io/defender_of_the_crown/ , deployed bundle
+   is the headless-gated CI artifact (upload-artifact -> deploy-pages).
+
+## beta1 — tagged + released 2026-11-15
+
+Annotated tag beta1 -> cb97ce6; GitHub release (prerelease) published:
+github.com/smoki99/defender_of_the_crown/releases/tag/beta1 . Final
+local chain on the same tree: fmt + clippy -D warnings + 48-target
+suite + 500-game soak + baseline gate (assertsFailed=0, problems=0).
