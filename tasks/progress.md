@@ -494,3 +494,35 @@ herald's cry is public knowledge.
   web/pkg (unknown sport -> the driver fell back to title/campaign and
   the "plate" frame was a boot strip); the harness serves whatever
   web/pkg was built last - always rebuild before capturing. (2026-11-15)
+- **T703 mg-tavern - THE TAVERN BRAWL (GOLD).** Eleventh sport (SPORTS
+  index 11, label BRAWL): three waves of 4/5/6 bruisers (15 rogues)
+  march in through alternating doors at FLOOR_Y; the belt rule makes the
+  nearest marcher the one who swings, so a pile can never chain-stun the
+  brawler, and W_SPEED 0.5/0.55/0.6 with 26/23 hit rings keeps wave 3
+  mean but fair. Grab (G, 10-tick stun), hurl (G at a stunned rogue: 6
+  ring points, 10 px knockback) and the three keg barrels (6/tick throw,
+  3-hit break) give the scoring; hitting the barmaid costs a foul and
+  her 15-tick kick-lock, and every foul shaves 15 off the 12-point-per-
+  rogue plus 20-clean-floor total - the win line is 92 = six rogues plus
+  the clean floor. The tavern itself draws the rule: two mottled ale
+  barrels (30/250/146, hoops, bunghole, bung) sit inside the table legs
+  at x 100/202, the pit boss guards the middle door (x 158, arms-out
+  8-wide stance so no rogue can cross the counter line at x 165), and
+  the maid patrols 25..275 at 0.6/tick, walking with swinging dress,
+  arms and hair. Eight scripted tests (banner gate, march-in + swing,
+  punch-stun-grab-hurl, stun drops the grip, barrel flattens the line,
+  barmaid out-of-bounds foul + kick-lock, clean sweep earns the gold at
+  92, the seed alone picks the maid's return). Host: deep-link alias
+  tavern, 88 ms gold; jsdom baselines PLAY s0 (banner spawn frame per
+  the SETTLE=250 contract, 0 px diff) and PLATE (frozen GOLD LAUREL,
+  blink-only 138/0 px) across two full 24-row sweeps, zero FAILs; real
+  Chromium smoke over the deep link proved the BRAWL band, WAVE/PUNCH
+  HUD, both door bruisers, animation (785 px moved/s), arrow-key
+  control (1164 px), the frozen GOLD LAUREL plate and 0 console errors.
+  Full cargo suite green (275 tests, +7), clippy 0
+  warnings, wasm32 release rebuilt (513 KB), title-flow regression 1022
+  frames green. Two traps recorded: SETTLE=3000 on the PLAY row looks
+  livelier but rAF tick jitter across the banner boundary made the
+  frame nondeterministic (227044 px swings) - the 250 ms static-spawn
+  contract exists for a reason; and a jsdom 320x256 target decoded at
+  320x200 crops the HUD row and fakes a frozen room. (2026-11-15)

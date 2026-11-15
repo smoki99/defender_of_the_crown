@@ -6,7 +6,6 @@ use defender_of_the_crown::engine::gfx::{
     Framebuffer, BLACK, DARKGRAY, DARKRED, EMBER, GRAY, LINEN, ORANGE, SILVER, TAN,
 };
 use defender_of_the_crown::minigames::framework::pick as sport_pick;
-use defender_of_the_crown::ui::host::make_game;
 use defender_of_the_crown::ui::{action_rects, end_turn_rect, kit, Btn, CampaignUi, SceneEvent};
 
 fn tap(x: i32, y: i32) -> SceneEvent {
@@ -128,27 +127,23 @@ fn garrison_roll_scroll_when_it_overflows() {
 
 #[test]
 fn sports_gate_is_the_meet_and_the_fee() {
-    // Season where the posted meet still has no shipped game; since the
-    // meet pool shifts as sports are finalized, don't fix one turn,
-    // scan instead.
-    let seed_of = |t: u32| ((t as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
-    let turn = (0..120u32)
-        .find(|&t| sport_pick(t, seed_of(t)).is_some_and(|s| make_game(s.id, 1).is_none()))
-        .expect("While there are still unshipped sports, a closed meet exists");
+    // Every posted on-season meet now ships, so the gate is exactly:
+    // a drawn meet plus a payable fee. The button tone follows the
+    // meet, a light purse greys it, and a payable tap launches the
+    // meet - the fee itself only settles when the host returns.
     let mut ui = CampaignUi::new(7, Difficulty::Normal);
     select(&mut ui, "Buckingham");
-    ui.g.turn = turn;
+    ui.g.turn = 12;
     let sports = btn(&action_rects(true), "sports").clone();
     let (cx, cy) = center(&sports);
     let mut fb = Framebuffer::new();
-    // If the entry fee is payable -> the tone follows the season's meet
-    let season_seed = seed_of(ui.g.turn);
-    let held = sport_pick(ui.g.turn, season_seed).is_some();
+    let held = sport_pick(ui.g.turn, ((ui.g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15).is_some();
+    assert!(held, "the season posts a meet");
     ui.draw(&mut fb);
-    assert_eq!(
-        fb.get(cx as u32 - 20, (sports.y + 2) as u32) == GRAY,
-        !held,
-        "button tone must follow the season meet (held: {held})"
+    assert_ne!(
+        fb.get(cx as u32 - 20, (sports.y + 2) as u32),
+        GRAY,
+        "a payable meet keeps the button lit"
     );
     // purse below the fee -> greyed whatever the season
     ui.g.gold[PLAYER.index()] = SPORTS_FEE - 1;
@@ -158,15 +153,11 @@ fn sports_gate_is_the_meet_and_the_fee() {
         GRAY,
         "broke player sees a greyed button"
     );
-    // a tap always answers honestly and costs nothing
+    // payable purse: the tap launches the meet and charges nothing yet
     ui.g.gold[PLAYER.index()] = 100;
     ui.event(&tap(cx, cy), true);
-    assert!(
-        ui.msg.contains("SPORTS") || ui.msg.contains("SPORT"),
-        "answer: {}",
-        ui.msg
-    );
-    assert_eq!(ui.g.gi(PLAYER), 100, "the answer must not charge the purse");
+    assert!(ui.launch_req.is_some(), "a payable meet launches");
+    assert_eq!(ui.g.gi(PLAYER), 100, "launch defers the fee to the host");
 }
 
 #[test]

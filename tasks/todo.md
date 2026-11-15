@@ -225,7 +225,13 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 - [x] **T702 mg-falcon**: inertia flight intercept, corn-raid counter.
   **2026-11-15:** scripted full-wave rescue = 100 = GOLD (gold line 88 =
   9/10); inertial glide + drag-rescue tested. Live mouse steering in Chromium.
-- [ ] **T703 mg-tavern**: 3 waves, grab/throw, barrels, barmaid rule.
+- [x] **T703 mg-tavern**: 3 waves, grab/throw, barrels, barmaid rule.
+  **2026-11-15:** clean sweep = 92 = GOLD (gold line 92: six rogues at 12
+  plus the clean-floor 20). Belt rule (nearest attacker swings) and the
+  maid kick-lock keep the brawl winnable; foul, hurl-chain and seed tests
+  green.
+  **GOLD 2026-11-15:** 88 ms gold deep link, 24/24 sport baselines clean
+  twice over, real-Chromium smoke green, 513 KB wasm (see progress log).
 - [ ] **T704 mg-dragon**: hoard sneak, loot-weight escape, cursed crown
   gamble; rare-event spawn (turn≥20 once) campaign test.
 - [ ] **T705 HALL OF FAME screen**: per-game records (localStorage), title
