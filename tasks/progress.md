@@ -743,3 +743,56 @@ Checkpoint ALPHA 2: T801-T805 above; full native suite (34 targets,
 manual_range_contains in tavern's barrel bounds - NaN semantics
 unchanged for finite positions). Payload 459,014 B and worst-case
 p95 6 ms: both budgets hold on the shipped -Oz binary. Tag alpha2.
+
+## T901 graphics close-out — done 2026-11-15
+
+Art-QA pass shipped in c373ffd: word-boundary report wrap + wider plate
+(27 cols x 13 rows, no outcome line lost), gauges clear of label ink
+(WEALTH bar renamed RICH, bars_hud re-pinned), ticker 39-char cap,
+crawl-1 fire glow t=2 + flames on the rooftops, crawl-2 sky dither t=8,
+GRAY3 contrast pass (page numbers, NO FEATS, ENTER ERASES), menu/options
+unselected borders GRAY3, subtitle + HALL OF FAME headings centered,
+boot baseline at 0.9 s (CTA lit). All 12 baselines recaptured and every
+changed screen reviewed from shots/png/. Payload 474,723 B, wasm gz
+151,908 B. Full suite 48 targets green, clippy -D warnings clean.
+
+## T903 feel pass — done 2026-11-15
+
+Transitions: Transition::Fade + Bayer Dissolve in engine/scene.rs drive
+every scene change (scene test). Siege shake NEW: gfx shake_viewport
+(raster-offset shift of the interior, BLACK bleed at the frame edge),
+armed 24 ticks when a battle report opens; the world jolts, HUD + plate
+stay still - battle_report siege_shaketh_the_world_not_the_plate pins
+>5000 px moved, plate header band pixel-identical, decay to 0. Victory/
+defeat scene: draw_over banner (CROWN SECURED / THE CROWN IS LOST) over
+the frozen map. Turn sting: one-shot Norman MOD fires on the AI banner.
+Coronation check in campaign::game (victory_v2 + dragon_event green).
+
+## T904 accessibility — done 2026-11-15
+
+Keyboard-only campaign: Tab cycles buttons, arrows move the keep caret,
+Enter activates (synthetic tap under the focus bevel), E ends the round
+ - ui_play keyboard_only_reigneth plays a whole turn mouseless. Contrast:
+every dim GRAY body text lifted to GRAY3 (QA pass above); focus caret is
+the hover bevel (kbd_btn) so keyboard focus is visible on-plate.
+
+## B1 SPEC §13 acceptance evidence (beta1) — 2026-11-15
+
+1. Suite+lint: cargo test 48 targets green + clippy -D warnings clean,
+   re-run after the shake pass; CI repeats both with --locked.
+2. Budget: ./build.sh (new SPEC entry; wraps tools/build-web.ts, which
+   throws over 2 MB) - payload 474,723 B = 23 % of budget.
+3. Browser gate: tools/baseline-check.mjs drives title-menu-campaign-
+   minigame-report-endturn through the real -Oz wasm: 12 states, pixel
+   diffs vs committed baselines, assertsFailed=0 problems=0 (zero
+   console errors); audio RMS table audible (T902 block above).
+4. Entry ≤ 2 s/3 clicks: fanfare+overture start on the first gesture
+   (music_flow), crawl auto-rolls to war in 3 inputs (787557f).
+5. Campaign loop: fog_spies/kingdom_bars/events_v2/marches/victory_v2
+   green; HARD-vs-EASY 8/10 sweep gate (3c1e422); 500-game soak clean
+   (0e8dab5).
+6. Minigames: 13 mg_* targets + T805 26/26 autoplay captures on the
+   shipped binary; HALL OF FAME reload persistence (T705).
+7. README controls + MIT LICENSE + CHANGELOG.md; ci.yml (test+clippy+
+   wasm+budget+headless gate+artifact+Pages) - build job green on run
+   #1; Pages enabled, deploy job live from this push.

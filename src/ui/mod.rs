@@ -19,8 +19,8 @@ use crate::campaign::units::UnitKind;
 use crate::engine::art;
 use crate::engine::gfx::{
     mix, BLACK, BLOOD, BROWN, CREAM, CYAN, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, EMBER, GOLD,
-    GRASS, GRAY, GRAY2, GRAY3, GREEN, LINEN, NAVY, NORMAN_RED, ORANGE, SAXON_BLUE, SILVER, STONE,
-    TAN, TEAL, W, WHITE, YELLOW,
+    GRASS, GRAY, GRAY2, GRAY3, GREEN, H, LINEN, NAVY, NORMAN_RED, ORANGE, SAXON_BLUE, SILVER,
+    STONE, TAN, TEAL, W, WHITE, YELLOW,
 };
 pub use crate::engine::scene::SceneEvent;
 
@@ -277,6 +277,9 @@ pub struct CampaignUi {
     pub panel_open: bool,
     pub msg: String,
     msg_ticks: u32,
+    /// Siege shake ticks left: the map jolts while the report plate is
+    /// fresh (T903 feel pass).
+    pub shake: u32,
     pub anim: u32,
     pub want_restart: bool,
     /// Hovered control id for bevel highlight + tooltip (T302).
@@ -337,6 +340,7 @@ impl CampaignUi {
             panel_open: false,
             msg: String::new(),
             msg_ticks: 0,
+            shake: 0,
             want_restart: false,
             anim: 0,
             hover: None,
@@ -367,6 +371,7 @@ impl CampaignUi {
 
     pub fn tick(&mut self) {
         self.msg_ticks = self.msg_ticks.saturating_sub(1);
+        self.shake = self.shake.saturating_sub(1);
         self.anim = self.anim.wrapping_add(1);
         // Bars glide toward the true meters (~8 ticks); the draw pass shows a
         let tgt = Self::bar_targets_of(&self.g);
@@ -443,7 +448,11 @@ impl CampaignUi {
         // T904: the keyboard is a full citizen - every action below is
         // reached by synthesizing the very tap a finger would send, so
         // the rules behind mouse and keys cannot drift apart.
-        if let SceneEvent::Key { code, pressed: true } = *ev {
+        if let SceneEvent::Key {
+            code,
+            pressed: true,
+        } = *ev
+        {
             self.key_press(code);
             return;
         }
@@ -616,8 +625,7 @@ impl CampaignUi {
                     return;
                 }
                 KEY_UP | KEY_DOWN if own => {
-                    let max =
-                        garrison_rows(&self.g, sel).len().saturating_sub(LIST_ROWS) as i32;
+                    let max = garrison_rows(&self.g, sel).len().saturating_sub(LIST_ROWS) as i32;
                     let d = if code == KEY_UP { -1 } else { 1 };
                     self.list_top = (self.list_top as i32 + d).clamp(0, max) as usize;
                     return;
@@ -717,6 +725,7 @@ impl CampaignUi {
                 self.report_pending = true;
             } else {
                 self.report_open = true;
+                self.shake = 24;
             }
         }
     }
@@ -884,6 +893,7 @@ impl CampaignUi {
     fn open_dawn(&mut self) {
         if std::mem::take(&mut self.report_pending) {
             self.report_open = true;
+            self.shake = 24;
         }
         if let Some(e) = self.pending_event.take() {
             self.event_kind = Some(e);
@@ -1028,6 +1038,13 @@ impl CampaignUi {
                 fb.fill_rect(x - 1, y - 1, 3, 3, NORMAN_RED);
                 fb.rect(x - 2, y - 2, 5, 5, BLACK);
             }
+        }
+        // Siege shake (T903): the world jolts under a fresh report plate
+        // while HUD, panel and the plate itself stay still.
+        if self.shake > 0 {
+            let dx = (self.shake * 7) % 5;
+            let dy = (self.shake * 11) % 3;
+            fb.shake_viewport(4, 4, W - 8, H - 8, dx as i32 - 2, dy as i32 - 1);
         }
         self.draw_hud(fb);
         if let Some(sel) = self.sel.filter(|_| self.panel_open) {

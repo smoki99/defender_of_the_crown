@@ -16,9 +16,9 @@ extern "C" {
 use crate::engine::audio::{Mod, Music, Player, Sfx};
 use crate::engine::fonts::{draw_text, draw_text_shadow};
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, BROWN, DARKGRAY, DARKGREEN, EMBER, GOLD, GRASS, GRAY, GRAY3,
-    GREEN, H, LIGHTBLUE, LINEN, NAVY, OLIVE, ORANGE, SAXON_BLUE, SILVER, SKY, STONE, TAN, W,
-    WHITE, YELLOW,
+    Framebuffer, BLACK, BLOOD, BROWN, DARKGRAY, DARKGREEN, EMBER, GOLD, GRASS, GRAY, GRAY3, GREEN,
+    H, LIGHTBLUE, LINEN, NAVY, OLIVE, ORANGE, SAXON_BLUE, SILVER, SKY, STONE, TAN, W, WHITE,
+    YELLOW,
 };
 use crate::engine::input::{
     Gesture, Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP,

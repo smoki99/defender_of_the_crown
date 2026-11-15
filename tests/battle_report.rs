@@ -95,6 +95,48 @@ fn battle_scrollteth_lines_in() {
 }
 
 #[test]
+fn siege_shaketh_the_world_not_the_plate() {
+    let (mut ui, target) = battle_setup();
+    let (tx, ty) = castle_screen(&ui.g.strongholds[target]);
+    assert_eq!(ui.shake, 0, "shake armed before the battle");
+    ui.event(&tap(tx, ty), true);
+    assert!(ui.report_open, "a fight spawned no report");
+    assert_eq!(ui.shake, 24, "the report did not arm the shake");
+
+    // Control draw at the same tick phase without the jolt...
+    let mut calm = Framebuffer::new();
+    ui.shake = 0;
+    ui.draw(&mut calm);
+    // ...then the same frame shaken.
+    ui.shake = 24;
+    let mut quake = Framebuffer::new();
+    ui.draw(&mut quake);
+    let mut moved = 0u32;
+    for y in 12..240u32 {
+        for x in 12..308u32 {
+            if calm.get(x, y) != quake.get(x, y) {
+                moved += 1;
+            }
+        }
+    }
+    assert!(moved > 5000, "map did not jolt: only {moved} px moved");
+    // The BATTLE REPORT header band must be untouched by the quake.
+    for y in 84..94u32 {
+        for x in 58..260u32 {
+            assert_eq!(
+                calm.get(x, y),
+                quake.get(x, y),
+                "plate header slid at {x},{y}"
+            );
+        }
+    }
+    for _ in 0..24 {
+        ui.tick();
+    }
+    assert_eq!(ui.shake, 0, "shake never decayed");
+}
+
+#[test]
 fn tap_skipeth_then_closethe() {
     let (mut ui, target) = battle_setup();
     let (tx, ty) = castle_screen(&ui.g.strongholds[target]);

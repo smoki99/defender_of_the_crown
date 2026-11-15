@@ -13,12 +13,7 @@ fn main() {
         }
         println!(
             "round {round}: turn {} report {} event {} champ {} ai_anim {} over {:?}",
-            ui.g.turn,
-            ui.report_open,
-            ui.event_open,
-            ui.champ_open,
-            ui.ai_anim,
-            ui.g.over,
+            ui.g.turn, ui.report_open, ui.event_open, ui.champ_open, ui.ai_anim, ui.g.over,
         );
         // dismiss whatever the dawn revealed, exactly like the harness
         if ui.report_open {

@@ -181,3 +181,14 @@ fn mix_endpoints_and_rows_are_correct() {
         "sky-navy midpoint must stay blue"
     );
 }
+
+#[test]
+fn shake_viewport_shifteth_and_returneth() {
+    let mut fb = Framebuffer::new();
+    fb.fill_rect(10, 10, 8, 8, GOLD);
+    fb.shake_viewport(0, 0, W, H, 3, 2);
+    assert_eq!(fb.get(13, 12), GOLD, "block did not ride the shift");
+    assert_eq!(fb.get(10, 10), BLACK, "the old seat stayed lit");
+    fb.shake_viewport(0, 0, W, H, -3, -2);
+    assert_eq!(fb.get(10, 10), GOLD, "the return shift lost the block");
+}

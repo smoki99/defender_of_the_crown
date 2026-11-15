@@ -31,7 +31,7 @@ const STATES = [
   ["howto-3", 300],
   ["fame", 150],
   ["difficulty", 150],
-  ["crawl-1", 1200],
+  ["crawl-1", 1600], // flame flicker: measured 1000-1321 across harness runs
   ["panel", 150], // own-castle roll, static after slide-in
   ["report", 400], // battle report, text scrolls in then rests
   ["campaign", 125], // turn-1 map is static

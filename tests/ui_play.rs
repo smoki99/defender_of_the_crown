@@ -187,8 +187,7 @@ fn keep_icon_edge_taps_hit_the_visible_keep() {
     // The defenders may legitimately win (garrison then unchanged) - the
     // invariant is that a battle was resolved and logged at London.
     assert!(
-        ui.g
-            .log
+        ui.g.log
             .iter()
             .any(|l| l.contains("YOUR ATTACK ON") && l.contains("London")),
         "no battle logged: {:?}",
@@ -199,7 +198,10 @@ fn keep_icon_edge_taps_hit_the_visible_keep() {
 #[test]
 fn keyboard_only_reigneth() {
     use defender_of_the_crown::engine::input::{KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT};
-    let key = |code: u32| SceneEvent::Key { code, pressed: true };
+    let key = |code: u32| SceneEvent::Key {
+        code,
+        pressed: true,
+    };
     let mut ui = CampaignUi::new(7, Difficulty::Normal);
     // Enter on a bare map lights the home capital
     ui.event(&key(KEY_ENTER), true);

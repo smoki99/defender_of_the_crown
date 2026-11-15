@@ -184,6 +184,35 @@ impl Framebuffer {
             self.data[(y as u32 * W + x as u32) as usize] = c;
         }
     }
+    /// Raster-offset screen shake (T903): shifts the rect by (dx, dy),
+    /// filling pixels whose source fell outside the frame with BLACK.
+    pub fn shake_viewport(&mut self, x0: u32, y0: u32, w: u32, h: u32, dx: i32, dy: i32) {
+        if (dx == 0 && dy == 0) || w == 0 || h == 0 {
+            return;
+        }
+        let x1 = (x0 + w).min(W);
+        let y1 = (y0 + h).min(H);
+        if x1 <= x0 || y1 <= y0 {
+            return;
+        }
+        let wv = (x1 - x0) as usize;
+        let mut buf = vec![0u8; wv * (y1 - y0) as usize];
+        for j in 0..(y1 - y0) as usize {
+            let sy = y0 as i32 + j as i32 - dy;
+            for i in 0..wv {
+                let sx = x0 as i32 + i as i32 - dx;
+                buf[j * wv + i] = if sx < 0 || sy < 0 || sx >= W as i32 || sy >= H as i32 {
+                    BLACK
+                } else {
+                    self.data[(sy as u32 * W + sx as u32) as usize]
+                };
+            }
+        }
+        for j in 0..(y1 - y0) as usize {
+            let d = ((y0 + j as u32) * W + x0) as usize;
+            self.data[d..d + wv].copy_from_slice(&buf[j * wv..(j + 1) * wv]);
+        }
+    }
 
     pub fn hline(&mut self, x0: i32, x1: i32, y: i32, c: u8) {
         if y < 0 || y >= H as i32 {
