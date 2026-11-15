@@ -223,8 +223,8 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   **2026-11-15:** GOLD scripted (8 pairs + speed bonus >=90; live mouse
   mismatch smoke). See progress.md.
 - [x] **T702 mg-falcon**: inertia flight intercept, corn-raid counter.
-  **2026-11-15:** scripted all-crows intercept = 88 = GOLD (best possible;
-  scale: 60=win, 90-100 reserved). Live mouse steering + plate in Chromium.
+  **2026-11-15:** scripted full-wave rescue = 100 = GOLD (gold line 88 =
+  9/10); inertial glide + drag-rescue tested. Live mouse steering in Chromium.
 - [ ] **T703 mg-tavern**: 3 waves, grab/throw, barrels, barmaid rule.
 - [ ] **T704 mg-dragon**: hoard sneak, loot-weight escape, cursed crown
   gamble; rare-event spawn (turn≥20 once) campaign test.
