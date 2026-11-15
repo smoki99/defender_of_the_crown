@@ -16,9 +16,12 @@ Locally: `bun run build && bun run serve` → http://127.0.0.1:8123
 
 Any key or click wakes the herald; the title menu is fully keyboard-driven
 (arrows + Enter). One click enters the campaign: click a Saxon castle,
-press the action buttons (LEVY / BOW / KNI / SIEGE / TOURNAMENT / END),
+press the action buttons (LEVY / BOW / KNIGHT / SIEGE / END TURN),
 manage the four kingdom bars (RICHES, PROVISIONS, LOYALTY, POPULARITY —
-see SPEC §5.2), and march to reclaim every castle from the Normans.
+see SPEC §5.2), and march to reclaim every castle from the Normans —
+tapping an adjacent Norman keep leads your host out. The campaign plays
+mouseless too: Tab cycles buttons, arrows move the caret, Enter
+activates, E ends the round, Esc closes a plate.
 Captured castles host sports meets — the 13 minigames pay gold and fame,
 and your best scores live in the hall of fame (browser storage).
 Per-minigame controls (SPEC §6):
