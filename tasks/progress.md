@@ -659,3 +659,35 @@ then the CHAMP X1 row matched glyph-for-glyph against the new generic
 season labels; the jewel scans exactly (102,0,0) on a full-bright
 scanline). shots: champ-modal, champ-panel. Tests 3/3 in
 `tests/champion_flow.rs`; full suite 45 targets green, clippy 0.
+
+## T802 Balance sweep - done 2026-11-15
+
+Every game's Q6 bar now has iron behind it. `tests/balance_sweep.rs`
+walks all thirteen SPORTS rows through `Tier::of`/`resolve` and asserts
+the table's own contract: rewards monotone per game, boundaries exact
+(bronze_at inclusive, gold exact, one-under slips a tier), and the
+catalogue itself - no duplicate labels, silver strictly under gold,
+plausible reward ladders. One resolver edge surfaced and died: a
+zero-reward special case shorted the ceiling, so gold is now always
+"at least silver at 1000", table-wide. The scripted half: the other
+modules already run their gold scripts (forge chain, joust
+passes, sword bout, catapult battery, dragon heist, falcon wave);
+`tests/mg_rampart.rs` gained its Q6 duo. The flawless watch is the
+greedy-optimal loop the engine's own SPORTS comment dares ("bow-perfect
+lands just above Gold"): hunt marching and foot teams whenever no climb
+is inside an arrow's grace, else lead the man nearest the battlements -
+resolves Gold (clamps 100). The slack watch is honest-casual: eye
+settles on the lowest man every 16 ticks, shaft flies at a fifteen-tick
+stale memory, a quarter of looses fumble via seeded LCG - wins, lands
+Silver, inside the spec band (bronze-or-silver, never the sack). Two
+calibration findings: HIT_R is a 7 px box, so no-lead aiming still hits
+slow-lane climbers - timing alone cannot model "casual", missed shots
+must be scripted; and 50 % fumble LOSES (3 breaches), which is the
+evidence the bronze corridor genuinely exists below the bot. Champion
+pacing measured over 100 games: the herald cries ~9.2 times per 60
+turns (first median turn 5), so the triple-crown recruit is early-mid
+game for a gold-punching player; AI banners never champion by design
+(meets are player-side) - soak's MAX_CHAMPIONS cap still guards.
+HARD-vs-EASY head-to-head measured 8/10 on the final engine, so the
+SPEC 6.1 gate in `tests/ai_v2.rs` rose 7 -> 8, no padding. Suite green,
+clippy 0, wasm check clean.

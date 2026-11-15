@@ -178,3 +178,148 @@ fn the_same_seed_layeth_the_same_siege() {
     };
     assert_eq!(snapshot(999), snapshot(999), "the siege must replay identically");
 }
+
+/// A flawless watch: stones on fat parties, lead-shots on every climber.
+/// The siege is scripted, so "perfect" is just the greedy-optimal loop.
+fn perfect_watch(g: &mut Rampart, sim: &mut Sim) {
+    // bow-perfect: every man loosed at - the marching runners first (a
+    // dead runner never plants a ladder), then every climber. The rocks
+    // stay in the cart: the module's own note is that this run "lands
+    // just above Gold" (24 runners + 72 climbers + 6 repels).
+    let march = 2.4_f32; // MARCH_SPD mirrored
+    sim.idle(g, PRESENT + 1);
+    for _ in 0..END_TICKS + 400 {
+        if !matches!(g.state(), MgState::Running) {
+            break;
+        }
+        let mut acted = false;
+        if g.quiver() > 0 {
+            // the man nearest the battlements and his remaining climb
+            let mut best: Option<(f32, usize, usize, f32)> = None; // y,w,c,left
+            for w in 0..6 {
+                for c in 0..3 {
+                    if let Some((cx, cy)) = g.climber_xy(w, c) {
+                        let lane = g.runner_xy(w, 0).map(|(_, y)| y).unwrap_or(cy + 60.0);
+                        let rate = ((lane - TOP_Y) / CLIMB_TICKS).max(0.05);
+                        let left = (cy - TOP_Y) / rate;
+                        if best.is_none_or(|(by, _, _, _)| cy < by) {
+                            best = Some((cy, w, c, left));
+                        }
+                        let _ = cx;
+                    }
+                }
+            }
+            // while no climber is inside an arrow's grace, spend the
+            // beat on the marching runners - that is where gold hides
+            if best.is_none_or(|(_, _, _, left)| left >= 40.0) {
+                'march: for w in 0..6 {
+                    // marching men, and the team waiting at a planted
+                    // foot, are fair game while no climb is in peril
+                    let st = g.ladder(w).0;
+                    if st != 1 && st != 3 {
+                        continue;
+                    }
+                    for r in 0..2 {
+                        if let Some((rx, ry)) = g.runner_xy(w, r) {
+                            let flight =
+                                ((rx - BOW.0).powi(2) + (ry - BOW.1).powi(2)).sqrt() / ARROW_SPD;
+                            // foot teams stand still; marching men don't
+                            let lead = if st == 1 { march * flight } else { 0.0 };
+                            sim.loose(g, (rx - lead) as i32, ry as i32);
+                            acted = true;
+                            break 'march;
+                        }
+                    }
+                }
+            }
+            // else lead the most urgent climber up his run
+            if !acted {
+                if let Some((_, w, c, _)) = best {
+                    let (cx, cy) = g.climber_xy(w, c).unwrap();
+                    let lane = g.runner_xy(w, 0).map(|(_, y)| y).unwrap_or(cy + 60.0);
+                    let rate = (lane - TOP_Y) / CLIMB_TICKS;
+                    let flight =
+                        ((cx - BOW.0).powi(2) + (cy - BOW.1).powi(2)).sqrt() / ARROW_SPD;
+                    sim.loose(g, cx as i32, (cy - flight * rate) as i32);
+                    acted = true;
+                }
+            }
+        }
+        if !acted {
+            sim.idle(g, 1);
+        }
+    }
+}
+
+#[test]
+fn a_flawless_watch_earneth_gold() {
+    use defender_of_the_crown::campaign::game::Tier;
+    let mut g = Rampart::new(7);
+    let mut sim = Sim::new();
+    perfect_watch(&mut g, &mut sim);
+    assert!(!matches!(g.state(), MgState::Lost), "flawless watch lost ({} breaches)", g.breaches());
+    assert!(g.score() >= 90, "flawless watch scored {} < gold line", g.score());
+    assert!(
+        matches!(g.state(), MgState::Won(Tier::Gold)),
+        "flawless watch did not resolve Gold: {:?}",
+        g.state()
+    );
+}
+
+#[test]
+fn a_slack_watch_bringeth_bronze_not_worse() {
+    // Casual read of the siege: the eye lands on the works every 16
+    // ticks, the shaft flies at where a man was last seen (he has
+    // since moved up), a quarter of looses are bobbled, and the rocks
+    // stay in the cart. The MG-QA Q6 bar: such a run must still WIN,
+    // rewarded at bronze or silver - never gold, never the sack.
+    use defender_of_the_crown::campaign::game::Tier;
+    let mut g = Rampart::new(7);
+    let mut sim = Sim::new();
+    sim.idle(&mut g, PRESENT + 1);
+    let mut ghost: Option<(f32, f32)> = None;
+    let mut t = 0u32;
+    let mut rng = 0x5DEECE66Du64; // the watch's fidgety finger
+    for _ in 0..END_TICKS + 400 {
+        if !matches!(g.state(), MgState::Running) {
+            break;
+        }
+        t += 1;
+        if t.is_multiple_of(16) {
+            // the eye settles on the lowest man - the easy target
+            ghost = (0..6)
+                .filter_map(|w| {
+                    (0..3)
+                        .filter_map(|c| g.climber_xy(w, c))
+                        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                })
+                .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .or(ghost);
+        }
+        let mut acted = false;
+        if t % 16 == 15 && g.quiver() > 0 {
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let flinch = rng >> 61 & 3 == 0; // about a quarter are bobbled
+            if let Some((x, y)) = ghost {
+                if !flinch {
+                    sim.loose(&mut g, x as i32, y as i32); // at the memory
+                }
+                acted = true;
+            }
+        }
+        if !acted {
+            sim.idle(&mut g, 1);
+        }
+    }
+    assert!(
+        matches!(
+            g.state(),
+            MgState::Won(Tier::Bronze) | MgState::Won(Tier::Silver)
+        ),
+        "slack watch did not place bronze-or-silver: {:?} ({})",
+        g.state(),
+        g.score()
+    );
+}

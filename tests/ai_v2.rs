@@ -40,7 +40,7 @@ fn a_harder_council_outwinneth_an_easier_one() {
             hwins += 1;
         }
     }
-    assert!(hwins >= 7, "Hard beat Easy only {hwins}/10 head-to-head");
+    assert!(hwins >= 8, "Hard beat Easy only {hwins}/10 head-to-head");
 }
 
 fn fingerprint(seed: u64) -> (u32, u8, u64, [u8; 12]) {
