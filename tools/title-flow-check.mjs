@@ -5,8 +5,8 @@
 import { window, coords, tap, key, px, snap, regionDiff, shot, ok, finish, getFrame, getFrameCount, problems, decodeTurn } from "./jsdom-harness.mjs";
 
 const seededOff = window.localStorage.getItem("doc.crt") === "0";
-const GOLD_ON = [136, 113, 0]; // 204,170,0 darkened 2/3 on a scanline row
-const GOLD_OFF = [204, 170, 0];
+const GOLD_ON = [124, 102, 34]; // T706 gold (187,153,51) darkened 2/3 on a scanline row
+const GOLD_OFF = [187, 153, 51];
 const near = (p, c) => Math.abs(p[0] - c[0]) <= 8 && Math.abs(p[1] - c[1]) <= 8 && Math.abs(p[2] - c[2]) <= 8;
 
 await Bun.sleep(700);
@@ -41,13 +41,13 @@ key("ArrowDown"); // HOW TO PLAY
 key("Enter");
 await Bun.sleep(120);
 shot("howto-1");
-ok(near(px(64, 130), [136, 119, 102]), `p1 keep drawn rgb=${px(64, 130)}`);
-ok(near(px(86, 132), seededOff ? [34, 34, 34] : [51, 51, 51]), `p1 road dash rgb=${px(86, 132)}`); // CRT flipped mid-run
+ok(near(px(64, 130), [119, 111, 102]), `p1 keep drawn rgb=${px(64, 130)}`); // T706 STONE
+ok(near(px(86, 132), [34, 34, 34]), `p1 road dash rgb=${px(86, 132)}`); // DARKGRAY (framebuffer ignores the CRT CSS filter)
 const p1 = snap();
 key("ArrowRight");
 await Bun.sleep(200);
 shot("howto-2");
-ok(near(px(72, 115), [153, 0, 34]), `p2 shield rgb=${px(72, 115)}`);
+ok(near(px(72, 115), [119, 17, 26]), `p2 shield rgb=${px(72, 115)}`); // T706 BLOOD
 ok(regionDiff(p1, snap(), 16, 96, 304, 216) > 150, `p2 art differs (${regionDiff(p1, snap(), 16, 96, 304, 216)}px)`);
 key("ArrowRight");
 await Bun.sleep(200);

@@ -2,7 +2,7 @@
 //! and the breathing selection pulse - pinned to exact framebuffer pixels.
 use defender_of_the_crown::campaign::game::Difficulty;
 use defender_of_the_crown::engine::gfx::{
-    Framebuffer, DARKGREEN, DEEPWATER, GOLD, SAXON_BLUE, SILVER, SKY, TEAL, YELLOW,
+    Framebuffer, DARKGREEN, DEEPWATER, GOLD, GRAY3, SAXON_BLUE, TAN, TEAL, YELLOW,
 };
 use defender_of_the_crown::ui::CampaignUi;
 
@@ -18,10 +18,9 @@ fn sea_shore_and_drifting_waves() {
     ui(0).draw(&mut fb);
     // North Sea at y=100: coastline sits near x=209, so x=300 is water.
     assert_eq!(fb.get(300, 100), DEEPWATER);
-    // Hatched shoreline at y=50 (Norfolk coast x~219, clear of keeps):
-    // SKY interleaves the coast on even checker cells.
-    assert_eq!(fb.get(220, 50), SKY);
-    assert_eq!(fb.get(221, 50), DEEPWATER, "no water cell beside hatch");
+    // Dry sand band lines the coast (T901) - pin the feature, not the
+    // exact column: keep sprites may overlap individual coastline pixels.
+    assert!(fb.count(TAN) > 100, "sand strip missing");
     // Wave dashes drift with anim: TEAL at y=0 for anim 0, gone at anim 9.
     assert_eq!(fb.get(235, 0), TEAL);
     let mut fb2 = Framebuffer::new();
@@ -35,19 +34,32 @@ fn forest_and_hill_scenery() {
     let mut fb = Framebuffer::new();
     ui(0).draw(&mut fb);
     assert!(fb.count(DARKGREEN) > 60, "forest canopies missing");
-    assert_eq!(fb.get(129, 50), SILVER, "Midlands hill highlight missing");
+    assert_eq!(fb.get(129, 50), GRAY3, "Midlands hill highlight missing");
 }
 
 #[test]
 fn banner_flutter_is_two_frames() {
-    // Buckingham (own, visible) keep centre: 125,100.
-    let mut a = Framebuffer::new();
-    ui(0).draw(&mut a);
-    let mut b = Framebuffer::new();
-    ui(8).draw(&mut b);
-    assert_eq!(a.get(121, 87), SAXON_BLUE, "frame 0 flag high");
-    assert_ne!(b.get(121, 87), SAXON_BLUE, "frame 1 flag must leave row 87");
-    assert_eq!(b.get(121, 88), SAXON_BLUE, "frame 1 flag low");
+    // Buckingham (own, visible) keep: pennant area around 125,100 top.
+    // The keep sprite owns the exact pennant pixels, so pin the
+    // invariant: Saxon-blue flag pixels exist and MOVE between the
+    // two flutter frames.
+    let blues = |anim: u32| -> Vec<(i32, i32)> {
+        let mut fb = Framebuffer::new();
+        ui(anim).draw(&mut fb);
+        let mut v = Vec::new();
+        for y in 76..102u32 {
+            for x in 110..142u32 {
+                if fb.get(x, y) == SAXON_BLUE {
+                    v.push((x as i32, y as i32));
+                }
+            }
+        }
+        v
+    };
+    let a = blues(0);
+    let b = blues(8);
+    assert!(!a.is_empty() && !b.is_empty(), "pennant missing");
+    assert_ne!(a, b, "flag does not flutter");
 }
 
 #[test]

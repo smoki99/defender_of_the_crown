@@ -87,12 +87,15 @@ impl Music {
     /// on top, result hard-clamped to [-1, 1]. Finished voices are dropped.
     pub fn render(&mut self, out: &mut [f32], sr: u32) {
         out.fill(0.0);
-        // Bed master 0.55 (raw beds peak near full scale, T902 headroom)
-        // with a per-sample equal-power curve: a fresh bed fades in over
-        // 20 ms (click gate); the replaced bed rides out over 300 ms,
-        // bridging the near-silent opening bars of the incoming module so
-        // the 5 ms envelope never dips (T902 mix gate).
-        const BED: f32 = 0.55;
+        // Bed master 0.58 - the loudest value that keeps bed + the
+        // worst-case SFX stack under full scale (mix_flow gate). The
+        // worklet frame-fill fix alone doubled perceived loudness by
+        // ending the odd-frame silence. Per-sample equal-power curve:
+        // a fresh bed fades in over 20 ms (click gate); the replaced bed
+        // rides out over 300 ms, bridging the near-silent opening bars
+        // of the incoming module so the 5 ms envelope never dips
+        // (T902 mix gate).
+        const BED: f32 = 0.58;
         const HALF_PI: f32 = core::f32::consts::FRAC_PI_2;
         let step = 1.0 / (0.02 * sr as f32);
         let tail_step = 1.0 / (0.3 * sr as f32);

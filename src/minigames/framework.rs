@@ -10,8 +10,8 @@
 
 pub use crate::campaign::game::Tier;
 use crate::campaign::rng::Xor;
-use crate::engine::gfx::Framebuffer;
-use crate::engine::input::Input;
+use crate::engine::gfx::{Framebuffer, BLACK, NAVY, ORANGE, TAN, W};
+use crate::engine::input::{Dir, Gesture, Input, KEY_LEFT, KEY_RIGHT};
 
 /// Live state of a sport mid-tick (SPEC 10). `Lost` can fire immediately
 /// when the game itself decides (lance shatters, dragon wakes); otherwise a
@@ -261,4 +261,55 @@ pub struct MgOutcome {
     pub id: &'static str,
     pub score: u32,
     pub tier: Option<Tier>,
+}
+
+// ---- T705 shared input + scene helpers ----------------------------------
+
+/// Action button OR a screen tap: every sport accepts both hands.
+pub fn tap_action(input: &Input, action: u32) -> bool {
+    input.key_pressed(action)
+        || input
+            .gestures()
+            .iter()
+            .any(|g| matches!(g, Gesture::Tap { .. }))
+}
+
+/// Horizontal lane step: arrow keys or an E/W swipe; -1, 0, +1 per press.
+pub fn lane_step(input: &Input) -> i32 {
+    let mut d = 0i32;
+    if input.key_pressed(KEY_LEFT) {
+        d -= 1;
+    }
+    if input.key_pressed(KEY_RIGHT) {
+        d += 1;
+    }
+    for g in input.gestures() {
+        match *g {
+            Gesture::Swipe { dir: Dir::W } => d -= 1,
+            Gesture::Swipe { dir: Dir::E } => d += 1,
+            _ => {}
+        }
+    }
+    d
+}
+
+/// Three-band dusk sky (zenith navy, dusty ember, warm horizon) across the
+/// strip `y0..y1` - the shared opening read of every tournament scene.
+pub fn dusk_sky(fb: &mut Framebuffer, y0: i32, y1: i32) {
+    let h = (y1 - y0).max(3) as u32;
+    let z = h * 55 / 100;
+    let e = h * 27 / 100;
+    fb.fill_rect(0, y0, W, z, NAVY);
+    fb.fill_rect(0, y0 + z as i32, W, e, ORANGE);
+    fb.fill_rect(0, y0 + (z + e) as i32, W, h - z - e, TAN);
+}
+
+/// Deterministic BLACK roofline silhouette standing on `base_y`: teeth of
+/// keep-gables and church spurs, stable across frames (no RNG).
+pub fn skyline(fb: &mut Framebuffer, base_y: i32) {
+    for x in 0..W as i32 {
+        let spur = (x / 8) % 3 == 0;
+        let h = 2 + (x % 5) + if spur { 5 } else { 0 };
+        fb.fill_rect(x, base_y - h, 1, h as u32, BLACK);
+    }
 }

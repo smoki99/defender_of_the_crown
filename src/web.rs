@@ -150,7 +150,9 @@ impl AppCtx for Ctx {
     }
     fn mg_best(&mut self, id: &str, score: u32) {
         let key = format!("doc.mg.{id}");
-        let prev = ls_get(&key).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+        let prev = ls_get(&key)
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0);
         if score > prev {
             ls_set(&key, &score.to_string());
         }
@@ -174,12 +176,15 @@ class DocSink extends AudioWorkletProcessor {
     this.port.postMessage(8192);
   }
   process(_ins, outs) {
-    const o = outs[0]; const n = o[0].length;
-    for (let i = 0; i < n; i += 2) {
+    const l = outs[0][0], r = outs[0][1]; const n = l.length;
+    // ONE stereo pair per frame - filling every frame keeps the ring
+    // pacing sane (the old i += 2 loop zeroed every odd frame: 50 % duty
+    // chop that read as broken noise instead of music).
+    for (let i = 0; i < n; i++) {
       if (((this.w - this.r) & 16383) >= 2) {
-        o[0][i] = this.ring[this.r]; o[1][i] = this.ring[(this.r + 1) & 16383];
+        l[i] = this.ring[this.r]; r[i] = this.ring[(this.r + 1) & 16383];
         this.r = (this.r + 2) & 16383;
-      } else { o[0][i] = 0; o[1][i] = 0; }
+      } else { l[i] = 0; r[i] = 0; }
     }
     if (((this.w - this.r) & 16383) < 4096) this.port.postMessage(8192);
     return true;
@@ -626,14 +631,14 @@ pub struct TitleScene {
     ticks: u32,
     touched: bool,
     stage: Stage,
-    item: usize, // menu/difficulty highlight (keyboard)
-    page: usize, // how-to page
-    crawl: usize, // intro crawl screen (T404)
-    dwell: u32,   // ticks the current crawl leaf has stood (T4xx auto-roll)
+    item: usize,            // menu/difficulty highlight (keyboard)
+    page: usize,            // how-to page
+    crawl: usize,           // intro crawl screen (T404)
+    dwell: u32,             // ticks the current crawl leaf has stood (T4xx auto-roll)
     pending: Option<usize>, // activation deferred to tick (needs AppCtx)
-    reset_armed: bool, // HOF erase needs a second ENTER (T705)
-    sound: bool, // OPTIONS mirror of the persisted mute flag
-    crt: bool,   // OPTIONS mirror of the persisted scanline flag (T405)
+    reset_armed: bool,      // HOF erase needs a second ENTER (T705)
+    sound: bool,            // OPTIONS mirror of the persisted mute flag
+    crt: bool,              // OPTIONS mirror of the persisted scanline flag (T405)
 }
 
 impl TitleScene {
@@ -660,8 +665,8 @@ fn initial_sound() -> bool {
         Some("1") => false,
         Some("0") => true,
         _ => !query_has("mute=1"),
-        }
     }
+}
 
 const MENU: [&str; 4] = ["BEGIN CAMPAIGN", "HOW TO PLAY", "HALL OF FAME", "OPTIONS"];
 const HOWTO: [(&str, [&str; 5]); 3] = [
@@ -711,26 +716,50 @@ fn back_rect() -> (i32, i32, u32, u32) {
     (134, 226, 52, 14)
 }
 
-/// `s` in `sc`-scaled 8x8 bitmap caps with offset shadow.
-fn draw_caps(fb: &mut Framebuffer, x: i32, y: i32, s: &str, fg: u8, sh: u8, sc: u32) {
-    for (col, ox) in [(sh, sc as i32), (fg, 0)].into_iter() {
-        let mut cx = x + ox;
-        for ch in s.chars() {
-            for (r, bits) in crate::engine::fonts::glyph(ch).iter().enumerate() {
-                for c in 0..8u32 {
-                    if bits & (0x80 >> c) != 0 {
-                        fb.fill_rect(
-                            cx + c as i32 * sc as i32,
-                            y + ox + r as i32 * sc as i32,
-                            sc,
-                            sc,
-                            col,
-                        );
-                    }
+/// T901: three-pass headline - SE drop shadow, gold body, sunlit top rows
+/// (glyph rows 0..2) and a shaded base row in `hi`/`hi2` - the Sachs look.
+/// `s` in `sc`-scaled 8x8 bitmap caps.
+fn draw_caps3(fb: &mut Framebuffer, x: i32, y: i32, s: &str, fg: u8, sh: u8, hi: u8, sc: u32) {
+    let mut cx = x + sc as i32;
+    for ch in s.chars() {
+        for (r, bits) in crate::engine::fonts::glyph(ch).iter().enumerate() {
+            for c in 0..8u32 {
+                if bits & (0x80 >> c) != 0 {
+                    fb.fill_rect(
+                        cx + c as i32 * sc as i32,
+                        y + sc as i32 + r as i32 * sc as i32,
+                        sc,
+                        sc,
+                        sh,
+                    );
                 }
             }
-            cx += 8 * sc as i32;
         }
+        cx += 8 * sc as i32;
+    }
+    let mut cx = x;
+    for ch in s.chars() {
+        for (r, bits) in crate::engine::fonts::glyph(ch).iter().enumerate() {
+            let col = if r < 2 {
+                hi
+            } else if r == 7 {
+                sh
+            } else {
+                fg
+            };
+            for c in 0..8u32 {
+                if bits & (0x80 >> c) != 0 {
+                    fb.fill_rect(
+                        cx + c as i32 * sc as i32,
+                        y + r as i32 * sc as i32,
+                        sc,
+                        sc,
+                        col,
+                    );
+                }
+            }
+        }
+        cx += 8 * sc as i32;
     }
 }
 
@@ -806,7 +835,13 @@ impl TitleScene {
     fn draw_flames(&self, fb: &mut Framebuffer) {
         let pal = [BLOOD, GOLD, YELLOW];
         for x in (0..W as i32).step_by(2) {
-            fb.fill_rect(x, 0, 2, 2, pal[((x / 3 + self.ticks as i32 / 2) as usize) % 3]);
+            fb.fill_rect(
+                x,
+                0,
+                2,
+                2,
+                pal[((x / 3 + self.ticks as i32 / 2) as usize) % 3],
+            );
             fb.fill_rect(
                 x,
                 H as i32 - 2,
@@ -816,7 +851,13 @@ impl TitleScene {
             );
         }
         for y in (0..H as i32).step_by(2) {
-            fb.fill_rect(0, y, 2, 2, pal[((y / 3 + self.ticks as i32 / 2) as usize) % 3]);
+            fb.fill_rect(
+                0,
+                y,
+                2,
+                2,
+                pal[((y / 3 + self.ticks as i32 / 2) as usize) % 3],
+            );
             fb.fill_rect(
                 W as i32 - 2,
                 y,
@@ -916,8 +957,19 @@ impl TitleScene {
             } else {
                 GRAY
             };
-            draw_text_shadow(fb, x, y, spec.label, if best > 0 { WHITE } else { SILVER }, BLACK);
-            let s = if best > 0 { best.to_string() } else { "-".into() };
+            draw_text_shadow(
+                fb,
+                x,
+                y,
+                spec.label,
+                if best > 0 { WHITE } else { SILVER },
+                BLACK,
+            );
+            let s = if best > 0 {
+                best.to_string()
+            } else {
+                "-".into()
+            };
             draw_text_shadow(fb, x + 108 - s.len() as i32 * 8, y, &s, tc, BLACK);
         }
         match ls_get("doc.hof") {
@@ -937,8 +989,21 @@ impl TitleScene {
             "ENTER ERASES RECORDS"
         };
         let r = Self::fame_rect();
-        fb.rect(r.0, r.1, r.2, r.3, if self.reset_armed { BLOOD } else { STONE });
-        draw_text_shadow(fb, r.0 + 6, r.1 + 3, msg, if self.reset_armed { BLOOD } else { GRAY }, BLACK);
+        fb.rect(
+            r.0,
+            r.1,
+            r.2,
+            r.3,
+            if self.reset_armed { BLOOD } else { STONE },
+        );
+        draw_text_shadow(
+            fb,
+            r.0 + 6,
+            r.1 + 3,
+            msg,
+            if self.reset_armed { BLOOD } else { GRAY },
+            BLACK,
+        );
         self.draw_back(fb);
     }
     /// Wipe every persisted record: all sport bests and the feat ticker.
@@ -975,7 +1040,10 @@ impl TitleScene {
         fb.fill_rect(20, 158, 276, 8, BLACK);
         for (hx, hw) in [(56i32, 30i32), (100, 22)] {
             fb.fill_rect(hx, 142, hw as u32, 16, BROWN);
-            fb.tri([(hx - 4, 144), (hx + hw + 4, 144), (hx + hw / 2, 128)], OLIVE);
+            fb.tri(
+                [(hx - 4, 144), (hx + hw + 4, 144), (hx + hw / 2, 128)],
+                OLIVE,
+            );
             fb.fill_rect(hx + hw / 2 - 3, 148, 6, 10, DARKGRAY);
         }
         // flame flicker riding the rooftops
@@ -1067,7 +1135,10 @@ impl Scene for TitleScene {
         // The boot herald swallows the very first gesture (it also unlocks
         // audio one tick later in the app loop).
         if self.stage == Stage::Boot {
-            if matches!(ev, SceneEvent::Tap { .. } | SceneEvent::Key { pressed: true, .. }) {
+            if matches!(
+                ev,
+                SceneEvent::Tap { .. } | SceneEvent::Key { pressed: true, .. }
+            ) {
                 self.stage = Stage::Menu;
             }
             return;
@@ -1216,6 +1287,20 @@ impl Scene for TitleScene {
             return;
         }
         fb.clear(NAVY);
+        // T901 dusk sky: star-flecked high sky, blue horizon glow below.
+        fb.gradient_v(0, 0, W, 44, BLACK, NAVY);
+        let mut sx = 5u32;
+        while sx < W {
+            let sy = (sx * 7 + 11) % 34;
+            if !(sx > 132 && sx < 188 && sy > 16) {
+                fb.set(
+                    sx as i32,
+                    sy as i32,
+                    if (sx * 3) % 5 == 0 { SILVER } else { GRAY },
+                );
+            }
+            sx += 7;
+        }
         fb.gradient_v(0, 84, W, 126, SAXON_BLUE, NAVY);
         self.draw_flames(fb);
         // side banners flanking the menu panel, clear of the lettering
@@ -1234,7 +1319,7 @@ impl Scene for TitleScene {
         fb.fill_rect(150, 32 + bob, 3, 3, BLOOD);
         fb.fill_rect(159, 32 + bob, 3, 3, SAXON_BLUE);
         fb.fill_rect(168, 32 + bob, 3, 3, BLOOD);
-        draw_caps(fb, 24, 44, "THE CROWN ENDURES", YELLOW, BLOOD, 2);
+        draw_caps3(fb, 24, 44, "THE CROWN ENDURES", GOLD, BLACK, YELLOW, 2);
         draw_text_shadow(fb, 63, 66, "A SAXON LIBERATION", WHITE, DARKGRAY);
         match self.stage {
             Stage::Menu => {
@@ -1380,8 +1465,11 @@ pub fn main() -> Result<(), JsValue> {
                 .iter()
                 .position(|s| s.id == id)
                 .and_then(|sid| {
-                    crate::ui::host::make_game(crate::minigames::framework::SPORTS[sid].id, play_seed)
-                        .map(|g| (sid, g))
+                    crate::ui::host::make_game(
+                        crate::minigames::framework::SPORTS[sid].id,
+                        play_seed,
+                    )
+                    .map(|g| (sid, g))
                 })
         });
     let first: Box<dyn Scene> = if want_test {
@@ -1522,7 +1610,6 @@ pub fn main() -> Result<(), JsValue> {
                     // campaign underneath, no mode change.
                     st.stack.pop(Transition::Fade);
                 } else if st.stack.top_wants_leave() {
-
                     let next = match st.mode {
                         Mode::Title => {
                             let diff = match PICK.load(std::sync::atomic::Ordering::Relaxed) {
@@ -1542,8 +1629,9 @@ pub fn main() -> Result<(), JsValue> {
                         Mode::Play { diff, seed } => {
                             let seed = seed + 1;
                             st.mode = Mode::Play { diff, seed };
-                            Box::new(PlayScene::new(seed, diff).with_autoplay(query_has("autoplay=1")))
-                                as Box<dyn Scene>
+                            Box::new(
+                                PlayScene::new(seed, diff).with_autoplay(query_has("autoplay=1")),
+                            ) as Box<dyn Scene>
                         }
                     };
                     st.stack.replace(next, Transition::Fade);
@@ -1607,17 +1695,10 @@ pub fn main() -> Result<(), JsValue> {
                         ("max", round2(pct(1.0))),
                         ("frames", h.len() as f64),
                     ] {
-                        let _ = js_sys::Reflect::set(
-                            &o,
-                            &JsValue::from_str(k),
-                            &JsValue::from_f64(v),
-                        );
+                        let _ =
+                            js_sys::Reflect::set(&o, &JsValue::from_str(k), &JsValue::from_f64(v));
                     }
-                    let _ = js_sys::Reflect::set(
-                        &w().into(),
-                        &JsValue::from_str("__perf"),
-                        &o,
-                    );
+                    let _ = js_sys::Reflect::set(&w().into(), &JsValue::from_str("__perf"), &o);
                 }
             }
             if st.shot_at > 0 && st.frame >= st.shot_at && !st.shot_done {

@@ -6,7 +6,7 @@ import { coords, tap, key, px, snap, regionDiff, shot, ok, finish, problems, dec
 
 const blood = (x, y) => {
   const [r, g, b] = px(x, y);
-  return Math.abs(r - 153) <= 30 && g <= 30 && Math.abs(b - 34) <= 26;
+  return Math.abs(r - 153) <= 55 && g <= 30 && Math.abs(b - 34) <= 26;
 };
 const LANE_Y = [118, 150, 182];
 
@@ -16,17 +16,13 @@ function pipLane() {
   return null;
 }
 // left edge of the rival's caparison stripe on his rail: rx-14, rx = 86+gap
-function rivalLeft(lane) {
-  for (const y of [LANE_Y[lane] + 5, LANE_Y[lane] + 6, LANE_Y[lane] + 7]) {
+function rivalLeft(pl) {
+  for (const y of [LANE_Y[pl] + 5, LANE_Y[pl] + 6, LANE_Y[pl] + 7]) {
     for (let x = 88; x < 306; x++) if (blood(x, y)) return x;
   }
   return null;
 }
-// the results screen's gold border frame - the ONLY proof we are looking at
-// the plate; a rival galloping down the top rail crosses the white-sampling
-// band and would fake the crown tableau.
-const goldFrame = () => { const p = px(40, 56); return p[0] === 204 && p[1] === 170 && p[2] === 0; };
-let lane = 1; // the horse starts on the middle rail
+let lane = 1; // my rail index; steerTo keeps it in sync with the arrows sent
 function steerTo(target) {
   while (lane !== target) {
     if (lane < target) { key("ArrowRight"); lane++; } else { key("ArrowLeft"); lane--; }
@@ -41,37 +37,43 @@ await Bun.sleep(900);
 key("Enter"); key("Enter"); key("Enter"); // crawl -> campaign
 await Bun.sleep(900);
 
-const linAt = (x, y) => { const f = snap(); const i = (y * 320 + x) * 4; return f[i] === 204 && f[i + 1] === 204 && f[i + 2] === 153; };
-async function dismissOverlay() {
-  for (let i = 0; i < 20 && !linAt(64, 100) && !linAt(74, 70); i++) await Bun.sleep(100);
-  if (linAt(64, 100)) { tap(10, 10); await Bun.sleep(150); tap(10, 10); await Bun.sleep(150); }
-  if (linAt(74, 70)) { tap(160, 128); await Bun.sleep(150); }
-}
-async function waitTurn(target, budgetMs = 25000) {
+// Exact-plate matchers. T705 reworked the parchment palette: LINEN is
+// (187,170,119) and the CREAM map labels (221,204,153) collide with any
+// loose matcher - the Lincoln label sits on the omen probe point and fakes
+// an open modal. Match the real plate (and its scanline-dimmed rows) only.
+const linen = (x, y) => { const p = px(x, y); return (Math.abs(p[0] - 187) <= 14 && Math.abs(p[1] - 170) <= 14 && Math.abs(p[2] - 119) <= 14) || (Math.abs(p[0] - 124) <= 12 && Math.abs(p[1] - 113) <= 12 && Math.abs(p[2] - 79) <= 12); };
+const reportOpen = () => linen(64, 100) || linen(70, 92);
+const omenOpen = () => linen(74, 70) || linen(80, 76);
+// After END the map is deaf for the Norman march (ai_anim, 60 ticks that
+// stretch over seconds under jsdom's throttled rAF); taps in that window
+// die. The dawn modal opens the very tick the march ends, so the walk only
+// has to keep tapping: while deaf the taps are harmlessly ignored, once the
+// plate shows they aim at OK, and the first tap on the bare map ends the
+// round again.
+async function walkTo(target, budgetMs = 120000) {
   const t0 = Date.now();
-  while (Date.now() - t0 < budgetMs) {
-    if (decodeTurn(snap()) === target) return true;
-    await dismissQuick();
-    await Bun.sleep(100);
+  let cur = decodeTurn(snap());
+  while (cur < target && Date.now() - t0 < budgetMs) {
+    if (reportOpen()) { tap(10, 10); await Bun.sleep(150); if (reportOpen()) tap(10, 10); }
+    else if (omenOpen()) tap(160, 128);
+    else tap(...coords.END);
+    await Bun.sleep(260);
+    cur = decodeTurn(snap());
   }
-  return false;
-}
-async function dismissQuick() {
-  if (linAt(64, 100)) { tap(10, 10); await Bun.sleep(120); tap(10, 10); await Bun.sleep(120); }
-  else if (linAt(74, 70)) { tap(160, 128); await Bun.sleep(120); }
+  return cur;
 }
 
 // the deterministic draw offers the joust at TURN 22 (splitmix-scrambled)
-let want = decodeTurn(snap());
-while (want < 22) {
-  await dismissOverlay();
-  tap(...coords.END);
-  want += 1;
-  if (!(await waitTurn(want))) break;
-}
-const turn = decodeTurn(snap());
+const turn = await walkTo(22);
 ok(turn === 22, `reached turn 22 for the joust draw (got ${turn})`);
-await dismissOverlay(); // a levy/omen modal may have landed with turn 22
+// a levy/omen modal may still be on its way with turn 22: give the march
+// animation time to surface it, then clear it before touching the map.
+for (let i = 0; i < 40; i++) {
+  if (reportOpen()) { tap(10, 10); await Bun.sleep(150); if (reportOpen()) tap(10, 10); }
+  else if (omenOpen()) tap(160, 128);
+  else if (i > 14) break;
+  await Bun.sleep(150);
+}
 tap(...coords.BUCK);   // own-castle roll
 await Bun.sleep(150);
 tap(...coords.SPORTS); // the tilt opens
@@ -92,13 +94,18 @@ const t0 = Date.now();
 while (Date.now() - t0 < 60000 && !home) {
   await Bun.sleep(20);
   const f = snap();
-  // crown tableau: WHITE text on the BLACK band at y 116..129
-  let white = 0;
-  for (let y = 119; y < 127; y += 2) for (let x = 80; x < 240; x += 2) {
-    const i = (y * 320 + x) * 4;
-    if (f[i] > 200 && f[i + 1] > 200 && f[i + 2] > 200) white++;
+  // results tableau (T706 art): NAVY plate framed by full-width GOLD rows
+  // at y56/y59 and y196/y199 (the scanline between each pair is dimmed,
+  // not gold); the gallop screen scores ~3 against this, results ~470.
+  let span = 0;
+  for (const y of [56, 59, 196, 199]) {
+    for (let x = 20; x < 300; x += 2) {
+      const i = (y * 320 + x) * 4;
+      const r = f[i], g = f[i + 1], b = f[i + 2];
+      if (r >= 150 && r - g >= 20 && r - g <= 55 && g - b >= 60) span++;
+    }
   }
-  if (white > 8 && goldFrame()) crownSeen++;
+  if (span > 150) crownSeen++;
   const pl = pipLane();
   if (pl !== null) {
     pipsSeen++;

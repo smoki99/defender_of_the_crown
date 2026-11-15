@@ -12,7 +12,8 @@ use super::framework::{resolve, MgState, Minigame, SPORTS};
 use crate::campaign::rng::Xor;
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BROWN, DARKGREEN, GOLD, GREEN, NAVY, ORANGE, SILVER, TAN, WHITE, YELLOW,
+    Framebuffer, BLACK, BROWN, DARKGRAY, DARKGREEN, GOLD, GREEN, NAVY, ORANGE, SILVER, TAN, WHITE,
+    YELLOW,
 };
 use crate::engine::input::Input;
 
@@ -72,6 +73,9 @@ pub struct Falcon {
     vy: f32,
     inter: u32, // crows turned back (rescues included)
     ears_lost: [bool; CROWS],
+    poof_t: u32, // 4..1: catch-puff lifetime at (poof_x, poof_y), 0 = none
+    poof_x: i32,
+    poof_y: i32,
     state: MgState,
     rng: Xor,
 }
@@ -105,6 +109,9 @@ impl Falcon {
             vy: 0.0,
             inter: 0,
             ears_lost: [false; CROWS],
+            poof_t: 0,
+            poof_x: 0,
+            poof_y: 0,
             state: MgState::Running,
             rng: Xor::new(seed ^ 0x46_41_4C_43),
         }
@@ -181,6 +188,9 @@ impl Falcon {
     }
 
     fn fly_crows(&mut self) {
+        if self.poof_t > 0 {
+            self.poof_t -= 1; // T-UX: catch-puff clock
+        }
         for i in 0..CROWS {
             let mut c = self.crows[i];
             if c.stage >= GONE {
@@ -228,6 +238,11 @@ impl Falcon {
             if dx * dx + dy * dy < CATCH * CATCH {
                 c.stage = GONE;
                 self.inter += 1;
+                // T-UX: the prey puffs out rather than blinking out of
+                // existence silently.
+                self.poof_t = 4;
+                self.poof_x = c.x as i32;
+                self.poof_y = c.y as i32;
             }
             self.crows[i] = c;
         }
@@ -252,7 +267,9 @@ impl Falcon {
     fn draw_run(&self, fb: &mut Framebuffer) {
         // dusk field: sky, grass, standing corn
         fb.fill_rect(0, 12, 320, 244, NAVY);
+        crate::minigames::framework::dusk_sky(fb, 12, 96);
         fb.fill_rect(0, FIELD_Y, 320, (256 - FIELD_Y) as u32, DARKGREEN);
+        crate::minigames::framework::skyline(fb, FIELD_Y);
         for x in (4..320).step_by(13) {
             fb.fill_rect(x, FIELD_Y + 2, 2, 4, GREEN);
         }
@@ -271,7 +288,12 @@ impl Falcon {
         }
         // crows: black bodies with a beating wing; the haul glows corn
         let flap = (self.elapsed / 8).is_multiple_of(2);
-        for c in self.crows.iter() {
+        // T-UX: the live target (earliest crow still in play - the same
+        // crow live_crow reports) blinks its head white for 4 ticks every
+        // 30 so the next catch is identifiable.
+        let target = (0..CROWS).find(|&i| self.crows[i].stage < GONE);
+        let blink = self.elapsed % 30 < 4;
+        for (i, c) in self.crows.iter().enumerate() {
             if c.stage >= GONE {
                 continue;
             }
@@ -281,8 +303,23 @@ impl Falcon {
             fb.fill_rect(x - 6, wy, 3, 2, BLACK);
             fb.fill_rect(x + 4, wy, 3, 2, BLACK);
             fb.fill_rect(x + 4, y - 2, 2, 2, ORANGE); // beak
+            if blink && Some(i) == target {
+                fb.fill_rect(x + 2, y - 3, 2, 2, WHITE); // target head flash
+            }
             if c.stage == 2 {
                 fb.fill_rect(x - 2, y + 3, 4, 5, YELLOW); // the stolen ear
+            }
+        }
+        // T-UX: POOF - five dots around the catch point, white fading to
+        // silver then dark grey as poof_t runs out.
+        if self.poof_t > 0 {
+            let pc = match self.poof_t {
+                4 => WHITE,
+                3 => SILVER,
+                _ => DARKGRAY,
+            };
+            for (ox, oy) in [(-4, -3), (4, -2), (-3, 3), (4, 3), (0, -6)] {
+                fb.fill_rect(self.poof_x + ox, self.poof_y + oy, 2, 2, pc);
             }
         }
         // the hawk: a brown kite with tan wingtips, gliding where thrown
@@ -298,7 +335,10 @@ impl Falcon {
         fb.fill_rect(hx + 3, hy - 2, 2, 2, SILVER); // hood glint
                                                     // drop shadow keeps the flight on the field plane
         fb.fill_rect(hx - 2, FIELD_Y + 1, 5, 2, BLACK);
-        draw_text_shadow(fb, 96, 240, "CATCH THE CROWS", WHITE, BLACK);
+        if self.tick_n.saturating_sub(PRESENT) < 180 {
+            // T-UX: the prompt strip fades ~3 s into the cast (audit)
+            draw_text_shadow(fb, 96, 240, "CATCH THE CROWS", WHITE, BLACK);
+        }
     }
 }
 

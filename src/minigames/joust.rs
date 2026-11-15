@@ -8,10 +8,11 @@
 use super::framework::{resolve, MgState, Minigame, SportSpec, SPORTS};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, CREAM, DARKGRAY, DARKRED, GOLD, GRASS, GRAY, GREEN, LINEN, NAVY,
+    Framebuffer, BLACK, BLOOD, CREAM, DARKGRAY, DARKRED, GOLD, GRASS, GRAY, GREEN, LINEN,
     SAXON_BLUE, STONE, WHITE, YELLOW,
 };
-use crate::engine::input::{Input, KEY_LEFT, KEY_RIGHT, KEY_SPACE};
+use crate::engine::input::{Input, KEY_SPACE};
+use crate::minigames::framework::{lane_step, tap_action};
 
 const PRESENT: u32 = 90; // "PRESENT ARMS" banner
 const CROWN: u32 = 110; // victory / defeat tableau
@@ -43,10 +44,10 @@ pub struct Joust {
     pass: usize, // 0, then 1
     lane: usize, // player's rail, slides toward want
     want: usize,
-    gap: f32, // rival distance, px; clash near IDEAL
-    slide: f32, // rendered lane offset in lanes (fractional)
+    gap: f32,            // rival distance, px; clash near IDEAL
+    slide: f32,          // rendered lane offset in lanes (fractional)
     thrust: Option<u32>, // tick the lance left the couched rest
-    hit: [i32; 2], // per pass result: 45 perfect, 28 solid, 15 graze, -10 shorn
+    hit: [i32; 2],       // per pass result: 45 perfect, 28 solid, 15 graze, -10 shorn
     sparks: u32,
     sparks_at: (i32, i32),
     score: u32,
@@ -162,16 +163,17 @@ impl Minigame for Joust {
         }
         self.tick_n += 1;
         self.phase_t += 1;
+        let step = lane_step(input);
         if self.sparks > 0 {
             self.sparks -= 1;
         }
         match self.phase {
             Phase::Done => {}
             Phase::Present => {
-                if input.key_pressed(KEY_LEFT) {
+                if step < 0 {
                     self.want = self.want.saturating_sub(1);
                 }
-                if input.key_pressed(KEY_RIGHT) {
+                if step > 0 {
                     self.want = (self.want + 1).min(2);
                 }
                 if self.phase_t >= PRESENT {
@@ -182,15 +184,15 @@ impl Minigame for Joust {
                 }
             }
             Phase::Ride => {
-                if input.key_pressed(KEY_LEFT) {
+                if step < 0 {
                     self.want = self.want.saturating_sub(1);
                 }
-                if input.key_pressed(KEY_RIGHT) {
+                if step > 0 {
                     self.want = (self.want + 1).min(2);
                 }
                 self.gap -= SPEED * dt;
                 // the lance: one commit per pass; judgement waits for it
-                if input.key_pressed(KEY_SPACE) && self.thrust.is_none() {
+                if tap_action(input, KEY_SPACE) && self.thrust.is_none() {
                     self.thrust = Some(self.tick_n);
                     self.judge();
                     self.phase = Phase::Clash;
@@ -218,10 +220,10 @@ impl Minigame for Joust {
             }
             Phase::Return => {
                 // the lists are chosen on the way back; slide is live
-                if input.key_pressed(KEY_LEFT) {
+                if step < 0 {
                     self.want = self.want.saturating_sub(1);
                 }
-                if input.key_pressed(KEY_RIGHT) {
+                if step > 0 {
                     self.want = (self.want + 1).min(2);
                 }
                 if self.phase_t >= TURN {
@@ -252,15 +254,27 @@ impl Minigame for Joust {
 impl Joust {
     fn paint(&self, fb: &mut Framebuffer) {
         // ---- lists: sky, crowd stand, tiltyard --------------------------
-        fb.fill_rect(0, 0, 320, 34, NAVY);
+        crate::minigames::framework::dusk_sky(fb, 0, 34);
+        crate::minigames::framework::skyline(fb, 34);
         fb.fill_rect(0, 34, 320, 26, STONE); // stands
         for x in (4..316).step_by(6) {
-            let c = [BLOOD, GOLD, SAXON_BLUE, LINEN][(((x / 6) as u32 + self.tick_n / 24) % 4) as usize];
+            let c = [BLOOD, GOLD, SAXON_BLUE, LINEN]
+                [(((x / 6) as u32 + self.tick_n / 24) % 4) as usize];
             fb.fill_rect(x, 40 + (x / 6) % 3, 2, 3, c);
         }
         fb.fill_rect(0, 60, 320, 22, DARKRED); // banner rail
         for x in (0..320).step_by(16) {
-            fb.fill_rect(x, 62, 8, 18, if (x / 16 + self.pass as i32) % 2 == 0 { BLOOD } else { SAXON_BLUE });
+            fb.fill_rect(
+                x,
+                62,
+                8,
+                18,
+                if (x / 16 + self.pass as i32) % 2 == 0 {
+                    BLOOD
+                } else {
+                    SAXON_BLUE
+                },
+            );
         }
         fb.fill_rect(0, 82, 320, 174, GRASS);
         // three lists (rails)
@@ -291,34 +305,63 @@ impl Joust {
         if self.sparks > 0 {
             let (sx, sy) = self.sparks_at;
             for k in 0..5 {
-                fb.fill_rect(sx + k * 2 - 4 + self.sparks as i32 / 3, sy + (k - 2) * 2, 2, 2, YELLOW);
+                fb.fill_rect(
+                    sx + k * 2 - 4 + self.sparks as i32 / 3,
+                    sy + (k - 2) * 2,
+                    2,
+                    2,
+                    YELLOW,
+                );
             }
         }
 
         // ---- HUD --------------------------------------------------------
-        fb.fill_rect(0, 0, 320, 12, BLACK);
-        draw_text_shadow(fb, 4, 2, "TOURNAMENT", GOLD, BLACK);
+        // HUD counters live at y>=14: the host band owns rows 0-11.
         draw_text_shadow(
             fb,
-            118,
-            2,
-            if self.pass == 0 { "PASS 1/2" } else { "PASS 2/2" },
+            4,
+            14,
+            if self.pass == 0 {
+                "PASS 1/2"
+            } else {
+                "PASS 2/2"
+            },
             WHITE,
             BLACK,
         );
-        draw_text_shadow(fb, 210, 2, &format!("LANCE {}", self.score), WHITE, BLACK);
+        draw_text_shadow(fb, 100, 14, &format!("LANCE {}", self.score), WHITE, BLACK);
         // the lane the rival rides, telegraphed plainly (SPEC: aim the lane)
-        draw_text_shadow(fb, 4, 246, "RIVAL RIDES -", WHITE, BLACK);
+        draw_text_shadow(fb, 4, 246, "RIVAL", WHITE, BLACK);
         for i in 0..3usize {
-            fb.fill_rect(104 + i as i32 * 12, 246, 8, 8, if i == self.rival_lane(self.pass) && self.phase != Phase::Present { BLOOD } else { GRAY });
+            fb.fill_rect(
+                104 + i as i32 * 12,
+                246,
+                8,
+                8,
+                if i == self.rival_lane(self.pass) && self.phase != Phase::Present {
+                    BLOOD
+                } else {
+                    GRAY
+                },
+            );
         }
-        draw_text_shadow(fb, 150, 246, "SPACE AT THE TILT", WHITE, BLACK);
+        // own wanted lane, outlined the instant the arrow/swipe lands -
+        // before this the choice painted nothing until the Ride phase.
+        draw_text_shadow(fb, 146, 246, "YOURS", GOLD, BLACK);
+        for i in 0..3usize {
+            let x = 192 + i as i32 * 12;
+            if i == self.want {
+                fb.fill_rect(x, 246, 8, 8, GOLD);
+            } else {
+                fb.rect(x, 246, 8, 8, GRAY);
+            }
+        }
 
         // ---- phase banners ---------------------------------------------
         match self.phase {
             Phase::Present => {
                 banner(fb, "PRESENT ARMS");
-                banner2(fb, "ARROWS TO MATCH, SPACE TO LANCE");
+                banner2(fb, "ARROWS/SWIPE LANE - SPACE/TAP LANCE");
             }
             Phase::Clash => {
                 let h = self.hit[self.pass];
@@ -352,8 +395,20 @@ impl Joust {
         let tack = if rival { BLOOD } else { SAXON_BLUE };
         let bob = ((self.tick_n / 6) % 2) as i32;
         // horse
-        fb.fill_rect(x - 14, y + 2 + bob, 26, 8, if rival { DARKRED } else { LINEN });
-        fb.fill_rect(x + (if rival { -20 } else { 10 }), y - 2 + bob, 8, 8, if rival { DARKRED } else { LINEN });
+        fb.fill_rect(
+            x - 14,
+            y + 2 + bob,
+            26,
+            8,
+            if rival { DARKRED } else { LINEN },
+        );
+        fb.fill_rect(
+            x + (if rival { -20 } else { 10 }),
+            y - 2 + bob,
+            8,
+            8,
+            if rival { DARKRED } else { LINEN },
+        );
         fb.fill_rect(x - 10, y + 10, 3, 8, if rival { DARKRED } else { LINEN });
         fb.fill_rect(x + 6, y + 10, 3, 8, if rival { DARKRED } else { LINEN });
         // knight + plume

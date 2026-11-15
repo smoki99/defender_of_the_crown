@@ -10,7 +10,7 @@
 //! Ruffians time and place themselves; the seed's only dice is where
 //! the barmaid returns after a foul.
 
-use super::framework::{resolve, MgState, Minigame, SPORTS};
+use super::framework::{lane_step, resolve, tap_action, MgState, Minigame, SPORTS};
 use crate::campaign::rng::Xor;
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
@@ -78,9 +78,9 @@ struct Barmaid {
 pub struct Tavern {
     tick_n: u32,
     phase: Phase,
-    wave: usize, // 1..=3
-    wave_ko: usize, // rogues down in the current wave
-    gap: u32, // inter-wave / spawn countdown
+    wave: usize,     // 1..=3
+    wave_ko: usize,  // rogues down in the current wave
+    gap: u32,        // inter-wave / spawn countdown
     to_spawn: usize, // rogues of this wave still offstage
     rf: [Rogue; ROGUES],
     ko: u32,
@@ -88,7 +88,7 @@ pub struct Tavern {
     face: i32,
     stun: u32,
     p_cd: u32,
-    p_fx: u8, // fist-out frames
+    p_fx: u8,    // fist-out frames
     held: usize, // NO_R, or the rogue overhead
     barrels: [Barrel; 3],
     maid: Barmaid,
@@ -130,8 +130,14 @@ impl Tavern {
             held: NO_R,
             barrels: [
                 Barrel { x: 90.0, roll: 0.0 },
-                Barrel { x: 200.0, roll: 0.0 },
-                Barrel { x: 240.0, roll: 0.0 },
+                Barrel {
+                    x: 200.0,
+                    roll: 0.0,
+                },
+                Barrel {
+                    x: 240.0,
+                    roll: 0.0,
+                },
             ],
             maid: Barmaid {
                 x: 120.0,
@@ -294,12 +300,20 @@ impl Tavern {
             }
             return;
         }
+        // T-UX: arrows hold to walk (unchanged); E/W swipes step the same
+        // way (audit: movement was keyboard-only)
         if input.key_down(KEY_LEFT) {
             self.px -= P_SPEED;
             self.face = -1;
         } else if input.key_down(KEY_RIGHT) {
             self.px += P_SPEED;
             self.face = 1;
+        } else {
+            let step = lane_step(input);
+            if step != 0 {
+                self.px += step as f32 * 24.0; // one swipe = one stride
+                self.face = step.signum();
+            }
         }
         self.px = self.px.clamp(P_MIN, P_MAX);
         if self.p_fx > 0 {
@@ -307,7 +321,7 @@ impl Tavern {
         }
         if self.p_cd > 0 {
             self.p_cd -= 1;
-        } else if input.key_pressed(KEY_SPACE) {
+        } else if tap_action(input, KEY_SPACE) {
             self.punch();
         }
     }
@@ -437,7 +451,11 @@ impl Tavern {
                 self.maid.gone = false;
                 self.maid.floor = false;
                 self.maid.timer = BM_COUNTER;
-                self.maid.x = if self.rng.next_u64() & 1 == 0 { 60.0 } else { 220.0 };
+                self.maid.x = if self.rng.next_u64() & 1 == 0 {
+                    60.0
+                } else {
+                    220.0
+                };
                 self.maid.dir = if self.maid.x < 160.0 { 0.6 } else { -0.6 };
             }
         } else {
@@ -449,7 +467,11 @@ impl Tavern {
             }
             if self.maid.timer == 0 {
                 self.maid.floor = !self.maid.floor;
-                self.maid.timer = if self.maid.floor { BM_FLOOR } else { BM_COUNTER };
+                self.maid.timer = if self.maid.floor {
+                    BM_FLOOR
+                } else {
+                    BM_COUNTER
+                };
             }
         }
         if self.flash > 0 {
@@ -572,7 +594,10 @@ impl Tavern {
         }
         // room notes
         draw_text_shadow(fb, 4, 240, &format!("WAVE {}/3", self.wave), WHITE, BLACK);
-        draw_text_shadow(fb, 110, 240, "PUNCH: SPACE", WHITE, BLACK);
+        if self.tick_n.saturating_sub(PRESENT) < 180 {
+            // T-UX: the punch strip fades out ~3 s into the brawl
+            draw_text_shadow(fb, 110, 240, "PUNCH: SPACE", WHITE, BLACK);
+        }
         draw_text_shadow(
             fb,
             250,

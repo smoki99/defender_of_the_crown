@@ -54,14 +54,23 @@ impl Sim {
     }
     /// Sight to (x, y) and loose one shaft this frame.
     fn loose(&mut self, g: &mut Rampart, x: i32, y: i32) {
-        self.frame(
-            g,
-            &[Raw::Move { x, y }, Raw::Down { x, y }],
-        );
+        self.frame(g, &[Raw::Move { x, y }, Raw::Down { x, y }]);
         self.frame(g, &[Raw::Up { x, y }]);
     }
     fn tap_space(&mut self, g: &mut Rampart) {
-        self.frame(g, &[Raw::Key { code: KEY_SPACE, pressed: true }, Raw::Key { code: KEY_SPACE, pressed: false }]);
+        self.frame(
+            g,
+            &[
+                Raw::Key {
+                    code: KEY_SPACE,
+                    pressed: true,
+                },
+                Raw::Key {
+                    code: KEY_SPACE,
+                    pressed: false,
+                },
+            ],
+        );
     }
 }
 
@@ -82,7 +91,10 @@ fn an_idle_watch_is_overrun() {
     let mut sim = Sim::new();
     run_until(&mut g, &mut sim, |_| false);
     assert!(g.breaches() >= 3, "a passive wall must be breached thrice");
-    assert!(matches!(g.state(), MgState::Lost), "three breaches lose the castle");
+    assert!(
+        matches!(g.state(), MgState::Lost),
+        "three breaches lose the castle"
+    );
 }
 
 #[test]
@@ -176,7 +188,11 @@ fn the_same_seed_layeth_the_same_siege() {
             g.rocks_left(),
         )
     };
-    assert_eq!(snapshot(999), snapshot(999), "the siege must replay identically");
+    assert_eq!(
+        snapshot(999),
+        snapshot(999),
+        "the siege must replay identically"
+    );
 }
 
 /// A flawless watch: stones on fat parties, lead-shots on every climber.
@@ -238,8 +254,7 @@ fn perfect_watch(g: &mut Rampart, sim: &mut Sim) {
                     let (cx, cy) = g.climber_xy(w, c).unwrap();
                     let lane = g.runner_xy(w, 0).map(|(_, y)| y).unwrap_or(cy + 60.0);
                     let rate = (lane - TOP_Y) / CLIMB_TICKS;
-                    let flight =
-                        ((cx - BOW.0).powi(2) + (cy - BOW.1).powi(2)).sqrt() / ARROW_SPD;
+                    let flight = ((cx - BOW.0).powi(2) + (cy - BOW.1).powi(2)).sqrt() / ARROW_SPD;
                     sim.loose(g, cx as i32, (cy - flight * rate) as i32);
                     acted = true;
                 }
@@ -257,8 +272,16 @@ fn a_flawless_watch_earneth_gold() {
     let mut g = Rampart::new(7);
     let mut sim = Sim::new();
     perfect_watch(&mut g, &mut sim);
-    assert!(!matches!(g.state(), MgState::Lost), "flawless watch lost ({} breaches)", g.breaches());
-    assert!(g.score() >= 90, "flawless watch scored {} < gold line", g.score());
+    assert!(
+        !matches!(g.state(), MgState::Lost),
+        "flawless watch lost ({} breaches)",
+        g.breaches()
+    );
+    assert!(
+        g.score() >= 90,
+        "flawless watch scored {} < gold line",
+        g.score()
+    );
     assert!(
         matches!(g.state(), MgState::Won(Tier::Gold)),
         "flawless watch did not resolve Gold: {:?}",

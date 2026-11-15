@@ -137,7 +137,11 @@ fn sports_gate_is_the_meet_and_the_fee() {
     let sports = btn(&action_rects(true, false), "sports").clone();
     let (cx, cy) = center(&sports);
     let mut fb = Framebuffer::new();
-    let held = sport_pick(ui.g.turn, ((ui.g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15).is_some();
+    let held = sport_pick(
+        ui.g.turn,
+        ((ui.g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15,
+    )
+    .is_some();
     assert!(held, "the season posts a meet");
     ui.draw(&mut fb);
     assert_ne!(

@@ -2,8 +2,8 @@
 //! in six waves along the curtain; loose arrows in the wall-walk quiver
 //! (they re-gather off the field), and two carts of rocks wait on the
 //! battlements for the fat of a climbing party. Aim with the mouse, loose
-//! with the button, tip the rocks with SPACE. Three men over the wall and
-//! the castle is lost.
+//! with the button, tip the rocks with SPACE or a drag. Three men over
+//! the wall and the castle is lost.
 //!
 //! Geometry: the curtain face is the strip `WALL_X0..=WALL_X1`; a ladder
 //! marches in along its lane row (`LANES`, far row first) from the right
@@ -14,10 +14,10 @@
 use super::framework::{resolve, MgState, Minigame, SportSpec, SPORTS};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BROWN, CREAM, DARKGRAY, GOLD, GRAY, GRAY3, GREEN, LINEN, NAVY,
-    NORMAN_RED, RED, SAXON_BLUE, SILVER, STONE, TAN, WHITE,
+    Framebuffer, BLACK, BROWN, CREAM, DARKGRAY, GOLD, GRAY, GRAY3, GREEN, LINEN, NAVY, NORMAN_RED,
+    RED, SAXON_BLUE, SILVER, STONE, TAN, WHITE,
 };
-use crate::engine::input::{Input, KEY_SPACE};
+use crate::engine::input::{Gesture, Input, KEY_SPACE};
 
 const PRESENT: u32 = 90; // "TO THE WALL" banner
 const TABLEAU: u32 = 100; // results beat before Done
@@ -78,7 +78,7 @@ struct Ladder {
     state: LState,
     t: u32,
     lane: f32,
-    x: f32, // current march position of the team
+    x: f32,            // current march position of the team
     runner: [bool; 2], // still marching/alive
     climber: [bool; 3],
     fell: bool, // rocks broke the ladder
@@ -358,7 +358,10 @@ impl Rampart {
         // nearest planted ladder to the sight
         let mut best: Option<(usize, f32)> = None;
         for (i, l) in self.ladders.iter().enumerate() {
-            if matches!(l.state, LState::Unborn | LState::March | LState::Held | LState::Breached) {
+            if matches!(
+                l.state,
+                LState::Unborn | LState::March | LState::Held | LState::Breached
+            ) {
                 continue;
             }
             let dy = self.sight.1.clamp(TOP_Y, l.lane) - self.sight.1;
@@ -372,9 +375,12 @@ impl Rampart {
             self.plate("NO LADDER IN REACH");
             return;
         };
-        if let Some(slot) = self.rocks.iter().position(|r| !r.live && r.lane == i).or_else(|| {
-            self.rocks.iter().position(|r| !r.live)
-        }) {
+        if let Some(slot) = self
+            .rocks
+            .iter()
+            .position(|r| !r.live && r.lane == i)
+            .or_else(|| self.rocks.iter().position(|r| !r.live))
+        {
             self.rocks[slot] = Rock {
                 live: true,
                 lane: i,
@@ -418,7 +424,11 @@ impl Rampart {
             if repelled {
                 self.score += W_REPEL;
             }
-            self.plate = if had { "LADDER SHATTERED" } else { "A WASTED ROCK" };
+            self.plate = if had {
+                "LADDER SHATTERED"
+            } else {
+                "A WASTED ROCK"
+            };
             self.plate_t = 30;
             rock.live = false;
         }
@@ -534,14 +544,20 @@ impl Minigame for Rampart {
             Phase::Run => {
                 self.tick_n += 1;
                 let (mx, my, _) = input.mouse();
-                self.sight = (
-                    (mx as f32).clamp(4.0, 316.0),
-                    (my as f32).clamp(4.0, 252.0),
-                );
+                self.sight = ((mx as f32).clamp(4.0, 316.0), (my as f32).clamp(4.0, 252.0));
                 if input.pressed() {
                     self.loose();
                 }
-                if input.key_pressed(KEY_SPACE) {
+                // T-UX: SPACE or a DRAG tips the rock at the finger (audit:
+                // rock drop was keyboard-only). A tap stays reserved for
+                // loosing arrows - reusing it here would drop a rock on
+                // every single click.
+                if input.key_pressed(KEY_SPACE)
+                    || input
+                        .gestures()
+                        .iter()
+                        .any(|g| matches!(g, Gesture::DragEnd { .. }))
+                {
                     self.drop_rock();
                 }
                 self.fly();
@@ -580,7 +596,13 @@ impl Rampart {
             fb.fill_rect(72, y - 2, 248, 5, if i % 2 == 0 { GREEN } else { DARKGRAY });
         }
         // the curtain ---------------------------------------------------------
-        fb.fill_rect(WALL_X0, 24, (WALL_X1 - WALL_X0) as u32, GROUND_Y as u32, STONE);
+        fb.fill_rect(
+            WALL_X0,
+            24,
+            (WALL_X1 - WALL_X0) as u32,
+            GROUND_Y as u32,
+            STONE,
+        );
         for x in (WALL_X0..WALL_X1).step_by(6) {
             fb.fill_rect(x, 24, 4, 8, STONE);
             fb.fill_rect(x + 2, 28, 2, 4, BLACK);
@@ -655,13 +677,7 @@ impl Rampart {
         for a in self.arrows.iter().filter(|a| a.live) {
             let (ax, ay) = (a.x as i32, a.y as i32);
             fb.fill_rect(ax - 1, ay - 1, 2, 2, WHITE);
-            fb.fill_rect(
-                (a.x - a.vx) as i32,
-                (a.y - a.vy) as i32,
-                1,
-                1,
-                LINEN,
-            );
+            fb.fill_rect((a.x - a.vx) as i32, (a.y - a.vy) as i32, 1, 1, LINEN);
         }
         // the sight -------------------------------------------------------------
         if self.phase != Phase::Board && self.phase != Phase::Done {
@@ -673,12 +689,12 @@ impl Rampart {
             fb.fill_rect(sx, sy, 1, 1, RED);
         }
         // HUD ---------------------------------------------------------------------
-        draw_text_shadow(fb, 4, 2, "DEFEND", GOLD, BLACK);
-        draw_text_shadow(fb, 72, 2, &format!("ARROWS {}", self.quiver), CREAM, BLACK);
+        // HUD counters live at y>=14: the host band owns rows 0-11.
+        draw_text_shadow(fb, 4, 14, &format!("ARROWS {}", self.quiver), CREAM, BLACK);
         draw_text_shadow(
             fb,
             180,
-            2,
+            14,
             &format!("ROCKS {}", self.rocks_left),
             CREAM,
             BLACK,
@@ -718,7 +734,18 @@ impl Rampart {
                 } else {
                     "THE CASTLE HOLDS"
                 };
-                draw_text_shadow(fb, 84, 84, msg, if self.state == MgState::Lost { RED } else { GOLD }, BLACK);
+                draw_text_shadow(
+                    fb,
+                    84,
+                    84,
+                    msg,
+                    if self.state == MgState::Lost {
+                        RED
+                    } else {
+                        GOLD
+                    },
+                    BLACK,
+                );
             }
             Phase::Done => {
                 let s = self.score.max(0) as u32;

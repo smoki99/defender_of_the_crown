@@ -43,7 +43,13 @@ impl Sim {
         }
     }
     fn hold(&mut self, g: &mut Tavern, code: u32) {
-        self.frame(g, &[Raw::Key { code, pressed: true }]);
+        self.frame(
+            g,
+            &[Raw::Key {
+                code,
+                pressed: true,
+            }],
+        );
     }
     fn stop(&mut self, g: &mut Tavern) {
         self.frame(
@@ -201,10 +207,7 @@ fn punch_staggers_grabs_hurls() {
     assert_eq!(g.held(), Some(t), "a punch on a stagger grabs");
     // three: hurl him at a wall
     let (px, _) = g.px();
-    sim.hold(
-        &mut g,
-        if px < 160.0 { KEY_LEFT } else { KEY_RIGHT },
-    );
+    sim.hold(&mut g, if px < 160.0 { KEY_LEFT } else { KEY_RIGHT });
     sim.stop(&mut g);
     sim.tap(&mut g);
     assert_eq!(g.held(), None, "the grip is gone once hurled");
@@ -249,7 +252,7 @@ fn stun_drops_the_grip() {
 fn barrel_flattens_the_line() {
     let (mut sim, mut g) = open_run(11);
     let t = wait_live(&mut sim, &mut g); // through the left door
-    // stand right of the middle barrel (x = 200) and kick it left into the line
+                                         // stand right of the middle barrel (x = 200) and kick it left into the line
     for _ in 0..120 {
         let (px, _) = g.px();
         if px > 206.0 {

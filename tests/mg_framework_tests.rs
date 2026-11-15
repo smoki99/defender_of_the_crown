@@ -254,11 +254,7 @@ fn draw_covers_every_sport() {
     }
     for s in SPORTS {
         if s.unlock_turn != u32::MAX {
-            assert!(
-                seen.contains(&s.id),
-                "{} never drawn in 400 seasons",
-                s.id
-            );
+            assert!(seen.contains(&s.id), "{} never drawn in 400 seasons", s.id);
         }
     }
 }

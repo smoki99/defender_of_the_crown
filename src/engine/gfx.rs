@@ -8,41 +8,44 @@ use std::sync::LazyLock;
 pub const W: u32 = 320;
 pub const H: u32 = 256;
 
-/// 32-color Amiga-like palette (OCS ham6-flavoured steps + game ramps).
-/// Index 0 is black (sprite-mask convention later reuses 0 as transparent).
+/// 32-color master palette, Sachs-style: five hue families built as shade
+/// ramps (sea teal, meadow/forest green, earth sienna, warm stone, gold),
+/// one bright accent (EMBER) and paper neutrals. Every channel is a
+/// multiple of 17 - representable exactly in the Amiga's 12-bit registers.
+/// Dark-atmosphere by design: no pure primaries, off-white highlights.
 pub const PALETTE: [[u8; 3]; 32] = [
-    [0, 0, 0],       // 0  BLACK
-    [17, 34, 85],    // 1  NAVY
-    [0, 68, 170],    // 2  BLUE (Saxon)
-    [85, 170, 255],  // 3  LIGHTBLUE
-    [0, 85, 0],      // 4  DARKGREEN
-    [34, 136, 34],   // 5  GREEN
-    [68, 170, 170],  // 6  TEAL
-    [128, 224, 224], // 7  CYAN
-    [102, 0, 0],     // 8  DARKRED
-    [187, 17, 17],   // 9  RED (Norman)
-    [153, 0, 34],    // 10 BLOOD
-    [238, 128, 162], // 11 PINK
-    [85, 51, 17],    // 12 BROWN
-    [221, 119, 0],   // 13 ORANGE
-    [187, 153, 102], // 14 TAN
-    [255, 187, 170], // 15 PEACH
-    [51, 51, 51],    // 16 DARKGRAY
-    [102, 102, 102], // 17 GRAY
-    [153, 153, 153], // 18 GRAY2
-    [187, 187, 187], // 19 GRAY3
-    [221, 221, 221], // 20 SILVER
-    [255, 255, 255], // 21 WHITE
-    [204, 170, 0],   // 22 GOLD
-    [255, 238, 68],  // 23 YELLOW
-    [119, 119, 0],   // 24 OLIVE
-    [153, 204, 255], // 25 SKY
-    [17, 51, 102],   // 26 DEEPWATER
-    [102, 170, 68],  // 27 GRASS
-    [136, 119, 102], // 28 STONE
-    [255, 244, 204], // 29 CREAM
-    [204, 204, 153], // 30 LINEN
-    [255, 136, 0],   // 31 EMBER
+    [0, 0, 0],       // 0  BLACK (sprite-mask / void)
+    [17, 34, 68],    // 1  NAVY
+    [51, 102, 153],  // 2  SAXON_BLUE
+    [136, 170, 204], // 3  LIGHTBLUE
+    [34, 51, 17],    // 4  DARKGREEN
+    [68, 102, 34],   // 5  GREEN
+    [51, 119, 119],  // 6  TEAL
+    [102, 170, 170], // 7  CYAN
+    [85, 17, 17],    // 8  DARKRED
+    [153, 34, 17],   // 9  RED (Norman)
+    [119, 17, 26],   // 10 BLOOD
+    [204, 136, 119], // 11 PINK
+    [51, 34, 17],    // 12 BROWN
+    [153, 85, 34],   // 13 ORANGE (sienna: highlands & embers)
+    [204, 170, 102], // 14 TAN (coast sand)
+    [221, 170, 119], // 15 PEACH
+    [34, 34, 34],    // 16 DARKGRAY
+    [85, 77, 68],    // 17 GRAY (dark stone)
+    [136, 128, 111], // 18 GRAY2
+    [170, 162, 136], // 19 GRAY3 (stone highlight)
+    [204, 204, 187], // 20 SILVER
+    [238, 238, 221], // 21 WHITE (off-white)
+    [187, 153, 51],  // 22 GOLD (ochre)
+    [238, 204, 119], // 23 YELLOW (pale gold)
+    [136, 119, 34],  // 24 OLIVE (dark gold)
+    [85, 153, 204],  // 25 SKY (cerulean)
+    [17, 51, 68],    // 26 DEEPWATER
+    [102, 136, 51],  // 27 GRASS (lowland)
+    [119, 111, 102], // 28 STONE
+    [221, 204, 153], // 29 CREAM (parchment)
+    [187, 170, 119], // 30 LINEN (dark parchment)
+    [238, 136, 34],  // 31 EMBER (single saturated accent)
 ];
 
 pub const BLACK: u8 = 0;

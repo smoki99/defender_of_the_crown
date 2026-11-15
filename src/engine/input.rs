@@ -294,6 +294,11 @@ impl Input {
     pub fn drag_travel(&self) -> i32 {
         self.stroke_max
     }
+    /// Push a gesture recognised elsewhere (e.g. a swipe classified by the
+    /// app-level dispatcher) straight into this frame's gesture list.
+    pub fn inject_gesture(&mut self, g: Gesture) {
+        self.gestures.push(g);
+    }
     pub fn gestures(&self) -> &[Gesture] {
         &self.gestures
     }

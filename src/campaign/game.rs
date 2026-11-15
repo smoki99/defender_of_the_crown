@@ -401,10 +401,16 @@ impl GameState {
             }
             self.push_log(format!("SPIES REPORT FROM {name}."));
             if self.rng.below(100) < 10 {
-                let skip: &[EventKind] =
-                    if self.dragon_seen { &[EventKind::DragonLair] } else { &[] };
-                self.tip =
-                    Some(EventKind::roll_excluding(&mut self.event_rng, self.turn + 1, skip));
+                let skip: &[EventKind] = if self.dragon_seen {
+                    &[EventKind::DragonLair]
+                } else {
+                    &[]
+                };
+                self.tip = Some(EventKind::roll_excluding(
+                    &mut self.event_rng,
+                    self.turn + 1,
+                    skip,
+                ));
                 self.push_log("A SERVANT MURMURS OF TOMORROW.");
             }
             Ok(true)
@@ -799,7 +805,10 @@ impl GameState {
         let n = self.ids_of(Faction::Norman).len();
         if s == n {
             if even {
-                self.push_log("TURN XC. THE CHRONICLE RECORDS AN EVEN TALE - THE WAR DRAGGETH ON.".to_string());
+                self.push_log(
+                    "TURN XC. THE CHRONICLE RECORDS AN EVEN TALE - THE WAR DRAGGETH ON."
+                        .to_string(),
+                );
                 return;
             }
             // Two even tales must not leave a war without an ending: from
@@ -829,19 +838,17 @@ impl GameState {
         };
         self.over = Some(w);
         let c = s.max(n);
-        self.push_log(
-            if even {
-                if w == PLAYER {
-                    "TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES THINE. VICTORY!".to_string()
-                } else {
-                    "TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES HIS. DEFEAT.".to_string()
-                }
-            } else if w == PLAYER {
-                format!("THE CHRONICLE DECIDETH: {c} CASTLES THINE. VICTORY!")
+        self.push_log(if even {
+            if w == PLAYER {
+                "TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES THINE. VICTORY!".to_string()
             } else {
-                format!("THE CHRONICLE DECIDETH: {c} CASTLES HIS. DEFEAT!")
+                "TURN XC. THE CHRONICLE DECIDETH: {c} CASTLES HIS. DEFEAT.".to_string()
             }
-        );
+        } else if w == PLAYER {
+            format!("THE CHRONICLE DECIDETH: {c} CASTLES THINE. VICTORY!")
+        } else {
+            format!("THE CHRONICLE DECIDETH: {c} CASTLES HIS. DEFEAT!")
+        });
     }
 
     /// Coronation (SPEC 5.6): London's lord with eight shires bows all.
@@ -910,7 +917,11 @@ impl GameState {
     /// the dice exactly once. Both factions suffer - and profit - equally.
     pub fn roll_events(&mut self) {
         self.dragon_offer = false; // an offer unseen dies with the old season
-        let skip: &[EventKind] = if self.dragon_seen { &[EventKind::DragonLair] } else { &[] };
+        let skip: &[EventKind] = if self.dragon_seen {
+            &[EventKind::DragonLair]
+        } else {
+            &[]
+        };
         let e = self
             .tip
             .take()
@@ -1206,7 +1217,9 @@ impl GameState {
         if tier == Tier::Gold {
             self.push_log("THE HOARD IS ROBBED! THE CROWN GLEAMETH WITH DOUBLE SPOILS.");
         } else {
-            self.push_log(format!("FROM THE HOARD: {tier:?} SPOILS, DOUBLE THE TOURNEY HAUL."));
+            self.push_log(format!(
+                "FROM THE HOARD: {tier:?} SPOILS, DOUBLE THE TOURNEY HAUL."
+            ));
         }
         Ok((tier, r))
     }

@@ -98,7 +98,10 @@ fn stone_clamps_the_runner() {
     for _ in 0..200 {
         walk(&mut sim, &mut g, &[KEY_UP], &mut held);
     }
-    assert!((g.player().1 - 148.8).abs() < 0.01, "held against the stone");
+    assert!(
+        (g.player().1 - 148.8).abs() < 0.01,
+        "held against the stone"
+    );
     assert_eq!(g.player().0, 24.0, "no drift");
 
     // west into the outer wall: the box clamps at 20.8
@@ -140,8 +143,8 @@ fn a_catch_seizes_champion_and_baron() {
     let mut g = Maze::new(13);
     sim.idle(&mut g, PRESENT);
 
-        // free the baron — the upper-middle street stays clear of his door
-        sim.idle(&mut g, 30);
+    // free the baron — the upper-middle street stays clear of his door
+    sim.idle(&mut g, 30);
     g.debug_place(280.0, 24.0);
     sim.idle(&mut g, 2);
     assert!(g.freed() && g.score() == 20);
@@ -186,7 +189,7 @@ fn c(cx: f32, cy: f32) -> (f32, f32) {
 /// The four gaoler beats in pixels — must mirror `GUARDS` in the module.
 const BEATS: [((f32, f32), (f32, f32)); 4] = [
     ((120.0, 120.0), (248.0, 120.0)), // mid street
-    ((216.0, 56.0), (248.0, 56.0)), // upper middle street
+    ((216.0, 56.0), (248.0, 56.0)),   // upper middle street
     ((88.0, 216.0), (264.0, 216.0)),  // bottom street
     ((56.0, 24.0), (248.0, 24.0)),    // top street
 ];
@@ -259,13 +262,16 @@ fn scripted_rescue_rides_gold() {
         (
             vec![
                 c(17.0, 11.0),
-                c(17.0, 1.0),  // up the column — torch I sits on it at (17,7)
+                c(17.0, 1.0), // up the column — torch I sits on it at (17,7)
                 c(17.0, 2.0),
-                c(18.0, 2.0),  // the nook: clear of every beat
+                c(18.0, 2.0), // the nook: clear of every beat
             ],
             false,
         ),
-        (vec![c(17.0, 2.0), c(17.0, 11.0), c(1.0, 11.0), c(1.0, 13.0)], true),
+        (
+            vec![c(17.0, 2.0), c(17.0, 11.0), c(1.0, 11.0), c(1.0, 13.0)],
+            true,
+        ),
     ];
 
     let mut sim = Sim::new();
@@ -323,7 +329,12 @@ fn scripted_rescue_rides_gold() {
             }
         }
         if _step % 200 == 0 {
-            eprintln!("t{_step} run{run} wpi{wpi} dep{departing} fright{} score{} pos{:?}", g.fright(), g.score(), g.player());
+            eprintln!(
+                "t{_step} run{run} wpi{wpi} dep{departing} fright{} score{} pos{:?}",
+                g.fright(),
+                g.score(),
+                g.player()
+            );
         }
         match g.state() {
             MgState::Won(_) | MgState::Lost => break,

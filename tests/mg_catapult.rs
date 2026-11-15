@@ -15,7 +15,11 @@ struct Sim {
 
 impl Sim {
     fn new() -> Self {
-        Self { inp: Input::new(), fb: Framebuffer::new(), frame: 0 }
+        Self {
+            inp: Input::new(),
+            fb: Framebuffer::new(),
+            frame: 0,
+        }
     }
     /// One 60 Hz frame; queued events land as this frame's edges.
     fn frame(&mut self, g: &mut Catapult, events: &[Raw]) {
@@ -33,9 +37,25 @@ impl Sim {
             if (g.angle() - target).abs() < 0.01 {
                 return;
             }
-            let k = if g.angle() > target { KEY_LEFT } else { KEY_RIGHT };
-            self.frame(g, &[Raw::Key { code: k, pressed: true }]);
-            self.frame(g, &[Raw::Key { code: k, pressed: false }]);
+            let k = if g.angle() > target {
+                KEY_LEFT
+            } else {
+                KEY_RIGHT
+            };
+            self.frame(
+                g,
+                &[Raw::Key {
+                    code: k,
+                    pressed: true,
+                }],
+            );
+            self.frame(
+                g,
+                &[Raw::Key {
+                    code: k,
+                    pressed: false,
+                }],
+            );
         }
         panic!("angle {} unreachable", target);
     }
@@ -44,8 +64,14 @@ impl Sim {
     /// zero, so the power is exactly CHARGE_STEP * frames below 100.
     fn fire(&mut self, g: &mut Catapult, frames: u32) {
         assert!(g.aiming(), "can only loose while aiming");
-        let down = Raw::Key { code: KEY_SPACE, pressed: true };
-        let up = Raw::Key { code: KEY_SPACE, pressed: false };
+        let down = Raw::Key {
+            code: KEY_SPACE,
+            pressed: true,
+        };
+        let up = Raw::Key {
+            code: KEY_SPACE,
+            pressed: false,
+        };
         if frames <= 1 {
             self.frame(g, &[down, up]);
         } else {
@@ -100,9 +126,10 @@ fn best_charge(g: &Catapult, want: Want) -> Option<(f32, u32, f32)> {
             let p = (CHARGE_STEP * n as f32).min(100.0);
             let (x, ticks, kind) = predict(a, p, g.wind(), ship, g.down());
             let (err, reach) = match want {
-                Want::Tower(tx) => {
-                    ((x - tx).abs(), kind == Landing::Tower || kind == Landing::Direct)
-                }
+                Want::Tower(tx) => (
+                    (x - tx).abs(),
+                    kind == Landing::Tower || kind == Landing::Direct,
+                ),
                 Want::Gap(wx) => ((x - wx).abs(), kind == Landing::Wall),
                 // The deck keeps sailing while the meter fills: the ship
                 // position at splash is ship_x_in(charge frames + flight).
@@ -128,12 +155,23 @@ fn predict_and_live_flight_agree() {
         let charge = 12u32; // power 19.2: always falls short of the wall
         let (px, _ticks, kind) =
             predict(45.0, CHARGE_STEP * charge as f32, g.wind(), false, g.down());
-        assert_eq!(kind, Landing::Ground, "seed {}: charge should fall short", seed);
+        assert_eq!(
+            kind,
+            Landing::Ground,
+            "seed {}: charge should fall short",
+            seed
+        );
         let shot = g.shot_no();
         s.fire(&mut g, charge);
         assert_eq!(s.wait_next(&mut g, shot), Landing::Ground);
         let dx = (g.last_x() - px).abs();
-        assert!(dx <= 3.0, "seed {}: live stop {:.1} vs predicted {:.1}", seed, g.last_x(), px);
+        assert!(
+            dx <= 3.0,
+            "seed {}: live stop {:.1} vs predicted {:.1}",
+            seed,
+            g.last_x(),
+            px
+        );
     }
 }
 
@@ -146,13 +184,23 @@ fn three_towers_fall_to_a_computed_battery() {
     s.wait_for_aim(&mut g);
     for (i, tx) in TOWERS.iter().enumerate() {
         let (a, n, err) = best_charge(&g, Want::Tower(*tx as f32)).expect("tower reachable");
-        assert!(err <= 2.0, "tower {} solved to {:.1}px (angle {a})", tx, err);
+        assert!(
+            err <= 2.0,
+            "tower {} solved to {:.1}px (angle {a})",
+            tx,
+            err
+        );
         let shot = g.shot_no();
         assert_eq!(shot, i);
         s.aim_angle(&mut g, a);
         s.fire(&mut g, n);
         let landed = s.wait_next(&mut g, shot);
-        assert!(landed == Landing::Direct || landed == Landing::Tower, "stone {}: {:?}", i, landed);
+        assert!(
+            landed == Landing::Direct || landed == Landing::Tower,
+            "stone {}: {:?}",
+            i,
+            landed
+        );
     }
     assert_eq!(g.down(), [true, true, true]);
 }
@@ -227,7 +275,11 @@ fn full_battery_and_ship_hits_sail_into_gold() {
         let (_a, n, _) = best_charge(&g, Want::Ship).expect("ship solvable");
         s.fire(&mut g, n);
         let landed = s.wait_next(&mut g, shot);
-        assert!(landed == Landing::Ship || landed == Landing::Broadside, "shot {}", shot);
+        assert!(
+            landed == Landing::Ship || landed == Landing::Broadside,
+            "shot {}",
+            shot
+        );
     }
     assert_eq!(g.state(), MgState::Won(Tier::Gold), "score {}", g.score());
 }
@@ -237,6 +289,9 @@ fn factory_arms_catapult_too() {
     use defender_of_the_crown::ui::host::make_game;
     assert!(make_game("catapult", 1).is_some(), "catapult shipped");
     assert!(make_game("dragon", 1).is_some(), "dragon shipped");
-    assert!(make_game("dragon", 7).is_some(), "dragon seedeth by sport no");
+    assert!(
+        make_game("dragon", 7).is_some(),
+        "dragon seedeth by sport no"
+    );
     assert!(make_game("wyvern", 1).is_none(), "unshipped ides stay void");
 }

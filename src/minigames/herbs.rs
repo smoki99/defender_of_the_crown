@@ -15,8 +15,8 @@ use super::framework::{resolve, MgState, Minigame, SPORTS};
 use crate::campaign::rng::Xor;
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, BROWN, CYAN, DARKGRAY, DARKGREEN, EMBER, GOLD, GREEN, NAVY, OLIVE,
-    ORANGE, PINK, SAXON_BLUE, SILVER, TAN, TEAL, WHITE, YELLOW,
+    Framebuffer, BLACK, BLOOD, BROWN, CREAM, CYAN, DARKGRAY, DARKGREEN, EMBER, GOLD, GREEN, NAVY,
+    OLIVE, ORANGE, PINK, SAXON_BLUE, SILVER, TAN, TEAL, WHITE, YELLOW,
 };
 use crate::engine::input::Input;
 
@@ -207,9 +207,6 @@ impl Herbs {
                 fb.fill_rect(bx, by, 3, 3, YELLOW);
             }
         }
-        if self.elapsed >= BOWL.saturating_sub(120) {
-            draw_text_shadow(fb, 118, 78, "IT BOILS OVER", BLOOD, BLACK);
-        }
         // the tile grid -------------------------------------------------------
         let (mx, my, _) = input.mouse();
         for i in 0..16 {
@@ -257,7 +254,24 @@ impl Herbs {
                 fb.fill_rect(cx + 15, cy + 9, 6, 4, SILVER);
             }
         }
-        draw_text_shadow(fb, 118, 240, "MATCH THE HERBS", WHITE, BLACK);
+        // HUD (T-UX audit): the pairs tally at (4,14) like the other
+        // sports, and the boil-over warning centered above the grid - it
+        // used to sit at y 78 under the tiles and never showed.
+        draw_text_shadow(
+            fb,
+            4,
+            14,
+            &format!("PAIRS {}/{}", self.pairs, HERBS.len()),
+            CREAM,
+            BLACK,
+        );
+        if self.elapsed >= BOWL.saturating_sub(120) {
+            crate::ui::kit::centered(fb, 14, "IT BOILS OVER", BLOOD, BLACK);
+        }
+        if self.tick_n.saturating_sub(PRESENT) < 180 {
+            // T-UX: the prompt strip fades ~3 s into the brew (audit)
+            draw_text_shadow(fb, 118, 240, "MATCH THE HERBS", WHITE, BLACK);
+        }
     }
 }
 

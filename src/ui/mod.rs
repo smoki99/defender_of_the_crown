@@ -3,23 +3,24 @@
 //! map band, a 56px HUD band (SPEC 7): the selected castle opens a panel
 //! whose buttons overlay the map's lower edge.
 
-pub mod kit;
 pub mod host;
+pub mod kit;
 
 pub use host::{MgHost, OutcomeCell, SportMode};
 
-use crate::minigames::framework::{SportSpec, pick as sport_pick, SPORTS};
+use crate::minigames::framework::{pick as sport_pick, SportSpec, SPORTS};
 use std::rc::Rc;
 
 use crate::campaign::events::EventKind;
 use crate::campaign::game::{
-    Difficulty, Faction, GameState, Stronghold, View, BAR_MAX, PLAYER, SPY_COST, SPORTS_FEE,
+    Difficulty, Faction, GameState, Stronghold, View, BAR_MAX, PLAYER, SPORTS_FEE, SPY_COST,
 };
 use crate::campaign::units::UnitKind;
+use crate::engine::art;
 use crate::engine::gfx::{
-    BLACK, BLOOD, CREAM, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, EMBER, GOLD, GRASS, GRAY,
-    GREEN, LINEN,
-    NAVY, NORMAN_RED, SAXON_BLUE, SILVER, SKY, STONE, TEAL, W, WHITE, YELLOW,
+    mix, BLACK, BLOOD, BROWN, CREAM, CYAN, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, EMBER, GOLD,
+    GRASS, GRAY, GRAY2, GRAY3, GREEN, LINEN, NAVY, NORMAN_RED, ORANGE, SAXON_BLUE, SILVER, STONE,
+    TAN, TEAL, W, WHITE, YELLOW,
 };
 pub use crate::engine::scene::SceneEvent;
 
@@ -269,6 +270,11 @@ pub const DEFEAT_MOD: &[u8] = include_bytes!("../../assets/music/defeat.mod");
 pub struct CampaignUi {
     pub g: GameState,
     pub sel: Option<usize>,
+    /// Baron panel visibility. CLOSE hides the panel but KEEPS the host
+    /// selected - otherwise closing the panel (which covers most of the
+    /// map) also dropped the selection and marching became impossible
+    /// without tapping through the panel blind.
+    pub panel_open: bool,
     pub msg: String,
     msg_ticks: u32,
     pub anim: u32,
@@ -312,6 +318,9 @@ pub struct CampaignUi {
     /// conquests, chronicle verdict and the crowned end screen - without
     /// a per-turn bot (T501 hook family).
     pub autoplay_player: bool,
+    /// T901: pre-painted terrain layer (Sachs-style relief, see
+    /// `build_terrain`); blitted as the map background every frame.
+    terrain: Vec<u8>,
 }
 
 impl CampaignUi {
@@ -322,6 +331,7 @@ impl CampaignUi {
         Self {
             g,
             sel: None,
+            panel_open: false,
             msg: String::new(),
             msg_ticks: 0,
             want_restart: false,
@@ -347,6 +357,7 @@ impl CampaignUi {
             sport_out: Rc::default(),
             sport_ctx: None,
             autoplay_player: false,
+            terrain: build_terrain(),
         }
     }
 
@@ -389,33 +400,32 @@ impl CampaignUi {
         ]
     }
 
-    /// North Sea + Channel: hatched shoreline, deep-water fill and teal
-    /// wave dashes drifting at anim cadence (T301 coast shading).
+    /// Drifting wave dashes over the static sea painted in the terrain
+    /// layer (T301 cadence, T901 repaint).
     fn draw_sea(&self, fb: &mut crate::engine::gfx::Framebuffer) {
         let drift = (self.anim / 9) % 11;
         for y in 0..MAP_BOTTOM {
-            let xe = coast_edge(y);
-            fb.fill_rect(xe + 2, y, W - xe as u32 - 2, 1, DEEPWATER);
-            for x in xe..xe + 2 {
-                if ((x + y) & 1) == 0 {
-                    fb.set(x, y, SKY);
-                }
-            }
             if (y as u32) % 11 == drift {
+                let xe = coast_edge(y);
                 fb.hline(xe + 6, xe + 13, y, TEAL);
             }
         }
     }
 
-    /// Static forest and hill sprites (T301).
+    /// Rosette trees and light-capped hills (T301 roster, T901 repaint):
+    /// NW-lit highlight, dark body, 1 px drop shadow to the SE.
     fn draw_scenery(&self, fb: &mut crate::engine::gfx::Framebuffer) {
         for (x, y) in HILLS {
-            fb.fill_circle(x, y, 4, GRAY);
-            fb.fill_circle(x - 1, y - 2, 2, SILVER);
+            fb.fill_circle(x + 1, y + 1, 5, BLACK);
+            fb.fill_circle(x, y, 5, GRAY);
+            fb.fill_circle(x - 1, y - 1, 3, GRAY2);
+            fb.fill_circle(x - 2, y - 2, 1, GRAY3);
         }
         for (x, y) in TREES {
-            fb.tri([(x - 3, y + 3), (x + 3, y + 3), (x, y - 4)], DARKGREEN);
-            fb.tri([(x - 2, y + 1), (x + 2, y + 1), (x, y - 5)], GREEN);
+            fb.fill_circle(x + 1, y + 2, 3, BLACK);
+            fb.fill_circle(x, y, 3, DARKGREEN);
+            fb.fill_circle(x - 1, y - 1, 2, GREEN);
+            fb.set(x - 1, y - 2, GRASS);
         }
     }
 
@@ -457,7 +467,7 @@ impl CampaignUi {
             }
             return;
         }
-        if let Some(sel) = self.sel {
+        if let Some(sel) = self.sel.filter(|_| self.panel_open) {
             if self.g.strongholds[sel].owner == PLAYER {
                 if let Some(d) = self.scrollbar(sel).hit(x, y) {
                     let max = garrison_rows(&self.g, sel).len().saturating_sub(LIST_ROWS);
@@ -474,11 +484,8 @@ impl CampaignUi {
             self.end_turn();
             return;
         }
-        if let Some(sel) = self.sel {
-            for b in action_rects(
-                self.g.strongholds[sel].owner == PLAYER,
-                self.g.dragon_offer,
-            ) {
+        if let Some(sel) = self.sel.filter(|_| self.panel_open) {
+            for b in action_rects(self.g.strongholds[sel].owner == PLAYER, self.g.dragon_offer) {
                 if b.hits(x, y) {
                     self.act(b.id, sel);
                     return;
@@ -493,7 +500,26 @@ impl CampaignUi {
                 let name = self.g.strongholds[id].name;
                 if self.g.strongholds[id].owner == PLAYER {
                     self.sel = Some(id);
+                    self.panel_open = true;
                     self.list_top = 0;
+                    // Tell the player what this host can do right now -
+                    // the old silent select read as "attack is broken".
+                    let foes = self
+                        .g
+                        .adj(id)
+                        .iter()
+                        .filter(|t| self.g.strongholds[**t].owner != PLAYER)
+                        .filter(|t| self.g.can_march(PLAYER, id, **t).is_ok())
+                        .count();
+                    if foes > 0 {
+                        self.say(&format!("{foes} MARKED FOES WITHIN REACH - TAP ONE"));
+                    } else if self.g.strongholds[id].moved {
+                        self.say("THIS HOST HAS ALREADY MARCHED");
+                    } else if self.g.strongholds[id].garrison.is_empty() {
+                        self.say("NO TROOPS HERE - LEVY MEN BELOW");
+                    } else {
+                        self.say("NO FOE BORDERES THIS KEEP");
+                    }
                 } else if let Some(sel) = self.sel {
                     if self.g.adj(sel).contains(&id) {
                         let before = self.g.log.len();
@@ -513,6 +539,7 @@ impl CampaignUi {
             }
             None => {
                 self.sel = None;
+                self.panel_open = false;
                 self.list_top = 0;
                 self.msg.clear();
                 self.msg_ticks = 0;
@@ -561,7 +588,7 @@ impl CampaignUi {
         } else {
             None
         };
-        if let Some(sel) = self.sel {
+        if let Some(sel) = self.sel.filter(|_| self.panel_open) {
             let own = self.g.strongholds[sel].owner == PLAYER;
             if own {
                 let scr = self.scrollbar(sel);
@@ -583,16 +610,22 @@ impl CampaignUi {
         self.hover = h;
     }
 
-    /// Nearest stronghold within tap reach, if any.
+    /// Nearest stronghold under the tap. The keep sprite spans
+    /// x in [cx-10, cx+10], y in [cy-14, cy+7]; the hit box is that
+    /// bounding box +1px, NOT a radius-12 circle - the circle missed the
+    /// drawn tower under the finger, so taps on an enemy icon silently
+    /// grabbed the wrong keep or nothing at all ("can't attack").
     fn tap_castle(&self, x: i32, y: i32) -> Option<usize> {
         let mut best: Option<(i64, usize)> = None;
         for s in &self.g.strongholds {
             let (cx, cy) = castle_screen(s);
             let dx = (x - cx) as i64;
             let dy = (y - cy) as i64;
-            let d = dx * dx + dy * dy;
-            if d <= 144 && best.is_none_or(|(b, _)| d < b) {
-                best = Some((d, s.id));
+            if dx.abs() <= 12 && (-17..=10).contains(&dy) {
+                let d = dx * dx + dy * dy;
+                if best.is_none_or(|(b, _)| d < b) {
+                    best = Some((d, s.id));
+                }
             }
         }
         best.map(|(_, id)| id)
@@ -600,7 +633,13 @@ impl CampaignUi {
 
     pub fn act(&mut self, id: &str, sel: usize) {
         if id == "close" {
-            self.sel = None;
+            if self.g.strongholds[sel].owner == PLAYER {
+                self.panel_open = false;
+            } else {
+                self.sel = None;
+            }
+            self.msg.clear();
+            self.msg_ticks = 0;
             return;
         }
         let outcome = if id == "spy" {
@@ -655,6 +694,7 @@ impl CampaignUi {
 
     fn end_turn(&mut self) {
         self.sel = None;
+        self.panel_open = false;
         let before = self.g.log.len();
         // One click = one round: end_player_turn already lets the Normans
         // act, rolls the omen, and pays both sides (T308 found the old
@@ -713,49 +753,73 @@ impl CampaignUi {
 
     pub fn draw(&mut self, fb: &mut crate::engine::gfx::Framebuffer) {
         use crate::engine::fonts::draw_text_shadow;
-        fb.clear(SKY);
-        fb.gradient_v(0, 0, W, MAP_BOTTOM as u32, SKY, GRASS);
+        let n = (W as usize) * MAP_BOTTOM as usize;
+        fb.data[..n].copy_from_slice(&self.terrain);
         self.draw_sea(fb);
         self.draw_scenery(fb);
         // roads
         for (a, b) in crate::campaign::map::roads() {
             let (ax, ay) = castle_screen(&self.g.strongholds[a]);
             let (bx, by) = castle_screen(&self.g.strongholds[b]);
-            draw_line(fb, ax, ay, bx, by, STONE);
+            draw_line(fb, ax, ay, bx, by, BROWN);
         }
         // castles
         for s in &self.g.strongholds {
             let (cx, cy) = castle_screen(s);
             let v = self.g.view(PLAYER, s.id);
             let hidden = matches!(v, View::Dark) && s.owner != PLAYER;
-            let body = match s.owner {
-                PLAYER => SAXON_BLUE,
-                Faction::Norman => NORMAN_KEEP,
-                Faction::Neutral => GRAY,
-            };
-            let body = if hidden { DARKGRAY } else { body };
-            // keep: 14x12 block with two crenellations, capital gets a crown
-            fb.fill_rect(cx - 7, cy - 4, 14, 10, body);
-            fb.fill_rect(cx - 7, cy - 7, 4, 3, body);
-            fb.fill_rect(cx + 3, cy - 7, 4, 3, body);
-            fb.fill_rect(cx - 2, cy, 4, 6, BLACK);
-            if s.capital {
-                fb.set(cx, cy - 9, GOLD);
-                fb.set(cx - 2, cy - 8, GOLD);
-                fb.set(cx + 2, cy - 8, GOLD);
-            }
-            if !hidden {
-                // two-frame banner fluttering from the left crenel (T301).
-                fb.vline(cx - 5, cy - 13, cy - 8, BLACK);
-                if ((self.anim / 8) & 1) == 0 {
-                    fb.fill_rect(cx - 4, cy - 13, 3, 2, body);
+            // T-ART: hand-drafted pixel-art keeps (tools/mkkeep.ts);
+            // faction tint + 2-frame pennant flutter; fog sprites for
+            // keeps the player cannot see.
+            let flutter = ((self.anim / 8) & 1) as usize;
+            let spr = if hidden {
+                if s.owner == Faction::Norman {
+                    art::KEEP_NORMAN_FOG
                 } else {
-                    fb.fill_rect(cx - 4, cy - 12, 3, 2, body);
+                    art::KEEP_SAXON_FOG
                 }
+            } else {
+                match s.owner {
+                    PLAYER => [art::KEEP_SAXON_0, art::KEEP_SAXON_1][flutter],
+                    Faction::Norman => [art::KEEP_NORMAN_0, art::KEEP_NORMAN_1][flutter],
+                    Faction::Neutral => art::KEEP_NEUTRAL_0,
+                }
+            };
+            spr.blit(fb, cx - 10, cy - 12, false);
+            if s.capital && !hidden {
+                // capital keeps fly a gold pennant over the right tower
+                fb.fill_rect(cx + 7, cy - 10, 2, 2, GOLD);
             }
             if s.port && !hidden {
                 fb.set(cx + 9, cy + 1, GOLD);
                 fb.set(cx + 9, cy + 2, GOLD);
+            }
+            // T-fix: march-target affordance. While one of our keeps is
+            // selected, every keep a march would actually land on gets a
+            // marching-ants road and a pulsing arrow - the panel-only
+            // feedback left players convinced attacking was broken.
+            if let Some(from) = self.sel {
+                if from != s.id && self.g.can_march(PLAYER, from, s.id).is_ok() {
+                    let (fx, fy) = castle_screen(&self.g.strongholds[from]);
+                    let ant = ((self.anim / 10) % 2) as i32;
+                    for k in 0..=16 {
+                        if k % 2 == ant {
+                            let ix = fx + (cx - fx) * k / 16;
+                            let iy = fy + (cy - fy) * k / 16;
+                            fb.set(ix, iy, NORMAN_RED);
+                        }
+                    }
+                    let p = ((self.anim / 8) & 1) == 0;
+                    let t = 1 + ((self.anim / 8) & 1) as i32;
+                    fb.tri(
+                        [
+                            (cx - 3, cy - 20 - t),
+                            (cx + 3, cy - 20 - t),
+                            (cx, cy - 15 - t),
+                        ],
+                        if p { ORANGE } else { GOLD },
+                    );
+                }
             }
             if self.g.tournament.contains(&Some(s.id)) {
                 // tourney year: a yellow pennant flies from the right crenel
@@ -781,7 +845,14 @@ impl CampaignUi {
             } else {
                 s.name.to_string()
             };
-            draw_text_shadow(fb, cx - label.len() as i32 * 3, cy + 8, &label, WHITE, BLACK);
+            draw_text_shadow(
+                fb,
+                cx - label.len() as i32 * 3,
+                cy + 8,
+                &label,
+                WHITE,
+                BLACK,
+            );
             if !hidden {
                 let n = match &v {
                     View::Own(i) | View::Spied(i) => i.counts.iter().sum::<u32>(),
@@ -806,7 +877,7 @@ impl CampaignUi {
             }
         }
         self.draw_hud(fb);
-        if let Some(sel) = self.sel {
+        if let Some(sel) = self.sel.filter(|_| self.panel_open) {
             if !self.report_open {
                 self.draw_panel(fb, sel);
             }
@@ -867,7 +938,14 @@ impl CampaignUi {
         let rows = garrison_rows(&self.g, sel);
         let top = self.list_top.min(rows.len().saturating_sub(LIST_ROWS));
         for (i, row) in rows.iter().skip(top).take(LIST_ROWS).enumerate() {
-            draw_text_shadow(fb, 10, 100 + i as i32 * 9, &row.to_uppercase(), CREAM, BLACK);
+            draw_text_shadow(
+                fb,
+                10,
+                100 + i as i32 * 9,
+                &row.to_uppercase(),
+                CREAM,
+                BLACK,
+            );
         }
         if own {
             let scr = self.scrollbar(sel);
@@ -934,9 +1012,9 @@ impl CampaignUi {
         }
         use crate::engine::fonts::draw_text_shadow;
         const CHARS: usize = 22; // inner plate width fits 22 chars at 8 px
-        // Wrap every log line to the plate, uppercase (period-correct).
-        // The plate is sized to the whole wrapped report (it never jumps
-        // mid-scroll); lines appear in place, capped at 9 rows.
+                                 // Wrap every log line to the plate, uppercase (period-correct).
+                                 // The plate is sized to the whole wrapped report (it never jumps
+                                 // mid-scroll); lines appear in place, capped at 9 rows.
         let mut rows: Vec<(String, u8)> = Vec::new();
         for line in self.report.iter() {
             let up = line.to_uppercase();
@@ -1129,8 +1207,9 @@ fn coast_edge(y: i32) -> i32 {
     P[P.len() - 1].1
 }
 
-/// Forest clusters: Sherwood, New Forest, Essex, far southwest.
-const TREES: [(i32, i32); 10] = [
+/// Forest clusters: Sherwood, New Forest, Essex, far southwest (T901:
+/// thickened toward real grove footprints).
+const TREES: [(i32, i32); 16] = [
     (150, 30),
     (159, 36),
     (151, 43),
@@ -1141,10 +1220,133 @@ const TREES: [(i32, i32); 10] = [
     (204, 57),
     (18, 162),
     (28, 168),
+    (40, 146),
+    (49, 154),
+    (96, 22),
+    (103, 29),
+    (14, 122),
+    (23, 129),
 ];
 
-/// Hills: Midlands knolls plus the Kent/Channel ridge.
-const HILLS: [(i32, i32); 5] = [(120, 58), (130, 52), (185, 135), (195, 143), (188, 166)];
+/// Hills: Midlands knolls plus the Kent/Channel ridge (T901: Pennine
+/// string and a western highland added).
+const HILLS: [(i32, i32); 9] = [
+    (120, 58),
+    (130, 52),
+    (185, 135),
+    (195, 143),
+    (188, 166),
+    (111, 49),
+    (112, 66),
+    (127, 64),
+    (24, 106),
+];
+
+/// Smoothstep value noise on an integer lattice (T901): deterministic
+/// 0..1 field, pure function of (x, y) - the painted map never changes.
+fn vnoise(x: i32, y: i32, cell: i32, seed: u32) -> f32 {
+    let gx = x.div_euclid(cell);
+    let gy = y.div_euclid(cell);
+    let fx = (x - gx * cell) as f32 / cell as f32;
+    let fy = (y - gy * cell) as f32 / cell as f32;
+    let h = |ix: i32, iy: i32| -> f32 {
+        let mut n = (ix as u32).wrapping_mul(0x27d4eb4d)
+            ^ (iy as u32).wrapping_mul(0x165667b1)
+            ^ seed.wrapping_mul(0x9e3779b9);
+        n ^= n >> 15;
+        n = n.wrapping_mul(0x7feb352d);
+        n ^= n >> 13;
+        (n & 1023) as f32 / 1024.0
+    };
+    let lerp = |a: f32, b: f32, t: f32| a + (b - a) * t;
+    let s = |t: f32| t * t * (3.0 - 2.0 * t);
+    let (u, v) = (s(fx), s(fy));
+    lerp(
+        lerp(h(gx, gy), h(gx + 1, gy), u),
+        lerp(h(gx, gy + 1), h(gx + 1, gy + 1), u),
+        v,
+    )
+}
+
+const fn bayer4(x: i32, y: i32) -> u32 {
+    const M: [u32; 16] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    M[(((y & 3) as usize) << 2) + (x & 3) as usize]
+}
+
+/// T901: pre-paint the whole map once per process: two-octave elevation
+/// relief on a Sachs-style meadow->forest->sienna->rock ramp with NW-lit
+/// slopes and Bayer-dithered band edges, sand + foam coastline, speckled
+/// deep water. Static layer -> the per-frame cost is one memcpy.
+fn build_terrain() -> Vec<u8> {
+    static TERRAIN: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::new(|| {
+        let ladder = [
+            GRASS,
+            mix(GRASS, GREEN, 4),
+            GREEN,
+            mix(GREEN, ORANGE, 4),
+            ORANGE,
+            mix(ORANGE, TAN, 4),
+            TAN,
+        ];
+        let elev = |x: i32, y: i32| -> f32 {
+            (0.62 * vnoise(x, y, 26, 0x0c0ffe) + 0.38 * vnoise(x, y, 9, 0xd0c0de)).clamp(0.0, 1.0)
+        };
+        let n = (W as usize) * MAP_BOTTOM as usize;
+        let mut field = vec![0f32; n];
+        for y in 0..MAP_BOTTOM {
+            for x in 0..W as i32 {
+                field[(x + y * W as i32) as usize] = elev(x, y);
+            }
+        }
+        let e_at = |x: i32, y: i32| -> f32 {
+            let x = x.clamp(0, W as i32 - 1);
+            let y = y.clamp(0, MAP_BOTTOM - 1);
+            field[(x + y * W as i32) as usize]
+        };
+        let mut t = vec![DEEPWATER; n];
+        for y in 0..MAP_BOTTOM {
+            let xe = coast_edge(y);
+            for x in 0..W as i32 {
+                let i = (x + y * W as i32) as usize;
+                if x > xe {
+                    // sea: checker foam hugging the coast, sparse flecks out
+                    if x - xe <= 2 {
+                        t[i] = if ((x + y) & 1) == 0 { CYAN } else { TEAL };
+                    } else if (x * 7 + y * 13) % 23 == 0 || (x * 11 + y * 5) % 61 == 0 {
+                        t[i] = TEAL;
+                    }
+                    continue;
+                }
+                let e = field[i];
+                let p = (e * e * 8.0).min(6.0);
+                let j = (p as usize).min(6);
+                let f = p - j as f32;
+                let mut c = ladder[j];
+                if j < 6 && f > 0.2 && f < 0.8 && (bayer4(x, y) as f32) / 15.0 < (f - 0.2) / 0.6 {
+                    c = ladder[j + 1];
+                }
+                // NW light: slopes rising away to the NW sit in shadow,
+                // SE-facing faces catch the sun.
+                let d = e_at(x - 4, y - 4) - e_at(x + 4, y + 4);
+                if d > 0.05 {
+                    c = mix(c, BLACK, 5);
+                } else if d < -0.05 {
+                    c = mix(c, WHITE, 5);
+                }
+                // sand strip: wet edge, dry sand, dune blend
+                match xe - x {
+                    0 => c = mix(TAN, BROWN, 4),
+                    1..=2 => c = TAN,
+                    3 => c = mix(GRASS, TAN, 4),
+                    _ => {}
+                }
+                t[i] = c;
+            }
+        }
+        t
+    });
+    TERRAIN.clone()
+}
 
 fn bar(
     fb: &mut crate::engine::gfx::Framebuffer,
@@ -1251,14 +1453,12 @@ impl PlayScene {
                     SportMode::Sports { sid } | SportMode::Herald { sid } => {
                         (sid as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
                     }
-                        SportMode::Hoard => 0x4452_414E_5354_4952,
+                    SportMode::Hoard => 0x4452_414E_5354_4952,
                 };
             if let Some(game) = host::make_game(spec.id, seed) {
                 self.ui.sport_ctx = Some((mode, spec));
                 let cell = self.ui.sport_out.clone();
-                app.push(Box::new(MgHost::new(
-                    spec, mode, game, cell, self.autoplay,
-                )));
+                app.push(Box::new(MgHost::new(spec, mode, game, cell, self.autoplay)));
             }
         }
         let done = self.ui.sport_out.borrow_mut().take();
@@ -1278,38 +1478,39 @@ impl PlayScene {
                     return;
                 }
                 let res = match mode {
-                    SportMode::Sports { sid } => self.ui.g.play_sports(
-                        PLAYER,
-                        sid,
-                        o.score,
-                        spec.silver_at,
-                        spec.gold_at,
-                    ),
-                    SportMode::Herald { .. } => self.ui.g.play_tournament(
-                        PLAYER,
-                        o.score,
-                        spec.silver_at,
-                        spec.gold_at,
-                    ),
-                    SportMode::Hoard => self.ui.g.play_dragon(
-                        PLAYER,
-                        o.score,
-                        spec.silver_at,
-                        spec.gold_at,
-                    ),
+                    SportMode::Sports { sid } => {
+                        self.ui
+                            .g
+                            .play_sports(PLAYER, sid, o.score, spec.silver_at, spec.gold_at)
+                    }
+                    SportMode::Herald { .. } => {
+                        self.ui
+                            .g
+                            .play_tournament(PLAYER, o.score, spec.silver_at, spec.gold_at)
+                    }
+                    SportMode::Hoard => {
+                        self.ui
+                            .g
+                            .play_dragon(PLAYER, o.score, spec.silver_at, spec.gold_at)
+                    }
                 };
                 let (msg, crowned) = match res {
                     Ok((tier, r)) => {
                         let mut m = match tier {
                             crate::campaign::game::Tier::Gold => {
                                 // a gold laurel is chronicle material (T505)
-                                app.record_feat(&format!("{} GOLD - SCORE {}", spec.label, o.score));
+                                app.record_feat(&format!(
+                                    "{} GOLD - SCORE {}",
+                                    spec.label, o.score
+                                ));
                                 format!("GOLD LAUREL: {} GOLD", r.gold)
                             }
                             crate::campaign::game::Tier::Silver => {
                                 format!("SILVER LAUREL: {} PROVISIONS", r.provisions)
                             }
-                            crate::campaign::game::Tier::Bronze => format!("BRONZE LAUREL: {} GOLD", r.gold),
+                            crate::campaign::game::Tier::Bronze => {
+                                format!("BRONZE LAUREL: {} GOLD", r.gold)
+                            }
                         };
                         if r.champion {
                             m.push_str(" AND A CHAMPION");
@@ -1352,10 +1553,18 @@ impl crate::engine::scene::Scene for PlayScene {
             if let Some(winner) = self.ui.g.over {
                 self.endgame = true;
                 app.play_music(None);
-                app.sting(if winner == PLAYER { VICTORY_MOD } else { DEFEAT_MOD });
+                app.sting(if winner == PLAYER {
+                    VICTORY_MOD
+                } else {
+                    DEFEAT_MOD
+                });
                 app.record_feat(&format!(
                     "{} - TURN {}",
-                    if winner == PLAYER { "CROWNED" } else { "CROWN LOST" },
+                    if winner == PLAYER {
+                        "CROWNED"
+                    } else {
+                        "CROWN LOST"
+                    },
                     self.ui.g.turn
                 ));
             }

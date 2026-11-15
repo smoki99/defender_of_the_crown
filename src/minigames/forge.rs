@@ -10,7 +10,7 @@
 //! Determinism: the pattern carries no seed variance at all — tempos and
 //! windows are fixed data, so a run is a pure function of the space taps.
 
-use super::framework::{resolve, MgState, Minigame, SPORTS};
+use super::framework::{resolve, tap_action, MgState, Minigame, SPORTS};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
     Framebuffer, BLACK, BLOOD, BROWN, CYAN, DARKGRAY, EMBER, GOLD, GRAY, GREEN, NAVY, SILVER, TAN,
@@ -52,6 +52,7 @@ pub struct Forge {
     t_local: u32, // ticks since this beat was armed
     judge: Judge, // last call, for the flash text
     judge_t: u32, // ticks left of the flash
+    spark_t: u32, // ticks left of the anvil spark burst
     heat: u32,    // visual: blank colour decays, perfect blows reforge it
     state: MgState,
 }
@@ -82,6 +83,7 @@ impl Forge {
             beat: 0,
             t_local: 0,
             judge: Judge::None,
+            spark_t: 0,
             judge_t: 0,
             heat: 120,
             state: MgState::Running,
@@ -143,9 +145,10 @@ impl Forge {
     }
 
     fn hammer(&mut self, input: &Input) {
-        if !input.key_pressed(KEY_SPACE) {
+        if !tap_action(input, KEY_SPACE) {
             return;
         }
+        self.spark_t = 6; // spark burst at the anvil (T-UX: press feedback)
         let iv = self.current_interval() as i32;
         let dt = self.t_local as i32 - iv;
         let j = if dt.abs() <= PERFECT_W {
@@ -170,17 +173,37 @@ impl Forge {
         let hot = self.heat / 40; // 0..=4
         let hot_col = [DARKGRAY, BROWN, EMBER, YELLOW, WHITE][hot as usize];
         fb.fill_rect(136, 112, 48, 6, hot_col);
-        // hammer head tracks the marker, arm swings on a judged blow
+        // hammer rides the bar marker, then DIPS to the anvil over the
+        // last 4 ticks before the hit-line window opens (T-UX: a readable
+        // swing; the old 2-tick parity flicker is gone)
         let iv = self.current_interval() as i32;
         let t = (self.t_local as i32).min(iv + AUTO_MISS_AT as i32);
         let x = (60 + (t * 200) / iv.max(1)).min(261);
-        let lifted = (self.t_local as i32) < iv && self.t_local.is_multiple_of(2);
-        let hy = if lifted { 70 } else { 92 };
-        fb.fill_rect(x - 2, 66, 4, hy - 66, TAN); // haft
-        fb.fill_rect(x - 8, (hy - 8) as i32, 16, 10, GRAY); // head
-        if self.judge_t > 30 && self.judge == Judge::Perfect {
-            for k in 0..4 {
-                fb.fill_rect(140 + k * 12, 104 - (k % 2) * 6, 3, 3, YELLOW); // sparks
+        let wind = iv - PERFECT_W; // tick the perfect window opens
+        let (hx, hy) = if t >= wind {
+            (160, 110) // head parked on the blank, awaiting the blow
+        } else if t > wind - 4 {
+            let k = t - (wind - 4); // 1..=3: glide down to the anvil
+            (x + (160 - x) * k / 4, 70 + 10 * k)
+        } else {
+            (x, 70) // riding the sweep
+        };
+        fb.fill_rect(hx - 2, 66, 4, (hy - 66) as u32, TAN); // haft
+        fb.fill_rect(hx - 8, hy - 8, 16, 10, GRAY); // head
+        if self.spark_t > 0 {
+            // press feedback: 2-3 px EMBER/GOLD sparks over the anvil
+            let sparks = [
+                (-12i32, -6i32, 3u32, EMBER),
+                (-4, -11, 2, GOLD),
+                (3, -5, 3, GOLD),
+                (11, -10, 2, EMBER),
+                (17, -3, 3, EMBER),
+            ];
+            for (dx, dy, s, c) in sparks[..(self.spark_t as usize).min(sparks.len())]
+                .iter()
+                .copied()
+            {
+                fb.fill_rect(160 + dx, 112 + dy, s, s, c);
             }
         }
         // tempo banner + beat pips ------------------------------------------------
@@ -271,6 +294,7 @@ impl Minigame for Forge {
         }
         self.t_local += 1;
         self.judge_t = self.judge_t.saturating_sub(1);
+        self.spark_t = self.spark_t.saturating_sub(1);
         self.heat = self.heat.saturating_sub(1);
         self.draw_run(fb);
     }

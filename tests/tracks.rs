@@ -10,10 +10,18 @@ const MINIGAME: &[u8] = include_bytes!("../assets/music/minigame.mod");
 
 fn check(name: &str, bytes: &'static [u8], min_order: usize) {
     let m = Mod::parse(bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
-    assert!(m.song_len >= min_order, "{name}: order length {}", m.song_len);
+    assert!(
+        m.song_len >= min_order,
+        "{name}: order length {}",
+        m.song_len
+    );
     assert!(!m.patterns.is_empty(), "{name}: no patterns");
     let budget = 128 * 1024 / 7;
-    assert!(bytes.len() <= budget, "{name}: {} B exceeds per-track budget", bytes.len());
+    assert!(
+        bytes.len() <= budget,
+        "{name}: {} B exceeds per-track budget",
+        bytes.len()
+    );
 }
 
 #[test]
@@ -30,6 +38,14 @@ fn all_seven_campaign_tracks_decodeth() {
 #[test]
 fn the_overture_loopeth_back_to_the_a_section() {
     let m = Mod::parse(TITLE).expect("title parses");
-    assert!(m.restart > 0, "title must carry a restart byte into the A-section");
-    assert!(m.restart < m.song_len, "restart {} beyond song_len {}", m.restart, m.song_len);
+    assert!(
+        m.restart > 0,
+        "title must carry a restart byte into the A-section"
+    );
+    assert!(
+        m.restart < m.song_len,
+        "restart {} beyond song_len {}",
+        m.restart,
+        m.song_len
+    );
 }

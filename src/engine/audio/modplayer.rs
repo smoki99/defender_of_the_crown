@@ -62,7 +62,11 @@ impl Mod {
             pcm_sizes.push(len_words * 2);
         }
         let song_len = bytes[950] as usize;
-        let restart = if bytes[951] < 127 { bytes[951] as usize } else { 0 };
+        let restart = if bytes[951] < 127 {
+            bytes[951] as usize
+        } else {
+            0
+        };
         if song_len == 0 || song_len > 128 {
             return Err("bad song length".into());
         }

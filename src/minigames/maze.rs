@@ -17,13 +17,14 @@ use crate::engine::gfx::{
     Framebuffer, BLACK, BROWN, CREAM, DARKGRAY, GOLD, GRAY, GRAY3, NAVY, NORMAN_RED, RED,
     SAXON_BLUE, SILVER, STONE, WHITE,
 };
-use crate::engine::input::{Input, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_UP};
+use crate::engine::input::{Dir, Gesture, Input, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_UP};
 
 const PRESENT: u32 = 90; // "TO THE DUNGEON" banner
 const TABLEAU: u32 = 100; // results beat before Done
 const CELL: f32 = 16.0;
 const HALF: f32 = 4.0; // half of the 9 px collision box
 const P_SPD: f32 = 1.6; // champion px/tick
+const STRIDE: u32 = 10; // ticks a swipe keeps walking (≈ one 16 px cell)
 const B_SPD: f32 = 1.6; // baron keeps up exactly
 const TRAIL_LAG: usize = 90; // baron walks this many frames behind
 const TRAIL_MAX: usize = 400;
@@ -70,7 +71,7 @@ const TORCHES: [(f32, f32); 2] = [(280.0, 120.0), (216.0, 184.0)]; // (17,7) (13
 /// Straight ping-pong beats (cell coords, every segment corridor-true).
 const GUARDS: [[[f32; 2]; 2]; 4] = [
     [[7.0, 7.0], [15.0, 7.0]],   // mid street
-    [[13.0, 3.0], [15.0, 3.0]],   // upper middle street — watches the column mouth
+    [[13.0, 3.0], [15.0, 3.0]],  // upper middle street — watches the column mouth
     [[5.0, 13.0], [16.0, 13.0]], // bottom street — the escort route
     [[3.0, 1.0], [15.0, 1.0]],   // top street — the baron's lane
 ];
@@ -99,7 +100,10 @@ impl Guard {
     fn pos(&self) -> (f32, f32) {
         let len = (self.bx - self.ax).hypot(self.by - self.ay);
         let k = if len == 0.0 { 0.0 } else { self.t / len };
-        (self.ax + (self.bx - self.ax) * k, self.ay + (self.by - self.ay) * k)
+        (
+            self.ax + (self.bx - self.ax) * k,
+            self.ay + (self.by - self.ay) * k,
+        )
     }
     fn step(&mut self) {
         if self.routed {
@@ -123,6 +127,9 @@ pub struct Maze {
     phase: Phase,
     phase_t: u32,
     player: (f32, f32),
+    swalk: (f32, f32), // latched swipe-walk unit vector (T-UX)
+    walk_t: u32,       // ticks left in the current swipe stride
+    moving: bool,      // champion shifted last tick (walk-anim gate)
     invuln: u32,
     caught: u32,
     guards: [Guard; GUARDS.len()],
@@ -166,9 +173,7 @@ impl Maze {
         // the beats are fixed; the gaolers' tempo and phase are the seed's
         let guards = std::array::from_fn(|i| {
             let beat = GUARDS[i];
-            let len = (beat[1][0] - beat[0][0])
-                .hypot(beat[1][1] - beat[0][1])
-                * CELL;
+            let len = (beat[1][0] - beat[0][0]).hypot(beat[1][1] - beat[0][1]) * CELL;
             let m = mix(seed ^ (i as u64) << 17);
             Guard {
                 ax: beat[0][0] * CELL + 8.0,
@@ -186,6 +191,9 @@ impl Maze {
             phase: Phase::Present,
             phase_t: 0,
             player: SPAWN,
+            swalk: (0.0, 0.0),
+            walk_t: 0,
+            moving: false,
             invuln: 0,
             caught: 0,
             guards,
@@ -249,6 +257,31 @@ impl Maze {
         if input.key_down(KEY_DOWN) {
             dy += 1.0;
         }
+        // T-UX (audit: arrows-only): a swipe latches a STRIDE-tick walk
+        // along its Dir (8-way), moved by the very per-tick wall tests
+        // below; one swipe ≈ one cell of advance, a fresh key cancels it.
+        for g in input.gestures() {
+            if let Gesture::Swipe { dir } = *g {
+                self.swalk = match dir {
+                    Dir::N => (0.0, -1.0),
+                    Dir::NE => (1.0, -1.0),
+                    Dir::E => (1.0, 0.0),
+                    Dir::SE => (1.0, 1.0),
+                    Dir::S => (0.0, 1.0),
+                    Dir::SW => (-1.0, 1.0),
+                    Dir::W => (-1.0, 0.0),
+                    Dir::NW => (-1.0, -1.0),
+                };
+                self.walk_t = STRIDE;
+            }
+        }
+        if dx != 0.0 || dy != 0.0 {
+            self.walk_t = 0; // a keyboard hold rules over a stride
+        } else if self.walk_t > 0 {
+            dx = self.swalk.0;
+            dy = self.swalk.1;
+            self.walk_t -= 1;
+        }
         let (px, py) = self.player;
         if dx != 0.0 && !blocked(px + dx * P_SPD, py) {
             self.player.0 = px + dx * P_SPD;
@@ -256,13 +289,12 @@ impl Maze {
         if dy != 0.0 && !blocked(px, py + dy * P_SPD) {
             self.player.1 = py + dy * P_SPD;
         }
+        self.moving = (self.player.0 - px).abs() + (self.player.1 - py).abs() > 0.0;
     }
 
     fn run_torches(&mut self) {
         for (i, t) in TORCHES.iter().enumerate() {
-            if !self.torch_taken[i]
-                && (self.player.0 - t.0).hypot(self.player.1 - t.1) < GRAB_R
-            {
+            if !self.torch_taken[i] && (self.player.0 - t.0).hypot(self.player.1 - t.1) < GRAB_R {
                 self.torch_taken[i] = true;
                 self.fright = FRIGHT_TICKS;
                 self.score += W_TORCH;
@@ -430,8 +462,20 @@ impl Maze {
         // the postern -----------------------------------------------------------
         let flick = self.phase == Phase::Run && self.freed && self.tick_n % 30 < 18;
         fb.fill_rect(SPAWN.0 as i32 - 6, SPAWN.1 as i32 - 7, 12, 14, BROWN);
-        fb.rect(SPAWN.0 as i32 - 6, SPAWN.1 as i32 - 7, 12, 14, if flick { GOLD } else { BLACK });
-        fb.fill_rect(SPAWN.0 as i32 - 4, SPAWN.1 as i32 - 5, 8, 10, if flick { GOLD } else { NAVY });
+        fb.rect(
+            SPAWN.0 as i32 - 6,
+            SPAWN.1 as i32 - 7,
+            12,
+            14,
+            if flick { GOLD } else { BLACK },
+        );
+        fb.fill_rect(
+            SPAWN.0 as i32 - 4,
+            SPAWN.1 as i32 - 5,
+            8,
+            10,
+            if flick { GOLD } else { NAVY },
+        );
         // the baron's cell: iron bars across the nook ---------------------------
         for k in 0..3 {
             fb.fill_rect(265, 25 + k * 5, 1, 4, GRAY3);
@@ -449,7 +493,11 @@ impl Maze {
         }
         // the baron -----------------------------------------------------------------
         let (bx, by) = (self.baron.0 as i32, self.baron.1 as i32);
-        let hop = if self.freed && self.tick_n % 24 < 12 { -1 } else { 0 };
+        let hop = if self.freed && self.tick_n % 24 < 12 {
+            -1
+        } else {
+            0
+        };
         fb.fill_rect(bx - 3, by - 4 + hop, 6, 9, CREAM);
         fb.fill_rect(bx - 3, by - 7 + hop, 6, 3, GOLD);
         if !self.freed {
@@ -463,7 +511,11 @@ impl Maze {
                 continue;
             }
             let (gx, gy) = (gx as i32, gy as i32);
-            let quake = if self.fright > 0 { (self.tick_n % 4 / 2) as i32 } else { 0 };
+            let quake = if self.fright > 0 {
+                (self.tick_n % 4 / 2) as i32
+            } else {
+                0
+            };
             if self.fright > 0 {
                 fb.fill_rect(gx - 3 + quake, gy - 4, 6, 9, SILVER);
                 fb.fill_rect(gx - 3 + quake, gy - 7, 6, 3, SAXON_BLUE);
@@ -476,17 +528,29 @@ impl Maze {
         let blink = self.invuln > 0 && self.tick_n % 6 < 3;
         if !blink && self.phase != Phase::Board && self.phase != Phase::Done {
             let (px, py) = (self.player.0 as i32, self.player.1 as i32);
+            // T-UX: 2-frame leg alternation, only while actually walking
+            let leg: i32 = if self.moving {
+                ((self.tick_n / 4) % 2) as i32
+            } else {
+                0
+            };
+            fb.fill_rect(px - 2 + leg, py + 5, 1, 2, BLACK);
+            fb.fill_rect(px + 1 - leg, py + 5, 1, 2, BLACK);
             fb.fill_rect(px - 3, py - 4, 6, 9, SAXON_BLUE);
             fb.fill_rect(px - 3, py - 7, 6, 3, SILVER);
             fb.fill_rect(px - 1, py - 9, 2, 2, RED);
         }
         // HUD ------------------------------------------------------------------------------
-        draw_text_shadow(fb, 4, 2, "RESCUE", GOLD, BLACK);
-        let goal = if self.freed { "ESCORT HIM OUT" } else { "FIND THE BARON" };
+        // HUD counters live at y>=14: the host band owns rows 0-11.
+        let goal = if self.freed {
+            "ESCORT HIM OUT"
+        } else {
+            "FIND THE BARON"
+        };
         draw_text_shadow(
             fb,
             104,
-            2,
+            14,
             goal,
             if self.freed { GOLD } else { CREAM },
             BLACK,
@@ -494,14 +558,14 @@ impl Maze {
         draw_text_shadow(
             fb,
             246,
-            2,
+            14,
             &format!("CAUGHT {}", self.caught),
             if self.caught > 0 { RED } else { CREAM },
             BLACK,
         );
         if self.fright > 0 {
             let w = (self.fright as i32 * 300) / FRIGHT_TICKS as i32;
-            fb.fill_rect(10, 13, w as u32, 1, GOLD);
+            fb.fill_rect(10, 23, w as u32, 1, GOLD);
         }
         if self.plate_t > 0 {
             let c = if self.plate == "SEIZED AT THE WALL" || self.plate == "BOTH BACK IN CHAINS" {
@@ -516,6 +580,8 @@ impl Maze {
                 if self.phase_t % 24 < 16 {
                     crate::ui::kit::centered(fb, 128, "TO THE DUNGEON", WHITE, BLACK);
                 }
+                // T-UX: the intro tells touch players the way in
+                crate::ui::kit::centered(fb, 142, "ARROW KEYS OR SWIPE", CREAM, BLACK);
             }
             Phase::Board | Phase::Done => {
                 let s = self.score.max(0) as u32;
@@ -524,7 +590,11 @@ impl Maze {
                     MgState::Lost => "STILL IN CHAINS",
                     _ => "THE BARON IS FREE",
                 };
-                let col = if self.state == MgState::Lost { RED } else { GOLD };
+                let col = if self.state == MgState::Lost {
+                    RED
+                } else {
+                    GOLD
+                };
                 draw_text_shadow(fb, 96, 84, msg, col, BLACK);
             }
             _ => {}

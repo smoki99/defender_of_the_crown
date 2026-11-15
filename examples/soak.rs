@@ -37,7 +37,12 @@ fn invariants(g: &GameState, check_gold: bool) -> Result<(), String> {
     let mut total = 0usize;
     for s in &g.strongholds {
         if s.garrison.len() > MAX_GARRISON {
-            return Err(format!("turn {}: {} garrison {}", g.turn, s.name, s.garrison.len()));
+            return Err(format!(
+                "turn {}: {} garrison {}",
+                g.turn,
+                s.name,
+                s.garrison.len()
+            ));
         }
         total += 1;
     }
@@ -89,7 +94,10 @@ fn run_forced_meets(seed: u64) -> Result<(), String> {
                 .map_err(|e| format!("forced meet refused: {e}"))?;
             let delta = g.gold[PLAYER.index()].saturating_sub(before);
             if delta > 80 {
-                return Err(format!("turn {}: meet netted {delta} > 80 (90 max - fee)", g.turn));
+                return Err(format!(
+                    "turn {}: meet netted {delta} > 80 (90 max - fee)",
+                    g.turn
+                ));
             }
         }
         // the herald's free meet: double haul, +40 once three champions ride
@@ -98,7 +106,10 @@ fn run_forced_meets(seed: u64) -> Result<(), String> {
             g.play_tournament(PLAYER, 9999, silver, gold)?;
             let delta = g.gold[PLAYER.index()].saturating_sub(before);
             if delta > 90 * 2 + 40 {
-                return Err(format!("turn {}: herald paid {delta} > table max 220", g.turn));
+                return Err(format!(
+                    "turn {}: herald paid {delta} > table max 220",
+                    g.turn
+                ));
             }
         }
         g.end_player_turn();

@@ -12,7 +12,10 @@ struct Ctx {
 
 impl Ctx {
     fn new() -> Self {
-        Self { log: RefCell::new(vec![]), feats: RefCell::new(vec![]) }
+        Self {
+            log: RefCell::new(vec![]),
+            feats: RefCell::new(vec![]),
+        }
     }
     fn drain(&self) -> Vec<String> {
         let l = self.log.borrow_mut().drain(..).collect();
@@ -25,7 +28,9 @@ impl AppCtx for Ctx {
         false
     }
     fn play_music(&mut self, track: Option<&'static str>) {
-        self.log.borrow_mut().push(format!("music:{}", track.unwrap_or("-")));
+        self.log
+            .borrow_mut()
+            .push(format!("music:{}", track.unwrap_or("-")));
     }
     fn sfx(&mut self, _kind: Sfx) {}
     fn sting(&mut self, track: &'static [u8]) {
@@ -43,7 +48,10 @@ fn the_campaign_opens_with_the_hall_theme() {
     ps.init(&mut ctx);
     assert_eq!(ctx.drain(), vec!["music:saxon"]);
     ps.tick(&mut ctx);
-    assert!(ctx.drain().is_empty(), "steady state must not restart the bed");
+    assert!(
+        ctx.drain().is_empty(),
+        "steady state must not restart the bed"
+    );
 }
 
 #[test]
@@ -64,7 +72,10 @@ fn victory_stingeth_once_and_recordeth_the_feat() {
     let mut ctx = Ctx::new();
     ps.ui.g.over = Some(PLAYER);
     ps.tick(&mut ctx);
-    assert_eq!(ctx.drain(), vec!["music:-", &format!("sting:{}", VICTORY_MOD.len())]);
+    assert_eq!(
+        ctx.drain(),
+        vec!["music:-", &format!("sting:{}", VICTORY_MOD.len())]
+    );
     let feats = ctx.feats.borrow().clone();
     assert_eq!(feats.len(), 1);
     assert!(feats[0].starts_with("CROWNED - TURN"), "got {:?}", feats[0]);
@@ -82,6 +93,10 @@ fn defeat_playeth_the_dirge() {
     let log = ctx.drain();
     assert_eq!(log[0], "music:-");
     assert!(log[1].starts_with("sting:"), "got {:?}", log);
-    assert_ne!(log[1], format!("sting:{}", VICTORY_MOD.len()), "defeat uses a different tune");
+    assert_ne!(
+        log[1],
+        format!("sting:{}", VICTORY_MOD.len()),
+        "defeat uses a different tune"
+    );
     assert!(ctx.feats.borrow()[0].starts_with("CROWN LOST"));
 }

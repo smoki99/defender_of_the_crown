@@ -5,10 +5,9 @@
 // shots/png/). Animated states carry a tolerance for tick-phase jitter;
 // static panels demand near-purity. Recapture with UPDATE=1.
 //   bun tools/baseline-check.mjs            # diff vs committed baselines
-//   UPDATE=1 bun tools/baseline-check.mjs   # recapture + write baselines
+import { key, tap, coords, px, snap, shot, png, ok, finish, decodeTurn, PAL, W, H } from "./jsdom-harness.mjs";
 import { mkdirSync, existsSync } from "node:fs";
 import { inflateSync, deflateSync } from "node:zlib";
-import { key, tap, coords, px, snap, shot, png, ok, finish, decodeTurn, W, H } from "./jsdom-harness.mjs";
 
 const BASE_DIR = new URL("../shots/", import.meta.url).pathname;
 const UPDATE = process.env.UPDATE === "1";
@@ -103,7 +102,8 @@ await Bun.sleep(200);
 // Force a battle: order Buckingham's host on London - the combat log rises
 // as the auto-opening BATTLE REPORT (LINEN plate at x62..258,y84..; the
 // omen modal never reaches x64/y88, so (64,88) is a report-only marker).
-const lin = (x, y) => { const p = px(x, y); return p[0] === 204 && p[1] === 204 && p[2] === 153; };
+const [LR, LG, LB] = PAL.LINEN;
+const lin = (x, y) => { const p = px(x, y); return p[0] === LR && p[1] === LG && p[2] === LB; };
 tap(...coords.BUCK);
 await Bun.sleep(250);
 tap(...coords.LON); // march order

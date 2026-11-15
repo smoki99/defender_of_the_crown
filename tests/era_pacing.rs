@@ -110,6 +110,9 @@ fn launching_a_meet_boards_the_season_sport_of_the_current_era() {
     let (spec, mode) = ui.launch_req.expect("the meet boards");
     assert_eq!(spec.id, want, "launch drifted from the button label");
     assert!(spec.unlock_turn <= 11, "launch broke the pacing gate");
-    assert!(matches!(mode, SportMode::Sports { .. } | SportMode::Herald { .. }));
+    assert!(matches!(
+        mode,
+        SportMode::Sports { .. } | SportMode::Herald { .. }
+    ));
     assert!(ui.g.gi(PLAYER) >= SPORTS_FEE);
 }

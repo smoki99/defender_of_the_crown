@@ -12,7 +12,7 @@
 //! whole bout unhurt. Three clean passes make the perfect script land
 //! exactly on 100, one tick above the Gold line (90).
 
-use super::framework::{resolve, MgState, Minigame, SportSpec, Tier, SPORTS};
+use super::framework::{resolve, tap_action, MgState, Minigame, SportSpec, Tier, SPORTS};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
     Framebuffer, BLACK, BLOOD, BROWN, CREAM, DARKGRAY, GOLD, GRASS, GRAY, LINEN, NAVY, NORMAN_RED,
@@ -217,8 +217,9 @@ pub struct Sword {
     plan: [Attack; ROUNDS_MAX as usize],
     phase: Phase,
     phase_t: u32,
-    round: u32, // 0-based round index
-    exch: u32,  // exchanges used in the current round
+    hint_t: u32, // ticks since play opened: fades the bottom strip (T-UX)
+    round: u32,  // 0-based round index
+    exch: u32,   // exchanges used in the current round
     since_parry: u32,
     flinch: bool, // parried the decoy lane on the strike that hurt us
     hit: bool,    // struck at least once this match
@@ -238,6 +239,7 @@ impl Sword {
         Self {
             plan: plan(seed),
             phase: Phase::Present,
+            hint_t: 0,
             phase_t: 0,
             round: 0,
             exch: 0,
@@ -461,6 +463,9 @@ impl Minigame for Sword {
             return;
         }
         self.phase_t += 1;
+        if self.phase != Phase::Present {
+            self.hint_t += 1; // T-UX: play-start clock for the bottom strip
+        }
         if self.banner > 0 {
             self.banner -= 1;
         }
@@ -489,7 +494,7 @@ impl Minigame for Sword {
             }
             Phase::Recoil => {
                 self.since_parry += 1;
-                if input.key_pressed(KEY_SPACE) || input.pressed() {
+                if tap_action(input, KEY_SPACE) || input.pressed() {
                     self.try_riposte();
                 }
                 if self.phase == Phase::Recoil && self.since_parry >= RECOIL {
@@ -527,6 +532,7 @@ impl Sword {
         // tilt: bunting, crowd row, sandy ground -------------------------
         fb.fill_rect(0, 0, 320, 12, BLACK);
         fb.fill_rect(0, 12, 320, (FLOOR_Y as i32 - 12) as u32, NAVY);
+        crate::minigames::framework::dusk_sky(fb, 12, FLOOR_Y as i32);
         for x in (8..312).step_by(24) {
             let c = if (x / 24) % 2 == 0 {
                 SAXON_BLUE
@@ -541,6 +547,7 @@ impl Sword {
         }
         fb.fill_rect(0, FLOOR_Y as i32, 320, 50, GRASS);
         fb.fill_rect(0, FLOOR_Y as i32, 320, 2, BROWN);
+        crate::minigames::framework::skyline(fb, FLOOR_Y as i32);
         // click bands on our half -----------------------------------------
         if self.phase == Phase::Windup {
             for (i, (lo, hi)) in BANDS.iter().enumerate() {
@@ -578,11 +585,11 @@ impl Sword {
             }
         }
         // HUD -----------------------------------------------------------------
-        draw_text_shadow(fb, 4, 2, "DUEL", GOLD, BLACK);
+        // HUD counters live at y>=14: the host band owns rows 0-11.
         draw_text_shadow(
             fb,
             60,
-            2,
+            14,
             &format!(
                 "ROUND {}/5",
                 (self.round as usize).min(ROUNDS_MAX as usize - 1) + 1
@@ -593,7 +600,7 @@ impl Sword {
         for i in 0..PTS_TO_WIN {
             fb.fill_rect(
                 150 + i as i32 * 8,
-                3,
+                14,
                 6,
                 6,
                 if i < self.mine { SAXON_BLUE } else { DARKGRAY },
@@ -602,7 +609,7 @@ impl Sword {
         for i in 0..PTS_TO_WIN {
             fb.fill_rect(
                 296 - i as i32 * 8,
-                3,
+                14,
                 6,
                 6,
                 if i < self.foe_pts {
@@ -613,7 +620,7 @@ impl Sword {
             );
         }
         if self.hit {
-            draw_text_shadow(fb, 224, 2, "HURT", RED, BLACK);
+            draw_text_shadow(fb, 224, 14, "HURT", RED, BLACK);
         }
         if self.banner > 0 && !self.last.word().is_empty() && self.phase != Phase::Done {
             draw_text_shadow(fb, 116, 96, self.last.word(), self.last.color(), BLACK);
@@ -628,7 +635,10 @@ impl Sword {
             let g1 = 26 * 64 / 40;
             fb.fill_rect(129 + g0, 229, (g1 - g0) as u32, 8, BLACK);
             fb.fill_rect(129 + g0, 229, 1, 8, GOLD);
-            draw_text_shadow(fb, 118, 240, "STRIKE IN THE GAP", GRAY, BLACK);
+            if self.hint_t < 180 {
+                // T-UX: the gap prompt fades ~3 s into the bout
+                draw_text_shadow(fb, 118, 240, "STRIKE IN THE GAP", GRAY, BLACK);
+            }
         }
         match self.phase {
             Phase::Present => {

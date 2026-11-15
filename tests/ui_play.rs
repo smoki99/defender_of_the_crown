@@ -134,3 +134,64 @@ fn taps_far_from_every_keep_deselecteth() {
     ui.event(&tap(318, 4), true); // far corner of the map band
     assert_eq!(ui.sel, None);
 }
+
+#[test]
+fn keep_icon_edge_taps_hit_the_visible_keep() {
+    // The keep sprite draws over x cx-10..cx+10, y cy-12..cy+11; the hit
+    // box (tap_castle) must cover that whole footprint. Before it matched
+    // the sprite, a tap on the tower base below-left of the anchor (as
+    // painted) selected a NEIGHBOURING keep or nothing - the reported
+    // "can't attack other cities". Pin the full select->march chain
+    // through icon-edge taps only.
+    let mut ui = CampaignUi::new(7, Difficulty::Normal);
+    let (bx, by) = castle_at(&ui, "Buckingham");
+    ui.event(&tap(bx - 6, by + 6), true);
+    assert_eq!(
+        ui.sel.map(|i| ui.g.strongholds[i].name),
+        Some("Buckingham"),
+        "icon-edge tap grabbed the wrong keep"
+    );
+    // close the baron panel, then march on London by tapping ITS icon base
+    let close = action_rects(true, false)
+        .into_iter()
+        .find(|b| b.id == "close")
+        .unwrap();
+    let (cx0, cy0) = center(&close);
+    ui.event(&tap(cx0, cy0), true);
+    assert!(!ui.panel_open);
+    // CLOSE hides the panel but KEEPS the host selected - the old
+    // deselect-on-close made marching impossible once the (map-covering)
+    // panel was dismissed.
+    assert_eq!(
+        ui.sel.map(|i| ui.g.strongholds[i].name),
+        Some("Buckingham"),
+        "CLOSE must keep the host selected for the march"
+    );
+    let buck =
+        ui.g.strongholds
+            .iter()
+            .position(|s| s.name == "Buckingham")
+            .unwrap();
+    let (lx, ly) = castle_at(&ui, "London");
+    ui.event(&tap(lx, ly + 5), true);
+    assert!(
+        ui.msg.contains("MARCHES"),
+        "march did not fire: {:?}",
+        ui.msg
+    );
+    assert_eq!(
+        ui.g.strongholds[buck].garrison.len(),
+        0,
+        "host did not leave"
+    );
+    // The defenders may legitimately win (garrison then unchanged) - the
+    // invariant is that a battle was resolved and logged at London.
+    assert!(
+        ui.g
+            .log
+            .iter()
+            .any(|l| l.contains("YOUR ATTACK ON") && l.contains("London")),
+        "no battle logged: {:?}",
+        &ui.g.log[ui.g.log.len().saturating_sub(3)..]
+    );
+}

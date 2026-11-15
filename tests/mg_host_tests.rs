@@ -273,19 +273,44 @@ fn driver_enter_key_closes_results_plate() {
         SportMode::Sports { sid: 2 },
         make_game("sword", 7).unwrap(),
         cell.clone(),
-        true,
+        false,
     );
     let mut fb = Framebuffer::new();
-    for _ in 0..90 {
+    // No input: the foe wins the duel on his own - the plate must then
+    // wait (no auto-ack without autoplay), whatever it takes him.
+    for _ in 0..3000 {
         host.draw(&mut fb);
     }
-    assert!(!host.wants_leave(), "plate waits for an explicit ack");
     host.event(&SceneEvent::Key {
         code: KEY_ENTER,
         pressed: true,
     });
     host.draw(&mut fb);
     assert!(host.wants_leave(), "ENTER on the plate must close the host");
+}
+
+/// Autoplay must never stall on the results plate: the demo bot acks it
+/// by itself shortly after the score freezes.
+#[test]
+fn autoplay_acks_results_plate() {
+    use defender_of_the_crown::ui::host::make_game;
+    let cell: OutcomeCell = Rc::new(RefCell::new(None));
+    let spec = SPORTS.iter().find(|s| s.id == "sword").unwrap();
+    let mut host = MgHost::new(
+        spec,
+        SportMode::Sports { sid: 2 },
+        make_game("sword", 7).unwrap(),
+        cell.clone(),
+        true,
+    );
+    let mut fb = Framebuffer::new();
+    for _ in 0..400 {
+        host.draw(&mut fb);
+        if host.wants_leave() {
+            return;
+        }
+    }
+    panic!("autoplay stalled on the results plate");
 }
 
 /// The SPORTS registry and the make_game factory must never drift: every
@@ -303,4 +328,44 @@ fn every_registered_sport_boots_by_id() {
         );
     }
     assert!(make_game("wyvern", 3).is_none(), "no phantom ides");
+}
+
+#[test]
+fn swipe_scene_event_reaches_the_joust_lanes() {
+    // T705 browser regression: the app-level recognizer consumes the raw
+    // stroke and forwards only SceneEvent::Swipe. If the host drops it the
+    // joust lanes freeze on touch devices, so it must reach the game input.
+    use defender_of_the_crown::engine::input::Dir;
+    use defender_of_the_crown::minigames::joust::Joust;
+    let spec = SPORTS.iter().find(|s| s.id == "joust").expect("joust spec");
+    let cell: OutcomeCell = Rc::default();
+    let mut h = MgHost::new(
+        spec,
+        SportMode::Sports { sid: 0 },
+        Box::new(Joust::new(7)),
+        cell,
+        false,
+    );
+    let mut fb = Framebuffer::new();
+    let mut rgba = vec![0u8; 320 * 256 * 4];
+    let mut pip_gold = |fb: &Framebuffer, n: usize| -> u32 {
+        fb.to_rgba(&mut rgba);
+        let mut k = 0u32;
+        for y in 246..254 {
+            for x in (192 + n * 12)..(200 + n * 12) {
+                let i = (y * 320 + x) * 4;
+                if rgba[i] == 187 && rgba[i + 1] == 153 {
+                    k += 1;
+                }
+            }
+        }
+        k
+    };
+    pump(&mut h, &mut fb, 20);
+    assert!(pip_gold(&fb, 1) >= 30, "want pip starts on the centre lane");
+    assert_eq!(pip_gold(&fb, 0), 0, "west lane idle");
+    h.event(&SceneEvent::Swipe { dir: Dir::W });
+    pump(&mut h, &mut fb, 2);
+    assert!(pip_gold(&fb, 0) >= 30, "west swipe must step the pip back");
+    assert_eq!(pip_gold(&fb, 1), 0, "centre pip gone after the step");
 }

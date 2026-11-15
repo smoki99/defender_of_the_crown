@@ -14,7 +14,7 @@ use crate::campaign::game::Tier;
 use crate::engine::audio::Sfx;
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{BLACK, BLOOD, BROWN, DARKGRAY, GOLD, GRAY, NAVY, SILVER, WHITE};
-use crate::engine::input::{Input, Raw, KEY_ENTER, KEY_ESC};
+use crate::engine::input::{Dir, Gesture, Input, Raw, KEY_ENTER, KEY_ESC};
 use crate::engine::scene::{AppCtx, Scene, SceneEvent};
 use crate::minigames::framework::{resolve, MgOutcome, MgState};
 use std::cell::RefCell;
@@ -24,8 +24,12 @@ use std::rc::Rc;
 /// the herald's free meet with double rewards.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SportMode {
-    Sports { sid: usize },
-    Herald { sid: usize },
+    Sports {
+        sid: usize,
+    },
+    Herald {
+        sid: usize,
+    },
     /// T704 rare event: the dragon's hoard heist, no castle attached.
     Hoard,
 }
@@ -47,6 +51,7 @@ pub struct MgHost {
     input: Input,
     frame: u64,
     stashed: Vec<Raw>,
+    swipes: Vec<Dir>,
     paused: bool,
     phase: Phase,
     res_ticks: u32,
@@ -74,6 +79,7 @@ impl MgHost {
             input: Input::new(),
             frame: 0,
             stashed: Vec::new(),
+            swipes: Vec::new(),
             paused: false,
             phase: Phase::Play,
             res_ticks: 0,
@@ -173,7 +179,7 @@ impl MgHost {
                 None => "NO PURSE - NO FEE",
             };
             kit::centered(fb, 140, purse, GOLD, BLACK);
-            kit::centered(fb, 176, "ENTER CONTINUES", SILVER, BLACK);
+            kit::centered(fb, 176, "TAP OR ENTER", SILVER, BLACK);
         }
     }
 }
@@ -196,6 +202,12 @@ impl Scene for MgHost {
             SceneEvent::DragEnd { x1, y1, .. } => Raw::Up { x: x1, y: y1 },
             SceneEvent::Key { code, pressed } => Raw::Key { code, pressed },
             SceneEvent::Wheel { dy } => Raw::Wheel { dy },
+            SceneEvent::Swipe { dir } => {
+                // classified upstream; the raw stream no longer carries the
+                // stroke, so hand the gesture to the game input directly.
+                self.swipes.push(dir);
+                return;
+            }
             _ => return,
         };
         self.stashed.push(raw);
@@ -219,6 +231,9 @@ impl Scene for MgHost {
             self.input.push(r);
         }
         self.input.begin_frame(self.frame);
+        for d in self.swipes.drain(..) {
+            self.input.inject_gesture(Gesture::Swipe { dir: d });
+        }
         if self.phase == Phase::Play {
             if self.input.key_pressed(b'p' as u32) || self.input.key_pressed(KEY_ESC) {
                 self.paused = !self.paused;
@@ -249,7 +264,9 @@ impl Scene for MgHost {
         } else {
             self.res_ticks += 1;
             self.draw_results(fb);
-            if self.input.key_pressed(KEY_ENTER) || (self.autoplay && self.res_ticks > 90) {
+            if self.input.key_pressed(KEY_ENTER)
+                || (self.res_ticks > 60 && (self.autoplay || self.input.pressed()))
+            {
                 self.done = true;
             }
         }

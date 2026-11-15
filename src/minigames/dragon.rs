@@ -15,10 +15,10 @@ use super::framework::{resolve, MgState, Minigame, SPORTS};
 use crate::campaign::rng::Xor;
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BROWN, DARKGRAY, DARKGREEN, DARKRED, EMBER, GOLD, GREEN, LINEN,
-    LIGHTBLUE, NAVY, ORANGE, PEACH, RED, SAXON_BLUE, SILVER, TAN, WHITE, YELLOW,
+    Framebuffer, BLACK, BROWN, DARKGRAY, DARKGREEN, DARKRED, EMBER, GOLD, GREEN, LIGHTBLUE, LINEN,
+    NAVY, ORANGE, PEACH, RED, SAXON_BLUE, SILVER, TAN, WHITE, YELLOW,
 };
-use crate::engine::input::{Input, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_UP};
+use crate::engine::input::{Dir, Gesture, Input, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_UP};
 
 const PRESENT: u32 = 90; // "THE DRAGON'S HOARD" banner
 const CYCLE: u32 = 150; // sleep -> doze -> gaze -> settle
@@ -31,6 +31,7 @@ const MARK_GAP: u32 = 45; // ticks between fire volleys
 const MARK_T: u32 = 16; // ember marker telegraph
 const FLAME_T: u32 = 10; // flame column duration
 const FLAME_W: f32 = 9.0; // half-width of the kill zone
+const STROKE_T: u32 = 12; // ticks a swipe/tap flee stroke runs
 
 const SP0: f32 = 1.6; // unencumbered speed
 const SLOW: f32 = 0.15; // speed lost per weight point - at the full hoard
@@ -74,9 +75,12 @@ pub struct Dragon {
     awake: bool,
     roar: u32,
     stage: u8, // 0 stalk, 1 marked, 2 flame
-    vt: u32, // current stage countdown
-    tx: f32, // marked column
-    ph0: u32, // seeded offset into the sleep cycle
+    vt: u32,   // current stage countdown
+    sx: f32,   // latched flee-stroke vector (T-UX swipe/tap)
+    sy: f32,
+    stroke: u32, // ticks left in the current stroke
+    tx: f32,     // marked column
+    ph0: u32,    // seeded offset into the sleep cycle
     escaped: bool,
     final_s: u32,
     state: MgState,
@@ -99,6 +103,9 @@ impl Dragon {
             roar: 0,
             stage: 0,
             vt: 0,
+            sx: 0.0,
+            sy: 0.0,
+            stroke: 0,
             tx: 0.0,
             ph0: rng.below(40),
             escaped: false,
@@ -175,6 +182,34 @@ impl Dragon {
 
     fn move_player(&mut self, input: &Input) {
         let sp = (SP0 - SLOW * self.weight as f32).max(0.7);
+        // T-UX (audit: flee was keyboard-only): a swipe strides along its
+        // Dir and any tap is a flee-LEFT stroke; touch has no hold, so a
+        // stroke runs STROKE_T ticks at the thief's encumbered pace.
+        for g in input.gestures() {
+            match *g {
+                Gesture::Swipe { dir: d } => {
+                    let (ux, uy) = match d {
+                        Dir::N => (0.0, -1.0),
+                        Dir::NE => (1.0, -1.0),
+                        Dir::E => (1.0, 0.0),
+                        Dir::SE => (1.0, 1.0),
+                        Dir::S => (0.0, 1.0),
+                        Dir::SW => (-1.0, 1.0),
+                        Dir::W => (-1.0, 0.0),
+                        Dir::NW => (-1.0, -1.0),
+                    };
+                    self.sx = ux;
+                    self.sy = uy;
+                    self.stroke = STROKE_T;
+                }
+                Gesture::Tap { .. } => {
+                    self.sx = -1.0;
+                    self.sy = 0.0;
+                    self.stroke = STROKE_T;
+                }
+                _ => {}
+            }
+        }
         let mut vx = 0.0;
         if input.key_down(KEY_LEFT) {
             vx = -sp;
@@ -188,6 +223,18 @@ impl Dragon {
             vy = -sp * 0.7;
         } else if input.key_down(KEY_DOWN) {
             vy = sp * 0.7;
+        }
+        if vx != 0.0 || vy != 0.0 {
+            self.stroke = 0; // a keyboard hold rules over a stroke
+        } else if self.stroke > 0 {
+            self.stroke -= 1;
+            vx = self.sx * sp;
+            vy = self.sy * sp * 0.7;
+            if vx > 0.0 {
+                self.face = 1;
+            } else if vx < 0.0 {
+                self.face = -1;
+            }
         }
         self.px = (self.px + vx).clamp(X_MIN, X_MAX);
         self.py = (self.py + vy).clamp(Y_MIN, Y_MAX);
@@ -285,7 +332,17 @@ impl Dragon {
         for i in 0..40i32 {
             let mx = 170 + i * 3;
             let mh = (40 - (20 - i).abs()) * 3;
-            fb.fill_rect(mx, 200 - mh, 3, mh as u32, if (mx / 3 + 200 - mh) % 7 == 0 { YELLOW } else { GOLD });
+            fb.fill_rect(
+                mx,
+                200 - mh,
+                3,
+                mh as u32,
+                if (mx / 3 + 200 - mh) % 7 == 0 {
+                    YELLOW
+                } else {
+                    GOLD
+                },
+            );
         }
         self.draw_dragon(fb);
         // loot sacks (linen bodies, gold cinch) and the crown
@@ -315,7 +372,13 @@ impl Dragon {
         // torches on the walls
         for tx in [40, 296] {
             fb.fill_rect(tx, 60, 3, 10, BROWN);
-            fb.fill_rect(tx, 54, 3, 6, if self.tick_n % 20 < 10 { EMBER } else { ORANGE });
+            fb.fill_rect(
+                tx,
+                54,
+                3,
+                6,
+                if self.tick_n % 20 < 10 { EMBER } else { ORANGE },
+            );
         }
         self.draw_fire(fb);
         self.draw_player(fb);
@@ -332,7 +395,11 @@ impl Dragon {
             ("SLEEPING", SILVER)
         };
         draw_text_shadow(fb, 130, 240, hint, hcol, BLACK);
-        draw_text_shadow(fb, 236, 240, "FLEE LEFT", SAXON_BLUE, BLACK);
+        if self.tick_n.saturating_sub(PRESENT) < 180 {
+            // T-UX: the text strip fades ~3 s into the heist (audit); the
+            // painted west door stays as the escape's non-text mark.
+            draw_text_shadow(fb, 236, 240, "FLEE LEFT", SAXON_BLUE, BLACK);
+        }
     }
 
     fn draw_dragon(&self, fb: &mut Framebuffer) {
@@ -347,7 +414,7 @@ impl Dragon {
         let (cyc, _) = self.cycle();
         if self.awake {
             fb.fill_rect(190, 136, 5, 4, EMBER); // roaring eye
-            // open maw with a flame gutter
+                                                 // open maw with a flame gutter
             fb.fill_rect(182, 142, 6, 5, RED);
             fb.fill_rect(182, 144, 4, 3, ORANGE);
         } else if cyc == 2 {
@@ -357,7 +424,7 @@ impl Dragon {
             fb.fill_rect(190, 137, 5, 1, EMBER); // just a slit
         } else {
             fb.fill_rect(190, 138, 5, 1, BLACK); // fast asleep
-            // drifting Zzz
+                                                 // drifting Zzz
             let z = ((self.tick_n / 16) % 3) as i32;
             draw_text_shadow(fb, 210 + z * 8, 104 - z * 7, "Z", YELLOW, BLACK);
         }
@@ -382,12 +449,22 @@ impl Dragon {
             for k in 0..2 {
                 fb.fill_rect(txi - 10, 168 + k * 52, 20, 2, EMBER);
             }
-            fb.fill_rect(txi - 1, 148, 2, 84, if self.tick_n % 4 < 2 { EMBER } else { DARKRED });
+            fb.fill_rect(
+                txi - 1,
+                148,
+                2,
+                84,
+                if self.tick_n % 4 < 2 { EMBER } else { DARKRED },
+            );
         } else if self.stage == 2 {
             // the column of flame, flickering
             for x in -9..10 {
                 let h = (96 - ((x * x) / 9)) as u32;
-                let c = if (x + self.tick_n as i32) % 3 == 0 { YELLOW } else { ORANGE };
+                let c = if (x + self.tick_n as i32) % 3 == 0 {
+                    YELLOW
+                } else {
+                    ORANGE
+                };
                 fb.fill_rect(txi + x, 232 - h as i32, 1, h, c);
             }
             fb.fill_rect(txi - 9, 232 - 40, 18, 40, RED);
@@ -449,9 +526,7 @@ impl Minigame for Dragon {
                 self.move_player(input);
                 self.grabs();
                 self.volley_tick();
-                if self.phase == Phase::Run
-                    && self.px <= DOOR
-                    && (150.0..216.0).contains(&self.py)
+                if self.phase == Phase::Run && self.px <= DOOR && (150.0..216.0).contains(&self.py)
                 {
                     self.finish(true);
                 }

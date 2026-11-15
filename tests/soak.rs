@@ -32,7 +32,12 @@ fn invariants(g: &GameState, check_gold: bool) -> Result<(), String> {
     }
     for s in &g.strongholds {
         if s.garrison.len() > MAX_GARRISON {
-            return Err(format!("turn {}: {} garrison {}", g.turn, s.name, s.garrison.len()));
+            return Err(format!(
+                "turn {}: {} garrison {}",
+                g.turn,
+                s.name,
+                s.garrison.len()
+            ));
         }
     }
     Ok(())

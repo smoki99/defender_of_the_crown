@@ -6,8 +6,9 @@
 // clips the apple. Score plate + purse delta close the proof.
 process.env.CROWN_QS ??= "scene=play&seed=7&turn=14&mute=1";
 const { coords, tap, key, keyDown, keyUp, px, snap, decodeTurn, regionDiff, shot, ok, finish, problems } = await import("./jsdom-harness.mjs");
-const GOLD = [204, 170, 0];
-const RED = [187, 17, 17];
+// T706 gold family: bright (187,153,51), dimmed (124,102,34)
+const goldP = (p) => p[0] >= 110 && p[0] - p[1] >= 20 && p[0] - p[1] <= 55 && p[1] - p[2] >= 30;
+const RED = [153, 34, 17]; // T706 Norman red
 const WHITE = [255, 255, 255];
 const eq = (p, q) => p[0] === q[0] && p[1] === q[1] && p[2] === q[2];
 
@@ -19,7 +20,7 @@ function targets(f) {
   for (let y = 108; y < 186; y++) {
     for (let x = 56; x < 264; x++) {
       const i = (y * 320 + x) * 4;
-      if (f[i] === GOLD[0] && f[i + 1] === GOLD[1] && f[i + 2] === GOLD[2]) {
+      if (goldP([f[i], f[i + 1], f[i + 2]])) {
         // cluster top-left of a 4x4 run
         if (!out.some((t) => Math.abs(t[0] - x) < 6 && Math.abs(t[1] - y) < 6)) out.push([x + 2, y + 2]);
       }
@@ -76,7 +77,7 @@ let booted = false;
 for (let i = 0; i < 600 && !booted; i++) {
   await Bun.sleep(200);
   const sky = px(160, 44);
-  if (sky[0] === 128 && sky[1] === 224 && sky[2] === 224) {
+  if (sky[0] >= 140 && sky[0] - sky[2] >= 40 && sky[1] - sky[2] >= 25) { // T706 parchment map top (bright or dim row)
     const t = decodeTurn(snap());
     if (t !== null && t >= 14 && t < 26) booted = true;
   } else if (i > 150) {
@@ -86,7 +87,7 @@ for (let i = 0; i < 600 && !booted; i++) {
 }
 ok(booted, "the deep-linked campaign answered at turn 14");
 await Bun.sleep(120);
-const linAt = (x, y) => { const f = snap(); const i = (y * 320 + x) * 4; return f[i] === 204 && f[i + 1] === 204 && f[i + 2] === 153; };
+const linAt = (x, y) => { const f = snap(); const i = (y * 320 + x) * 4; const r = f[i], g = f[i + 1], b = f[i + 2]; return (Math.abs(r - 187) <= 14 && Math.abs(g - 170) <= 14 && Math.abs(b - 119) <= 14) || (Math.abs(r - 124) <= 12 && Math.abs(g - 113) <= 12 && Math.abs(b - 79) <= 12); };
 // dismiss any campaign modal that covers the plate area (linen title at the
 // centre), but never tap on a bare map: a stray tap there selects a castle,
 // whose linen plate the loop would then mistake for yet another modal.
@@ -213,9 +214,9 @@ shot("archery-apple");
 let scoreSeen = false;
 for (let i = 0; i < 150 && !scoreSeen; i++) {
   const f = snap();
-  // the scanline filter dims alternate rows: bright GOLD anywhere in the
-  // SCORE text band (y56..72, x100..220) is the results plate.
-  scan: for (let y = 56; y < 72; y++) for (let x = 100; x < 220; x++) { const i2 = (y * 320 + x) * 4; if (f[i2] >= 180 && f[i2 + 1] >= 140 && f[i2 + 2] <= 40) { scoreSeen = true; break scan; } }
+  // the scanline filter dims alternate rows: T706 GOLD (bright or dim)
+  // anywhere in the SCORE text band (y56..72, x100..220) is the results plate.
+  scan: for (let y = 56; y < 72; y++) for (let x = 100; x < 220; x++) { const i2 = (y * 320 + x) * 4; const r = f[i2], g = f[i2 + 1], b = f[i2 + 2]; if (r >= 115 && r - g >= 20 && r - g <= 60 && g - b >= 60) { scoreSeen = true; break scan; } }
   if (!scoreSeen) await Bun.sleep(100);
 }
 ok(scoreSeen, "the GALLERY board showed the score");

@@ -12,6 +12,14 @@ mkdirSync(SHOTS, { recursive: true });
 
 export const W = 320, H = 256;
 
+// ---- shipped palette parsed from src/engine/gfx.rs (single source of
+// truth): pixel assertions must pin the CURRENT palette, never stale RGB.
+export const PAL = Object.fromEntries(
+  [...(await Bun.file(`${ROOT}/src/engine/gfx.rs`).text()).matchAll(
+    /\[(\d+),\s*(\d+),\s*(\d+)\],\s*\/\/\s*\d+\s+(\w+)/g,
+  )].map((m) => [m[4], [Number(m[1]), Number(m[2]), Number(m[3])]]),
+);
+
 // ---- tap coordinates from `cargo run --example coords`
 export const coords = {};
 export const digits = {};
@@ -146,7 +154,7 @@ export function shot(name) {
 
 /// HUD turn counter read straight from the framebuffer (8x8 glyphs at (160,204)).
 export function decodeTurn(fr) {
-  const white = (x, y) => { const i = (y * W + x) * 4; return fr[i] > 150 && fr[i + 1] > 150 && fr[i + 2] > 150; };
+  const white = (x, y) => { const i = (y * W + x) * 4; return fr[i] > 140 && fr[i + 1] > 140 && fr[i + 2] > 140; };
   const cellMask = (cx, cy) => { const rows = []; for (let r = 0; r < 8; r++) { let m = 0; for (let c = 0; c < 8; c++) if (white(cx + c, cy + r)) m |= 0x80 >> c; rows.push(m); } return rows; };
   let s = "";
   for (let k = 0; k < 2; k++) {

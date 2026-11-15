@@ -55,8 +55,14 @@ fn every_reward_table_is_monotone_and_gated() {
         }
         // the purse-side resolver agrees on the promotion lines
         assert_eq!(Tier::of(s.gold_at, s.silver_at, s.gold_at), Tier::Gold);
-        assert_eq!(Tier::of(s.gold_at - 1, s.silver_at, s.gold_at), Tier::Silver);
+        assert_eq!(
+            Tier::of(s.gold_at - 1, s.silver_at, s.gold_at),
+            Tier::Silver
+        );
         assert_eq!(Tier::of(s.silver_at, s.silver_at, s.gold_at), Tier::Silver);
-        assert_eq!(Tier::of(s.silver_at - 1, s.silver_at, s.gold_at), Tier::Bronze);
+        assert_eq!(
+            Tier::of(s.silver_at - 1, s.silver_at, s.gold_at),
+            Tier::Bronze
+        );
     }
 }

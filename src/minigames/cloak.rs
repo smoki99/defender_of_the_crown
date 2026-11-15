@@ -8,7 +8,7 @@
 //! route to a 95+.
 //!
 //! Geometry: the keep is the fixed 20x16 [`KEEP`] (`#` = stone); the thief
-//! steps one 16 px cell per beat of the movement cooldown, guards step one
+//! steps one 16 px cell per press, swipe or cooldown beat, guards step one
 //! cell every `period` ticks along fixed ping-pong beats. The only seed
 //! variance is each guard's tempo and starting phase, so a run is fully
 //! predictable once observed — and fully deterministic in tests.
@@ -19,7 +19,7 @@ use crate::engine::gfx::{
     Framebuffer, BLACK, BROWN, CREAM, DARKGRAY, GOLD, GRAY, GRAY3, NAVY, NORMAN_RED, RED,
     SAXON_BLUE, SILVER, STONE, WHITE,
 };
-use crate::engine::input::{Input, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_UP};
+use crate::engine::input::{Dir, Gesture, Input, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_UP};
 
 const PRESENT: u32 = 90; // "THE KEEP AT NIGHT" banner
 const TABLEAU: u32 = 100; // results beat before Done
@@ -95,7 +95,6 @@ struct Guard {
     fx: i32,
     fy: i32,
 }
-
 
 impl Guard {
     fn beat_len(&self) -> i32 {
@@ -367,7 +366,9 @@ impl Cloak {
     /// the web adapter passes raw codepoints for printable keys).
     fn held_dir(input: &Input, test: fn(&Input, u32) -> bool) -> Option<(i32, i32)> {
         let is = |arrow: u32, w: u8| {
-            test(input, arrow) || test(input, w as u32) || test(input, w.to_ascii_uppercase() as u32)
+            test(input, arrow)
+                || test(input, w as u32)
+                || test(input, w.to_ascii_uppercase() as u32)
         };
         if is(KEY_UP, b'w') {
             Some((0, -1))
@@ -385,6 +386,23 @@ impl Cloak {
     fn move_thief(&mut self, input: &Input) {
         // a fresh press wins over a held key; held steps repeat on cooldown
         let mut dir = Self::held_dir(input, Input::key_pressed);
+        // T-UX (audit: arrows-only): one swipe = one cell step in its Dir
+        // (8-way), worth as much as a fresh key press.
+        if dir.is_none() {
+            dir = input.gestures().iter().find_map(|g| match *g {
+                Gesture::Swipe { dir: d } => Some(match d {
+                    Dir::N => (0, -1),
+                    Dir::NE => (1, -1),
+                    Dir::E => (1, 0),
+                    Dir::SE => (1, 1),
+                    Dir::S => (0, 1),
+                    Dir::SW => (-1, 1),
+                    Dir::W => (-1, 0),
+                    Dir::NW => (-1, -1),
+                }),
+                _ => None,
+            });
+        }
         if dir.is_none() && self.tick_n.saturating_sub(self.last_move) >= MOVE_CD {
             dir = Self::held_dir(input, Input::key_down);
         }
@@ -442,7 +460,10 @@ impl Cloak {
         }
         self.guard_t += 1;
         for g in self.guards.iter_mut() {
-            let p = g.period.saturating_sub(self.bells * SPEEDUP).max(MIN_PERIOD);
+            let p = g
+                .period
+                .saturating_sub(self.bells * SPEEDUP)
+                .max(MIN_PERIOD);
             if self.guard_t.is_multiple_of(p) {
                 g.step();
             }
@@ -570,13 +591,7 @@ impl Cloak {
         }
         // the postern ------------------------------------------------------------
         let lit = self.phase == Phase::Run && self.torch_out.iter().all(|t| *t);
-        fb.fill_rect(
-            GATE.0 * CELL + 2,
-            GATE.1 * CELL + 1,
-            12,
-            14,
-            BROWN,
-        );
+        fb.fill_rect(GATE.0 * CELL + 2, GATE.1 * CELL + 1, 12, 14, BROWN);
         fb.rect(
             GATE.0 * CELL + 2,
             GATE.1 * CELL + 1,
@@ -594,16 +609,46 @@ impl Cloak {
         // the portcullis -----------------------------------------------------------
         if !self.gate_open {
             for k in 0..4 {
-                fb.fill_rect(PORTCULLIS.0 * CELL + 2 + k * 4, PORTCULLIS.1 * CELL + 1, 2, 14, GRAY3);
+                fb.fill_rect(
+                    PORTCULLIS.0 * CELL + 2 + k * 4,
+                    PORTCULLIS.1 * CELL + 1,
+                    2,
+                    14,
+                    GRAY3,
+                );
             }
-            fb.fill_rect(PORTCULLIS.0 * CELL + 1, PORTCULLIS.1 * CELL + 1, 14, 2, GRAY);
+            fb.fill_rect(
+                PORTCULLIS.0 * CELL + 1,
+                PORTCULLIS.1 * CELL + 1,
+                14,
+                2,
+                GRAY,
+            );
         } else {
-            fb.fill_rect(PORTCULLIS.0 * CELL + 1, PORTCULLIS.1 * CELL + 1, 14, 3, GRAY3);
+            fb.fill_rect(
+                PORTCULLIS.0 * CELL + 1,
+                PORTCULLIS.1 * CELL + 1,
+                14,
+                3,
+                GRAY3,
+            );
         }
         // the lever -------------------------------------------------------------------
         let (lx, ly) = (LEVER.0 * CELL, LEVER.1 * CELL);
-        fb.fill_rect(lx + 6, ly + 6, 3, 8, if self.gate_open { GRAY3 } else { BROWN });
-        fb.fill_rect(lx + 5, ly + (if self.gate_open { 3 } else { 4 }), 6, 3, if self.gate_open { SILVER } else { GOLD });
+        fb.fill_rect(
+            lx + 6,
+            ly + 6,
+            3,
+            8,
+            if self.gate_open { GRAY3 } else { BROWN },
+        );
+        fb.fill_rect(
+            lx + 5,
+            ly + (if self.gate_open { 3 } else { 4 }),
+            6,
+            3,
+            if self.gate_open { SILVER } else { GOLD },
+        );
         // bells ------------------------------------------------------------------------
         for (i, b) in BELLS.iter().enumerate() {
             let (bx, by) = (b.0 * CELL, b.1 * CELL);
@@ -628,7 +673,11 @@ impl Cloak {
         for i in 0..self.guards.len() {
             let (gx, gy, _) = self.guard(i);
             let (gx, gy) = (gx * CELL + 8, gy * CELL + 8);
-            let quake = if self.frozen > 0 { (self.phase_t % 4 / 2) as i32 } else { 0 };
+            let quake = if self.frozen > 0 {
+                (self.phase_t % 4 / 2) as i32
+            } else {
+                0
+            };
             fb.fill_rect(gx - 3 + quake, gy - 4, 6, 9, NORMAN_RED);
             fb.fill_rect(gx - 3 + quake, gy - 7, 6, 3, SILVER);
         }
@@ -640,13 +689,35 @@ impl Cloak {
             fb.fill_rect(px - 3, py - 7, 6, 1, SAXON_BLUE);
         }
         // HUD --------------------------------------------------------------------------------
-        draw_text_shadow(fb, 4, 2, "STEALTH", GOLD, BLACK);
-        draw_text_shadow(fb, 108, 2, &format!("TORCHES {}/5", self.torches_out()), CREAM, BLACK);
+        draw_text_shadow(
+            fb,
+            4,
+            14,
+            &format!("TORCHES {}/5", self.torches_out()),
+            CREAM,
+            BLACK,
+        );
         for k in 0..self.cloaks {
-            fb.fill_rect(224 + k as i32 * 8, 4, 6, 7, if self.cloaks == 1 { RED } else { SILVER });
+            fb.fill_rect(
+                224 + k as i32 * 8,
+                15,
+                6,
+                7,
+                if self.cloaks == 1 { RED } else { SILVER },
+            );
         }
         for k in 0..3 {
-            fb.fill_rect(262 + k * 8, 3, 6, 7, if (k as u32) < self.bells { GOLD } else { DARKGRAY });
+            fb.fill_rect(
+                262 + k * 8,
+                14,
+                6,
+                7,
+                if (k as u32) < self.bells {
+                    GOLD
+                } else {
+                    DARKGRAY
+                },
+            );
         }
         if self.plate_t > 0 {
             let c = if self.plate == "HALT! AN EYE FOUND YOU" || self.plate == "IN IRONS!" {
@@ -669,7 +740,11 @@ impl Cloak {
                     MgState::Lost => "IN THE TOWER",
                     _ => "INTO THE NIGHT",
                 };
-                let col = if self.state == MgState::Lost { RED } else { GOLD };
+                let col = if self.state == MgState::Lost {
+                    RED
+                } else {
+                    GOLD
+                };
                 draw_text_shadow(fb, 96, 84, msg, col, BLACK);
             }
             _ => {}

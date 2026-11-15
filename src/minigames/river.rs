@@ -1,8 +1,9 @@
 //! mg-river — CANOE (SPEC 6 #7): pole the champion upstream to the falls.
-//! Hold SPACE to bend the pole, release to vault: the leap carries a burst
-//! of speed AND lifts the canoe clear of whatever the river owns — a boulder
-//! gets vaulted, a pike boat gets ridden over (the crew swims). Touch either
-//! from the water and the river wins that argument: wipeout, swept back.
+//! Hold SPACE to bend the pole, release to vault — a tap is one mid-power
+//! stroke: the leap carries a burst of speed AND lifts the canoe clear of
+//! whatever the river owns: a boulder gets vaulted, a pike boat gets ridden
+//! over (the crew swims). Touch either from the water and the river wins
+//! that argument: wipeout, swept back.
 //! Landing is its own safety: the moment the hull touches back down the
 //! canoe skims — a mark met in that skim is HOPPED (credited like a vault),
 //! never a capsize, and a landing in a rock's wash only shakes the canoe.
@@ -13,13 +14,13 @@
 //! hull huddles in that rock's wake row, or the pair would be unclearnable.
 //! All marks are constant; lanes, tempo and phase come from the seed.
 
-use super::framework::{resolve, MgState, Minigame, SPORTS};
+use super::framework::{resolve, tap_action, MgState, Minigame, SPORTS};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
     Framebuffer, BLACK, BROWN, CREAM, DARKGRAY, DEEPWATER, GOLD, GRAY, GRAY3, LIGHTBLUE, NAVY,
     NORMAN_RED, SAXON_BLUE, SILVER, STONE, TAN, TEAL, WHITE,
 };
-use crate::engine::input::{Input, KEY_LEFT, KEY_RIGHT, KEY_SPACE};
+use crate::engine::input::{Dir, Gesture, Input, KEY_LEFT, KEY_RIGHT, KEY_SPACE};
 
 const PRESENT: u32 = 90; // "UP THE RIVER" banner
 const TABLEAU: u32 = 100; // results beat before Done
@@ -30,6 +31,7 @@ const STEER: f32 = 2.2; // px/tick
 const CURRENT: f32 = 0.9; // px/tick the river gives for free
 const MAX_CHARGE: u32 = 30;
 const MIN_VAULT: u32 = 8;
+const TAP_VAULT: u32 = 14; // touch stroke: fixed mid-power bend
 const STUN: u32 = 45; // paddle-drift after a wipeout
 const GRACE: u32 = 135; // hazard immunity from wipe to calm water
 const WASH_BACK: f32 = 25.0; // px the river spits you down
@@ -61,7 +63,7 @@ struct Rock {
     p: f32,
     x: f32,
     settled: bool, // vaulted, drowned, or left behind
-    hit: bool,    // cleared it in the air
+    hit: bool,     // cleared it in the air
 }
 
 #[derive(Clone, Copy)]
@@ -187,7 +189,12 @@ impl River {
         self.vel
     }
     pub fn rock(&self, i: usize) -> (f32, f32, bool, bool) {
-        (self.rocks[i].p, self.rocks[i].x, self.rocks[i].settled, self.rocks[i].hit)
+        (
+            self.rocks[i].p,
+            self.rocks[i].x,
+            self.rocks[i].settled,
+            self.rocks[i].hit,
+        )
     }
     pub fn boat(&self, i: usize) -> (f32, bool, bool) {
         (self.boats[i].p, self.boats[i].settled, self.boats[i].sunk)
@@ -247,6 +254,17 @@ impl River {
         if input.key_down(KEY_RIGHT) {
             dx += STEER;
         }
+        // T-UX (audit: steering was keyboard-only): an E/W swipe nudges
+        // the hull one steer-step per swipe.
+        for g in input.gestures() {
+            if let Gesture::Swipe { dir } = *g {
+                match dir {
+                    Dir::W | Dir::NW | Dir::SW => dx -= STEER,
+                    Dir::E | Dir::NE | Dir::SE => dx += STEER,
+                    _ => {}
+                }
+            }
+        }
         self.x = (self.x + dx).clamp(X0, X1);
     }
 
@@ -264,6 +282,12 @@ impl River {
                 let c = self.charge;
                 self.vel = (self.vel + 0.09 * c as f32).min(3.2);
                 self.air = 26 + c;
+                self.air_len = self.air;
+            } else if tap_action(input, KEY_SPACE) {
+                // T-UX (audit: the pole was keyboard-only): touch has no
+                // hold, so a tap strokes once at a fixed mid bend.
+                self.vel = (self.vel + 0.09 * TAP_VAULT as f32).min(3.2);
+                self.air = 26 + TAP_VAULT;
                 self.air_len = self.air;
             }
             self.charge = 0;
@@ -415,7 +439,9 @@ impl River {
             }
         }
         for y in (4..256).step_by(7) {
-            let seed = (y as u32).wrapping_mul(2654435761).wrapping_add(so as u32 * 97);
+            let seed = (y as u32)
+                .wrapping_mul(2654435761)
+                .wrapping_add(so as u32 * 97);
             let xx = 36 + ((seed >> 13) % 244) as i32;
             if (seed >> 25) & 3 == 0 {
                 fb.fill_rect(xx, y, 2, 1, TEAL);
@@ -490,7 +516,11 @@ impl River {
         }
         // the canoe ------------------------------------------------------------------------
         let k = self.air as f32 / self.air_len as f32;
-        let lift = if self.air > 0 { (4.0 * k * (1.0 - k) * 8.0) as i32 } else { 0 };
+        let lift = if self.air > 0 {
+            (4.0 * k * (1.0 - k) * 8.0) as i32
+        } else {
+            0
+        };
         let cx = self.x as i32;
         let cy = CANOE_Y;
         let blink = self.invuln > 0 && self.stun > 0 && self.tick_n % 6 < 3;
@@ -508,18 +538,24 @@ impl River {
             if self.charge > 0 {
                 // the bent pole reaching downstream
                 for t in 0..10 {
-                    fb.fill_rect(cx + 2 + t, hy - 4 + t + (self.charge as i32 / 6), 1, 1, SILVER);
+                    fb.fill_rect(
+                        cx + 2 + t,
+                        hy - 4 + t + (self.charge as i32 / 6),
+                        1,
+                        1,
+                        SILVER,
+                    );
                 }
             }
         }
         // HUD ---------------------------------------------------------------------------------
-        draw_text_shadow(fb, 4, 2, "CANOE", GOLD, BLACK);
+        // HUD counters live at y>=14: the host band owns rows 0-11.
         let rem = (P_TOTAL - self.s).max(0.0) as i32;
-        draw_text_shadow(fb, 116, 2, &format!("FALLS {rem}"), CREAM, BLACK);
+        draw_text_shadow(fb, 4, 14, &format!("FALLS {rem}"), CREAM, BLACK);
         draw_text_shadow(
             fb,
             250,
-            2,
+            14,
             &format!("WIPE {}", self.wipes),
             if self.wipes > 0 { NORMAN_RED } else { CREAM },
             BLACK,
@@ -533,7 +569,11 @@ impl River {
         fb.fill_rect(306, 220 - ph, 3, ph.max(1) as u32, GOLD);
         fb.fill_rect(304, 18, 7, 3, WHITE); // the falls mark
         if self.plate_t > 0 {
-            let c = if self.plate == "WIPEOUT!" { NORMAN_RED } else { GOLD };
+            let c = if self.plate == "WIPEOUT!" {
+                NORMAN_RED
+            } else {
+                GOLD
+            };
             draw_text_shadow(fb, 104, 120, self.plate, c, BLACK);
         }
         match self.phase {
@@ -549,7 +589,11 @@ impl River {
                     MgState::Lost => "THE RIVER WINS",
                     _ => "THE FALLS CLEARED",
                 };
-                let col = if self.state == MgState::Lost { NORMAN_RED } else { GOLD };
+                let col = if self.state == MgState::Lost {
+                    NORMAN_RED
+                } else {
+                    GOLD
+                };
                 draw_text_shadow(fb, 96, 84, msg, col, BLACK);
             }
             _ => {}

@@ -125,7 +125,10 @@ fn keep_geometry_loops_and_nook() {
         assert!(shut.contains(b), "bell {:?} unreachable", b);
     }
     assert!(shut.contains(&LEVER));
-    assert!(!shut.contains(&TORCHES[4]), "nook must be sealed while shut");
+    assert!(
+        !shut.contains(&TORCHES[4]),
+        "nook must be sealed while shut"
+    );
     let open = reachable(true);
     assert!(open.contains(&TORCHES[4]), "lever must open the nook");
 }
@@ -213,7 +216,10 @@ fn clean_sweep_scores_hundred() {
     wait_safe(&mut sim, &mut g, GATE); // in at the postern, all dark
     assert_eq!(g.bells(), 0);
     assert_eq!(g.score(), 100, "5x15 + escape 10 + clean 15");
-    assert!(matches!(g.state(), MgState::Won(Tier::Gold)), "clean sweep must be GOLD");
+    assert!(
+        matches!(g.state(), MgState::Won(Tier::Gold)),
+        "clean sweep must be GOLD"
+    );
 }
 
 #[test]

@@ -8,7 +8,7 @@
 //! broadside 30 — three clean towers and one ship hit knock on Silver's
 //! door, and Gold (92) demands direct hits plus a broadside on the deck.
 
-use super::framework::{resolve, MgState, Minigame, SportSpec, SPORTS};
+use super::framework::{resolve, tap_action, MgState, Minigame, SportSpec, SPORTS};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
     Framebuffer, BLACK, BROWN, CREAM, DARKGRAY, DEEPWATER, GOLD, GRASS, GRAY, LINEN, NAVY, ORANGE,
@@ -37,6 +37,7 @@ pub const BROADSIDE_BAND: f32 = 4.0; // |dx| for the broadside bonus
 
 const PRESENT: u32 = 80; // banner + instructions
 const IMPACT: u32 = 34; // smoke / rubble beat before the next stone
+const TRAIL: usize = 6; // flight positions kept for the trail draw
 
 /// Power gained per frame while SPACE is held (meter ping-pongs 0..=100).
 pub const CHARGE_STEP: f32 = 1.6;
@@ -133,7 +134,11 @@ pub fn judge_x(x: f32, down: [bool; 3], ship_x: Option<f32>) -> Landing {
     }
     for (i, tx) in TOWERS.iter().enumerate() {
         if !down[i] && (x - *tx as f32).abs() <= TOWER_BAND {
-            return if (x - *tx as f32).abs() <= DIRECT_BAND { Landing::Direct } else { Landing::Tower };
+            return if (x - *tx as f32).abs() <= DIRECT_BAND {
+                Landing::Direct
+            } else {
+                Landing::Tower
+            };
         }
     }
     if (WALL.0 as f32..=WALL.1 as f32).contains(&x) {
@@ -213,9 +218,13 @@ pub struct Catapult {
     last: Landing,
     smoke: u32,
     smoke_at: (i32, i32),
-    down: [bool; 3], // towers felled
-    ship_t: u32,     // ticks since the ship phase opened (drives ship_x)
-    ship_up: bool,   // seeded initial traverse direction
+    trail: [(i32, i32); TRAIL], // recent shot positions, circular buffer
+    trail_i: usize,             // next write slot
+    trail_n: u32,               // slots filled so far (0..=TRAIL)
+    hint_t: u32,                // ticks since play opened: fades the tip strip (T-UX)
+    down: [bool; 3],            // towers felled
+    ship_t: u32,                // ticks since the ship phase opened (drives ship_x)
+    ship_up: bool,              // seeded initial traverse direction
     score: u32,
     state: MgState,
 }
@@ -240,6 +249,10 @@ impl Catapult {
             last: Landing::Ground,
             smoke: 0,
             smoke_at: (0, 0),
+            trail: [(0, 0); TRAIL],
+            trail_i: 0,
+            trail_n: 0,
+            hint_t: 0,
             down: [false; 3],
             ship_t: 0,
             ship_up: mix(seed ^ 0xBEEF).is_multiple_of(2),
@@ -327,10 +340,16 @@ impl Catapult {
         self.drag = None;
         self.phase = Phase::Flight;
         self.phase_t = 0;
+        self.trail_n = 0; // a loose starts a fresh arc, fresh trail
+        self.trail_i = 0;
     }
 
     fn resolve_stone(&mut self) {
-        let ship = if self.ship_phase() { Some(self.ship_now()) } else { None };
+        let ship = if self.ship_phase() {
+            Some(self.ship_now())
+        } else {
+            None
+        };
         self.last = judge_x(self.sx, self.down, ship);
         if matches!(self.last, Landing::Tower | Landing::Direct) {
             for (i, tx) in TOWERS.iter().enumerate() {
@@ -341,7 +360,10 @@ impl Catapult {
         }
         self.score = (self.score + self.last.points()).min(100);
         self.smoke = 26;
-        self.smoke_at = (self.sx.clamp(6.0, 314.0) as i32, (self.sy - 4.0).max(14.0) as i32);
+        self.smoke_at = (
+            self.sx.clamp(6.0, 314.0) as i32,
+            (self.sy - 4.0).max(14.0) as i32,
+        );
         self.phase = Phase::Impact;
         self.phase_t = 0;
     }
@@ -381,6 +403,9 @@ impl Minigame for Catapult {
             return;
         }
         self.phase_t += 1;
+        if self.phase != Phase::Present {
+            self.hint_t += 1; // T-UX: play-start clock for the tip strip
+        }
         if self.ship_phase() {
             self.ship_t += 1;
         }
@@ -399,7 +424,7 @@ impl Minigame for Catapult {
                     self.angle = (self.angle + 0.75).min(80.0);
                 }
                 // SPACE hold: ping-ponging power meter
-                if input.key_pressed(KEY_SPACE) {
+                if tap_action(input, KEY_SPACE) {
                     self.charging = true;
                     self.charge_dir = 1.0;
                     self.power = 0.0; // every charge starts dead cold
@@ -463,6 +488,11 @@ impl Minigame for Catapult {
                         break;
                     }
                 }
+                if self.phase == Phase::Flight {
+                    self.trail[self.trail_i] = (self.sx as i32, self.sy as i32);
+                    self.trail_i = (self.trail_i + 1) % TRAIL;
+                    self.trail_n = (self.trail_n + 1).min(TRAIL as u32);
+                }
             }
             Phase::Impact => {
                 if self.phase_t >= IMPACT {
@@ -483,12 +513,20 @@ impl Catapult {
         // sky / sea / ground -------------------------------------------------
         fb.fill_rect(0, 0, 320, 12, BLACK);
         fb.fill_rect(0, 12, 320, 194, NAVY);
+        crate::minigames::framework::dusk_sky(fb, 12, 176);
         if self.ship_phase() {
             fb.fill_rect(SEA_X as i32, 176, (320.0 - SEA_X) as u32, 30, DEEPWATER);
             fb.fill_rect(0, GROUND_Y as i32, SEA_X as u32, 50, GRASS);
-            fb.fill_rect(SEA_X as i32, GROUND_Y as i32, (320.0 - SEA_X) as u32, 50, BROWN);
+            fb.fill_rect(
+                SEA_X as i32,
+                GROUND_Y as i32,
+                (320.0 - SEA_X) as u32,
+                50,
+                BROWN,
+            );
         } else {
             fb.fill_rect(0, GROUND_Y as i32, 320, 50, GRASS);
+            crate::minigames::framework::skyline(fb, GROUND_Y as i32);
         }
         // keep + wall + towers -----------------------------------------------
         fb.fill_rect(150, 132, 26, 20, STONE);
@@ -533,6 +571,12 @@ impl Catapult {
         }
         // stone in flight + impact smoke ---------------------------------------
         if self.phase == Phase::Flight {
+            // T-UX: 1 px SILVER trail dots behind the shot, older ones
+            // darker GRAY, so the 3 px stone stays readable at speed.
+            for k in 0..self.trail_n as usize {
+                let (tx, ty) = self.trail[(self.trail_i + TRAIL - 1 - k) % TRAIL];
+                fb.fill_rect(tx, ty, 1, 1, if k < 3 { SILVER } else { GRAY });
+            }
             fb.fill_rect(self.sx as i32, self.sy as i32, 3, 3, WHITE);
         }
         if self.smoke > 0 {
@@ -545,20 +589,26 @@ impl Catapult {
             draw_text_shadow(fb, 96, 96, self.last.word(), c, BLACK);
         }
         // HUD -------------------------------------------------------------------
-        draw_text_shadow(fb, 4, 2, "SIEGE", GOLD, BLACK);
-        draw_text_shadow(fb, 64, 2, &format!("STONES {}", 6 - self.shot.min(6)), CREAM, BLACK);
+        draw_text_shadow(
+            fb,
+            4,
+            14,
+            &format!("STONES {}", 6 - self.shot.min(6)),
+            CREAM,
+            BLACK,
+        );
         // Wind gauge (T410): pennant on the pole points downwind, a flag
         // per pip below it - readable at a glance, not a dash soup.
-        fb.fill_rect(296, 2, 1, 16, WHITE);
+        fb.fill_rect(296, 14, 1, 16, WHITE);
         if self.wind > 0 {
-            fb.fill_rect(297, 3, 7, 4, YELLOW);
+            fb.fill_rect(297, 15, 7, 4, YELLOW);
         } else if self.wind < 0 {
-            fb.fill_rect(288, 3, 7, 4, YELLOW);
+            fb.fill_rect(288, 15, 7, 4, YELLOW);
         } else {
-            fb.fill_rect(297, 3, 4, 2, YELLOW); // limp in a dead calm
+            fb.fill_rect(297, 15, 4, 2, YELLOW); // limp in a dead calm
         }
         for i in 0..self.wind.abs() {
-            let y = 9 + i * 3;
+            let y = 21 + i * 3;
             if self.wind > 0 {
                 fb.fill_rect(299, y, 3, 2, SILVER);
             } else if self.wind < 0 {
@@ -580,9 +630,13 @@ impl Catapult {
                 crate::ui::kit::centered(fb, 132, "ARROWS SET ANGLE - SPACE PUMP", LINEN, BLACK);
                 crate::ui::kit::centered(fb, 143, "RELEASE TO LOOSE", CREAM, BLACK);
             }
-            Phase::Aim => {
-                let tip =
-                    if self.ship_phase() { "SINK THE SUPPLY SHIP" } else { "BREACH THE TOWERS" };
+            Phase::Aim if self.hint_t < 180 => {
+                // T-UX: the tip strip fades ~3 s into the siege (audit)
+                let tip = if self.ship_phase() {
+                    "SINK THE SUPPLY SHIP"
+                } else {
+                    "BREACH THE TOWERS"
+                };
                 draw_text_shadow(fb, 104, 246, tip, GRAY, BLACK);
             }
             _ => {}

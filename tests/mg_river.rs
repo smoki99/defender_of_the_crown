@@ -178,7 +178,10 @@ fn run_scripted(seed: u64) -> (River, u32) {
 fn scripted_canoe_takes_gold() {
     let (g, ticks) = run_scripted(7);
     assert_eq!(g.wipes(), 0, "the clean script must not swim");
-    assert!(ticks < TIME_LIMIT - 200, "reached the falls at tick {ticks}");
+    assert!(
+        ticks < TIME_LIMIT - 200,
+        "reached the falls at tick {ticks}"
+    );
     let vaults = (0..8).filter(|i| g.rock(*i).3).count();
     let sunk = (0..4).filter(|i| g.boat(*i).2).count();
     assert_eq!(vaults, 8, "every rock vaulted");
@@ -254,7 +257,10 @@ fn pike_boats_sweep_and_obey_the_seed() {
         assert!(half <= 25.0, "boat {i} must huddle in the rock's wake");
         for t in [100, 400, 900, 1500] {
             let x = a.boat_x(i, t);
-            assert!((mid - half..=mid + half).contains(&x), "boat {i} off its row");
+            assert!(
+                (mid - half..=mid + half).contains(&x),
+                "boat {i} off its row"
+            );
         }
     }
     let x0 = a.boat_x(0, 100);
@@ -273,7 +279,10 @@ fn drifting_still_ends_at_the_falls_and_scores_by_wipeouts() {
         }
         sim.frame(&mut g, &[]);
     }
-    assert!(g.scroll() >= 2600.0, "even the idle drift reaches the falls");
+    assert!(
+        g.scroll() >= 2600.0,
+        "even the idle drift reaches the falls"
+    );
     let want = (40 - 8 * g.wipes() as i32).clamp(0, 100) as u32;
     assert_eq!(g.score(), want);
     if want >= 40 {

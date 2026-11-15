@@ -1,16 +1,17 @@
 //! mg-archery — GALLERY (SPEC 6 #4): the butts at the tournament field.
-//! Steer the drawn arrow with the arrows keys and loose it with SPACE.
+//! Steer the drawn arrow with the arrows keys and loose it with SPACE or
+//! a tap — a tap first lays the shaft at the finger, then looses it.
 //! Targets rise from the booths; the fool runs along the front and an apple
 //! swings on a silk from the gantry. Ten targets, one apple, fourteen
 //! shafts — a clean sweep plus the apple is the only Gold.
 
-use super::framework::{resolve, MgState, Minigame, SportSpec, SPORTS};
+use super::framework::{resolve, tap_action, MgState, Minigame, SportSpec, SPORTS};
 use crate::engine::fonts::draw_text_shadow;
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, BROWN, CREAM, GOLD, GREEN, LINEN, NAVY, ORANGE,
-    RED, SAXON_BLUE, TAN, WHITE, YELLOW,
+    Framebuffer, BLACK, BLOOD, BROWN, CREAM, GOLD, GREEN, LINEN, NAVY, ORANGE, RED, SAXON_BLUE,
+    TAN, WHITE, YELLOW,
 };
-use crate::engine::input::{Input, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP};
+use crate::engine::input::{Gesture, Input, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP};
 
 const PRESENT: u32 = 90; // "NOCK ARROWS" banner
 const TABLEAU: u32 = 100; // results beat before Done
@@ -122,7 +123,13 @@ impl Archery {
     }
     /// Which holes volley `v` will pop, in slot order (None = idle slot).
     pub fn scheduled(&self, v: u32) -> [Option<usize>; 3] {
-        let n = if v >= 6 { 3 } else if v >= 3 { 2 } else { 1 };
+        let n = if v >= 6 {
+            3
+        } else if v >= 3 {
+            2
+        } else {
+            1
+        };
         let mut out = [None; 3];
         for (s, slot) in out.iter_mut().enumerate().take(n) {
             *slot = Some(self.hole(v, s as u32));
@@ -132,7 +139,9 @@ impl Archery {
 
     /// The hole popped for volley `v`, slot `s` (0..3, at most 3 distinct).
     fn hole(&self, v: u32, s: u32) -> usize {
-        (mix(self.seed ^ (v as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (s as u64).wrapping_mul(0x85EB_CA6B))
+        (mix(self.seed
+            ^ (v as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            ^ (s as u64).wrapping_mul(0x85EB_CA6B))
             % 8) as usize
     }
 
@@ -167,7 +176,11 @@ impl Archery {
             ),
         ];
         for s in 0..3 {
-            out[s] = if self.struck(v, s) { (raw[s].0, 0.0) } else { raw[s] };
+            out[s] = if self.struck(v, s) {
+                (raw[s].0, 0.0)
+            } else {
+                raw[s]
+            };
         }
         out
     }
@@ -291,7 +304,16 @@ impl Minigame for Archery {
                 } else if self.fool_x > 302.0 {
                     self.fool_dir = -1.0;
                 }
-                if input.key_pressed(KEY_SPACE) {
+                if tap_action(input, KEY_SPACE) {
+                    // T-UX (audit: shoot was keyboard-only): a tap lays
+                    // the shaft at the pointer, then looses it there
+                    if let Some(&Gesture::Tap { x, y, .. }) = input
+                        .gestures()
+                        .iter()
+                        .find(|g| matches!(g, Gesture::Tap { .. }))
+                    {
+                        self.cross = ((x as f32).clamp(8.0, 312.0), (y as f32).clamp(56.0, 210.0));
+                    }
                     self.loose();
                 }
                 if self.tick_n >= VOLLEYS * VOLLEY {
@@ -313,9 +335,17 @@ impl Minigame for Archery {
 impl Archery {
     fn paint(&self, fb: &mut Framebuffer) {
         fb.fill_rect(0, 0, 320, 256, NAVY);
+        crate::minigames::framework::dusk_sky(fb, 0, 44);
+        crate::minigames::framework::skyline(fb, 44);
         fb.fill_rect(0, 200, 320, 56, GREEN); // turf the fool trots on
         for x in (6..316).step_by(12) {
-            fb.fill_rect(x, 44, 6, 6, [BLOOD, GOLD, SAXON_BLUE, LINEN][((x / 12) % 4) as usize]);
+            fb.fill_rect(
+                x,
+                44,
+                6,
+                6,
+                [BLOOD, GOLD, SAXON_BLUE, LINEN][((x / 12) % 4) as usize],
+            );
         }
         fb.fill_rect(14, 92, 292, 108, LINEN); // booth wall
         fb.fill_rect(14, 92, 292, 3, BROWN);
@@ -347,7 +377,13 @@ impl Archery {
             let (ax, ay) = (ax as i32, ay as i32);
             let mut t = 0.0;
             while t < 1.0 {
-                fb.fill_rect((160.0 + (ax as f32 - 160.0) * t) as i32, (66.0 + (ay as f32 - 66.0) * t) as i32, 1, 1, WHITE);
+                fb.fill_rect(
+                    (160.0 + (ax as f32 - 160.0) * t) as i32,
+                    (66.0 + (ay as f32 - 66.0) * t) as i32,
+                    1,
+                    1,
+                    WHITE,
+                );
                 t += 0.1;
             }
             fb.fill_rect(ax - 3, ay - 2, 6, 6, RED);
@@ -371,9 +407,9 @@ impl Archery {
             fb.fill_rect(cx, cy, 1, 1, RED);
         }
         // HUD -----------------------------------------------------------------
-        draw_text_shadow(fb, 4, 2, "GALLERY", GOLD, BLACK);
-        draw_text_shadow(fb, 72, 2, &format!("SHAFTS {}", self.arrows), CREAM, BLACK);
-        draw_text_shadow(fb, 240, 2, &format!("HITS {}/10", self.hits), CREAM, BLACK);
+        // HUD counters live at y>=14: the host band owns rows 0-11.
+        draw_text_shadow(fb, 4, 14, &format!("SHAFTS {}", self.arrows), CREAM, BLACK);
+        draw_text_shadow(fb, 240, 14, &format!("HITS {}/10", self.hits), CREAM, BLACK);
         if self.plate_t > 0 {
             let c = if self.plate == "BULLSEYE" || self.plate == "THE APPLE!" {
                 GOLD
@@ -393,7 +429,14 @@ impl Archery {
             Phase::Board => {
                 let s = self.score.max(0) as u32;
                 draw_text_shadow(fb, 110, 60, &format!("SCORE {}", s), GOLD, BLACK);
-                draw_text_shadow(fb, 60, 84, &format!("{} TARGETS + APPLE", self.hits), CREAM, BLACK);
+                draw_text_shadow(
+                    fb,
+                    60,
+                    84,
+                    &format!("{} TARGETS + APPLE", self.hits),
+                    CREAM,
+                    BLACK,
+                );
             }
             Phase::Done => {
                 let s = self.score.max(0) as u32;

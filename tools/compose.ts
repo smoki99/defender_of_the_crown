@@ -36,16 +36,30 @@ export interface SampleDef {
 // one full cycle, `len` samples -> plays at any pitch (single-cycle loop)
 export function cycle(wave: "square" | "pulse" | "tri" | "saw", len = 128, amp = 100, duty = 0.5): Int8Array {
   const d = new Int8Array(len);
+  const shape = (p: number): number => {
+    p = p - Math.floor(p);
+    switch (wave) {
+      case "square": return p < 0.5 ? 1 : -1;
+      case "pulse": return p < duty ? 1 : -0.6;
+      case "tri": return 4 * Math.abs(p - 0.5) - 1;
+      case "saw": return 2 * p - 1;
+    }
+    return 0;
+  };
   for (let i = 0; i < len; i++) {
     const p = i / len;
+    // Body + soft harmonic stack + a slow warp: a raw single-cycle
+    // square is the C64 "beep"; the odd-harmonic blend keeps the chip
+    // character but adds the mid-range body an Amiga lead has. All
+    // terms are integer-periodic in p, so the loop stays seamless.
     let v: number;
-    switch (wave) {
-      case "square": v = p < 0.5 ? 1 : -1; break;
-      case "pulse": v = p < duty ? 1 : -0.6; break;
-      case "tri": v = 4 * Math.abs(p - 0.5) - 1; break;
-      case "saw": v = 2 * p - 1; break;
+    if (wave === "tri") {
+      v = shape(p) + 0.14 * shape(3 * p + 0.13) + 0.06 * shape(5 * p);
+    } else {
+      v = shape(p) + 0.3 * shape(3 * p + 0.11) + 0.17 * shape(5 * p) + 0.06 * Math.sin(4 * Math.PI * p);
     }
-    d[i] = Math.round(v * amp);
+    v /= 1.53;
+    d[i] = Math.max(-127, Math.min(127, Math.round(v * amp)));
   }
   return d;
 }

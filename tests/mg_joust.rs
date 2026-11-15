@@ -31,12 +31,28 @@ impl Sim {
         g.tick(1.0 / 60.0, &self.inp, &mut self.fb);
     }
     fn tap_key(&mut self, g: &mut Joust, code: u32) {
-        self.frame(g, &[Raw::Key { code, pressed: true }, Raw::Key { code, pressed: false }]);
+        self.frame(
+            g,
+            &[
+                Raw::Key {
+                    code,
+                    pressed: true,
+                },
+                Raw::Key {
+                    code,
+                    pressed: false,
+                },
+            ],
+        );
     }
     /// Steer toward a rail (one press per frame), then keep cantering.
     fn steer(&mut self, g: &mut Joust, lane: usize, settle: u32) {
         while g.target() != lane {
-            let k = if g.target() < lane { KEY_RIGHT } else { KEY_LEFT };
+            let k = if g.target() < lane {
+                KEY_RIGHT
+            } else {
+                KEY_LEFT
+            };
             self.tap_key(g, k);
         }
         for _ in 0..settle {
@@ -83,7 +99,10 @@ fn crowned_double_pass_takes_the_wreath() {
     // both passes: same rail as the rival, lance inside the perfect band
     let (score, state) = full_run(7, |r| (r, 3));
     assert_eq!(score, 97, "two perfect passes + crown bonus");
-    assert_eq!(state, MgState::Won(defender_of_the_crown::minigames::framework::Tier::Gold));
+    assert_eq!(
+        state,
+        MgState::Won(defender_of_the_crown::minigames::framework::Tier::Gold)
+    );
 }
 
 #[test]
@@ -98,7 +117,10 @@ fn one_solid_one_perfect_lands_silver() {
         }
     });
     assert!((70..95).contains(&score), "score {score} must land silver");
-    assert_eq!(state, MgState::Won(defender_of_the_crown::minigames::framework::Tier::Silver));
+    assert_eq!(
+        state,
+        MgState::Won(defender_of_the_crown::minigames::framework::Tier::Silver)
+    );
 }
 
 #[test]

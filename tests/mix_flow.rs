@@ -11,7 +11,11 @@ use defender_of_the_crown::engine::audio::{Mod, Music, Player, Sfx};
 const SR: usize = 48_000;
 
 fn player(name: &str, all: &[(&str, &[u8])]) -> Player {
-    let bytes = all.iter().find(|(n, _)| *n == name).map(|(_, b)| *b).unwrap();
+    let bytes = all
+        .iter()
+        .find(|(n, _)| *n == name)
+        .map(|(_, b)| *b)
+        .unwrap();
     Player::new(Mod::parse(bytes).unwrap())
 }
 
@@ -90,7 +94,10 @@ fn bed_changes_never_gap_or_spike() {
                 continue;
             }
             let (peak, emin, emed) = run(a, b, 4);
-            assert!(peak < 0.995, "{a} -> {b}: transition spikes (peak {peak:.3})");
+            assert!(
+                peak < 0.995,
+                "{a} -> {b}: transition spikes (peak {peak:.3})"
+            );
             assert!(
                 emin > 0.15 * emed,
                 "{a} -> {b}: transition gap (env_min {emin:.4}, median {emed:.4})"

@@ -13,9 +13,11 @@ pub fn centered(fb: &mut crate::engine::gfx::Framebuffer, y: i32, s: &str, fg: u
     crate::engine::fonts::draw_text_shadow(fb, (320 - w) / 2, y, s, fg, sh);
 }
 
-/// Bevelled panel: TAN rim, DARKGRAY face, light inner top/left edge and
-/// dark inner bottom/right edge (Amiga three-tone).
+/// Framed panel: drop shadow, TAN rim, three-tone bevel and a dark-stone
+/// face carrying sparse grain speckles plus corner studs (T901 depth).
 pub fn panel(fb: &mut Framebuffer, x: i32, y: i32, w: u32, h: u32) {
+    // drop shadow behind and to the SE
+    fb.fill_rect(x + 2, y + 2, w, h, BLACK);
     fb.fill_rect(x, y, w, h, DARKGRAY);
     fb.rect(x, y, w, h, TAN);
     let x1 = x + w as i32 - 1;
@@ -24,11 +26,29 @@ pub fn panel(fb: &mut Framebuffer, x: i32, y: i32, w: u32, h: u32) {
     fb.vline(x + 1, y + 1, y1 - 1, GRAY);
     fb.hline(x + 1, x1 - 1, y1 - 1, BLACK);
     fb.vline(x1 - 1, y + 1, y1 - 1, BLACK);
+    // stone grain: a deterministic lattice of dark pixels on the face
+    for py in (y + 3..y1 - 1).step_by(3) {
+        for px in (x + 3..x1 - 1).step_by(3) {
+            if (px * 13 + py * 7) % 97 == 0 {
+                fb.set(px, py, BLACK);
+            }
+        }
+    }
+    // iron corner studs
+    for (sx, sy) in [
+        (x + 2, y + 2),
+        (x1 - 2, y + 2),
+        (x + 2, y1 - 2),
+        (x1 - 2, y1 - 2),
+    ] {
+        fb.set(sx, sy, SILVER);
+    }
 }
 
-/// Raised button: three tones (face/light/shadow) per state - enabled,
-/// hover (hot) or disabled. Callers paint the label.
+/// Raised button: drop shadow behind a three-tone bevel face per state -
+/// enabled, hover (hot) or disabled. Callers paint the label.
 pub fn button(fb: &mut Framebuffer, b: &Btn, hot: bool, enabled: bool) {
+    fb.fill_rect(b.x + 2, b.y + 2, b.w, b.h, BLACK);
     let face = if !enabled {
         GRAY
     } else if hot {

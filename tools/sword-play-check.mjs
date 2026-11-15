@@ -5,9 +5,10 @@
 // stagger-meter gap, and rides the laurel plate home to the campaign map.
 import { coords, tap, key, px, snap, regionDiff, shot, ok, finish, problems, decodeTurn } from "./jsdom-harness.mjs";
 
-const GOLD = [204, 170, 0];
+// T706 gold family: bright (187,153,51), dimmed (124,102,34)
+const goldP = (p) => p[0] >= 110 && p[0] - p[1] >= 20 && p[0] - p[1] <= 55 && p[1] - p[2] >= 30;
 const BLACK = [0, 0, 0];
-const WHITE = [255, 255, 255];
+const whiteP = (p) => (p[0] >= 225 && p[1] >= 225 && p[2] >= 205) || (p[0] >= 150 && p[0] <= 182 && p[1] >= 150 && p[2] >= 138 && p[2] <= 168); // T706 off-white (238,238,221) + dim row
 const eq = (p, q) => p[0] === q[0] && p[1] === q[1] && p[2] === q[2];
 const POSE_Y = [118, 152, 188];
 const LANE_KEY = ["ArrowUp", "ArrowRight", "ArrowDown"];
@@ -16,24 +17,24 @@ const LANE_KEY = ["ArrowUp", "ArrowRight", "ArrowDown"];
 function tipLane() {
   for (let l = 0; l < 3; l++) {
     const y = POSE_Y[l];
-    for (let x = 178; x < 188; x += 2) if (eq(px(x, y), WHITE)) return l;
+    for (let x = 178; x < 188; x += 2) if (whiteP(px(x, y))) return l;
   }
   return null;
 }
 const meterOn = () => eq(px(160, 232), BLACK);
-const duelPlate = () => eq(px(36, 92), GOLD); // THE DUEL plate border
-const resPlate = () => eq(px(40, 56), GOLD) && eq(px(279, 199), GOLD); // host results
+const duelPlate = () => goldP(px(36, 92)); // THE DUEL plate border
+const resPlate = () => goldP(px(40, 56)) && goldP(px(279, 199)); // host results
 function laurel() {
   // the results head line is GOLD on a win, BLOOD on a loss
   let n = 0;
-  for (let y = 72; y < 79; y++) for (let x = 104; x < 204; x += 2) if (eq(px(x, y), GOLD)) n++;
+  for (let y = 72; y < 79; y++) for (let x = 104; x < 204; x += 2) if (goldP(px(x, y))) n++;
   return n > 8;
 }
 // the map HUD purse line: "GOLD nnn" in GOLD glyphs at (4,204).
 function purseText() {
   let n = 0;
   for (let y = 204; y < 212; y++)
-    for (let x = 4; x < 90; x++) if (eq(px(x, y), GOLD)) n++;
+    for (let x = 4; x < 90; x++) if (goldP(px(x, y))) n++;
   return n;
 }
 
@@ -45,7 +46,7 @@ await Bun.sleep(900);
 key("Enter"); key("Enter"); key("Enter"); // crawl -> campaign
 await Bun.sleep(900);
 
-const linAt = (x, y) => { const f = snap(); const i = (y * 320 + x) * 4; return f[i] === 204 && f[i + 1] === 204 && f[i + 2] === 153; };
+const linAt = (x, y) => { const f = snap(); const i = (y * 320 + x) * 4; const r = f[i], g = f[i + 1], b = f[i + 2]; return (Math.abs(r - 187) <= 14 && Math.abs(g - 170) <= 14 && Math.abs(b - 119) <= 14) || (Math.abs(r - 124) <= 12 && Math.abs(g - 113) <= 12 && Math.abs(b - 79) <= 12); };
 async function dismissQuick() {
   if (linAt(64, 100)) { tap(10, 10); await Bun.sleep(120); tap(10, 10); await Bun.sleep(120); }
   else if (linAt(74, 70)) { tap(160, 128); await Bun.sleep(120); }

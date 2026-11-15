@@ -5,11 +5,9 @@
 // and the doc.hof chronicle the title screen's HALL OF FAME reads.
 import { coords, tap, key, px, snap, regionDiff, shot, ok, finish, problems, decodeTurn } from "./jsdom-harness.mjs";
 
-const GOLD = [204, 170, 0];
-const eq = (p, q) => p[0] === q[0] && p[1] === q[1] && p[2] === q[2];
 const blood = (x, y) => {
   const [r, g, b] = px(x, y);
-  return Math.abs(r - 153) <= 30 && g <= 30 && Math.abs(b - 34) <= 26;
+  return Math.abs(r - 153) <= 55 && g <= 30 && Math.abs(b - 34) <= 26;
 };
 const LANE_Y = [118, 150, 182];
 
@@ -23,15 +21,27 @@ function rivalLeft(lane) {
   }
   return null;
 }
-// the results screen's gold border frame - the ONLY proof we are looking at
-// the plate; during a ride a rival galloping down the top rail crosses the
-// white-sampling band and would fake the crown tableau.
-const goldFrame = () => { const p = px(40, 56); return p[0] === 204 && p[1] === 170 && p[2] === 0; };
-function laurelHead() {
-  // results plate head line: GOLD glyph pixels only on a gold laurel
+// results tableau (T706): NAVY plate framed by full-width GOLD rows at
+// y56/y59/y196/y199 (T706 gold is (187,153,51), dimmed (124,102,34)); the
+// gallop screen scores ~3 against this, the results plate ~470.
+const resultsPlate = (f) => {
+  let span = 0;
+  for (const y of [56, 59, 196, 199]) for (let x = 20; x < 300; x += 2) {
+    const i = (y * 320 + x) * 4;
+    const r = f[i], g = f[i + 1], b = f[i + 2];
+    if (r >= 150 && r - g >= 20 && r - g <= 55 && g - b >= 60) span++;
+  }
+  return span > 150;
+};
+function laurelHead(f) {
+  // "GOLD LAUREL!" head line (y76..83): gold glyph pixels, only on results
   let n = 0;
-  for (let y = 72; y < 79; y++) for (let x = 104; x < 204; x += 2) if (eq(px(x, y), GOLD)) n++;
-  return n > 8;
+  for (let y = 76; y < 84; y++) for (let x = 100; x < 224; x++) {
+    const i = (y * 320 + x) * 4;
+    const r = f[i], g = f[i + 1], b = f[i + 2];
+    if (r >= 110 && r - g >= 20 && r - g <= 55 && g - b >= 30) n++;
+  }
+  return n > 6;
 }
 let lane = 1;
 function steerTo(target) {
@@ -39,14 +49,6 @@ function steerTo(target) {
     if (lane < target) { key("ArrowRight"); lane++; } else { key("ArrowLeft"); lane--; }
   }
 }
-const creamRow = (pl) => {
-  const y = LANE_Y[pl] + 7;
-  let n = 0;
-  for (let x = 96; x < 150; x++) { const p = px(x, y); if (p[0] === 255 && p[1] === 244 && p[2] === 204) n++; }
-  return n;
-};
-const lanceHud = () => { let n = 0; for (let y = 2; y < 10; y++) for (let x = 210; x < 280; x++) { const p = px(x, y); if (p[0] > 200 && p[1] > 200 && p[2] > 200) n++; } return n; };
-
 await Bun.sleep(700);
 key(" "); await Bun.sleep(120);        // boot herald
 key("Enter"); await Bun.sleep(120);    // BEGIN CAMPAIGN
@@ -55,36 +57,38 @@ await Bun.sleep(900);
 key("Enter"); key("Enter"); key("Enter"); // crawl -> campaign
 await Bun.sleep(900);
 
-const linAt = (x, y) => { const f = snap(); const i = (y * 320 + x) * 4; return f[i] === 204 && f[i + 1] === 204 && f[i + 2] === 153; };
-async function dismissQuick() {
-  if (linAt(64, 100)) { tap(10, 10); await Bun.sleep(120); tap(10, 10); await Bun.sleep(120); }
-  else if (linAt(74, 70)) { tap(160, 128); await Bun.sleep(120); }
-}
-async function dismissOverlay() {
-  for (let i = 0; i < 20 && !linAt(64, 100) && !linAt(74, 70); i++) await Bun.sleep(100);
-  await dismissQuick();
-}
-async function waitTurn(target, budgetMs = 25000) {
+const linAt = (x, y) => { const f = snap(); const i = (y * 320 + x) * 4; const r = f[i], g = f[i + 1], b = f[i + 2]; return (Math.abs(r - 187) <= 14 && Math.abs(g - 170) <= 14 && Math.abs(b - 119) <= 14) || (Math.abs(r - 124) <= 12 && Math.abs(g - 113) <= 12 && Math.abs(b - 79) <= 12); };
+// Converging walk: the march animation deafens the map after END and the
+// omen/report plate lands seconds later at jsdom rAF speed, so fixed
+// schedules drop taps (turn stuck forever). Exact LINEN plates decide:
+// tap OK/skip on a real plate, tap END only on the bare map.
+async function walkTo(target, budgetMs = 120000) {
   const t0 = Date.now();
-  while (Date.now() - t0 < budgetMs) {
-    if (decodeTurn(snap()) === target) return true;
-    await dismissQuick();
-    await Bun.sleep(100);
+  let cur = decodeTurn(snap());
+  while (cur < target && Date.now() - t0 < budgetMs) {
+    if (linAt(64, 100)) {
+      tap(10, 10); await Bun.sleep(150);
+      if (linAt(64, 100)) tap(10, 10);
+      await Bun.sleep(150);
+    } else if (linAt(74, 70)) {
+      tap(160, 128); await Bun.sleep(150);
+    } else {
+      tap(...coords.END); await Bun.sleep(220);
+    }
+    cur = decodeTurn(snap()) ?? cur;
   }
-  return false;
+  return cur;
 }
 
 // the deterministic draw offers the joust at TURN 22 (splitmix-scrambled)
-let want = decodeTurn(snap());
-while (want < 22) {
-  await dismissOverlay();
-  tap(...coords.END);
-  want += 1;
-  if (!(await waitTurn(want))) break;
-}
-const turn = decodeTurn(snap());
+const turn = await walkTo(22);
 ok(turn === 22, `reached turn 22 for the joust draw (got ${turn})`);
-await dismissOverlay();
+for (let i = 0; i < 40; i++) {
+  if (linAt(64, 100)) { tap(10, 10); await Bun.sleep(150); if (linAt(64, 100)) tap(10, 10); }
+  else if (linAt(74, 70)) { tap(160, 128); await Bun.sleep(150); }
+  else if (i > 14) break;
+  else await Bun.sleep(150);
+}
 
 ok(localStorage.getItem("doc.hof") === null || localStorage.getItem("doc.hof") === "",
   "the hall of fame starts blank");
@@ -103,46 +107,39 @@ let steerOk = 0;
 let crownSeen = 0;
 let gold = false;
 let home = false;
-let firedWin = false;
 let posted = false;
+let maxRl = 0;
 const t0 = Date.now();
 while (Date.now() - t0 < 60000 && !home) {
   await Bun.sleep(20);
   const f = snap();
-  let white = 0;
-  for (let y = 119; y < 127; y += 2) for (let x = 80; x < 240; x += 2) {
-    const i = (y * 320 + x) * 4;
-    if (f[i] > 200 && f[i + 1] > 200 && f[i + 2] > 200) white++;
-  }
-  if (white > 8 && goldFrame()) crownSeen++;
+  if (resultsPlate(f)) crownSeen++;
   const pl = pipLane();
-  if (pl !== null) pipsSeen++;
-  const rl = pl !== null ? rivalLeft(pl) : null;
-  // a fresh ride opens when the rival re-enters at full gallop; the
-  // lance and the rails only bite while one is running
-  if (rl !== null && rl > 200) { armed = true; firedWin = false; }
-  if (pl !== null && pl !== lane && armed && Date.now() > steerOk) {
-    console.log(`steer ${lane}->${pl}`);
-    steerTo(pl);
-    steerOk = Date.now() + 60;
-  }
-  if (rl !== null) {
-    if (armed && rl >= 94 && rl <= 101 && pl === lane) {
-      key(" "); // the queue can swallow a single edge: hold the window
-      if (!firedWin && lanced < 2) {
-        firedWin = true;
-        armed = false; // re-arm only at rl>200: arrows bite on a live ride
-        lanced++;
-      }
+  if (pl !== null) {
+    pipsSeen++;
+    if (pl !== lane && Date.now() > steerOk) {
+      steerTo(pl);
+      steerOk = Date.now() + 150;
     }
   }
-  if (lanced === 2 && !posted && white > 8 && goldFrame()) {
+  const rl = pl !== null ? rivalLeft(pl) : null;
+  if (rl !== null) {
+    if (rl > maxRl) maxRl = rl;
+    if (rl > 200) armed = true; // pass live (opening or return gallop)
+    // sweet spot: stripe left edge 92..103 (joust-proven window)
+    if (armed && rl >= 92 && rl <= 103 && lanced < 2) {
+      key(" ");
+      lanced++;
+      armed = false;
+    }
+  }
+  if (lanced === 2 && !posted && resultsPlate(f)) {
     posted = true;
     shot("at-results");
   }
   // the plate scrolls in over ~1 s: ride home once the head line is
   // painted gold, or once any banner has sat painted long enough.
-  if (crownSeen > 2 && laurelHead()) gold = true;
+  if (crownSeen > 2 && laurelHead(f)) gold = true;
   if (crownSeen > 2 && (gold || crownSeen > 40)) key("Enter"); // results -> map
   if (lanced >= 2 && crownSeen > 2 && decodeTurn(f) === 22) {
     await Bun.sleep(200); // a calm repainted map frame
@@ -154,7 +151,7 @@ shot("loop-home");
 ok(lanced === 2, `both lances thrown off pixel timing (thrown ${lanced})`);
 ok(gold, "the results plate head gleamed GOLD LAUREL");
 ok(home, "ENTER returned to the campaign map");
-
+console.log(`diag pips=${pipsSeen} maxRl=${maxRl} lanced=${lanced} elapsed=${Date.now() - t0}ms`);
 const purse = snap();
 ok(regionDiff(purseBefore, purse, 4, 204, 90, 212) > 0, "the purse line moved with the fee and prize");
 

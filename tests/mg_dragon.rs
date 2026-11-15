@@ -368,7 +368,10 @@ fn the_mark_telegrapheth_before_the_flame() {
     assert_eq!(g.volley().0, 1, "still telegraphing one tick shy");
     sim.stand_still(&mut g);
     assert_eq!(g.volley().0, 2, "ember bursts into flame");
-    assert!(matches!(g.state(), MgState::Running), "the flame kills next tick");
+    assert!(
+        matches!(g.state(), MgState::Running),
+        "the flame kills next tick"
+    );
     sim.stand_still(&mut g);
     assert_eq!(g.state(), MgState::Lost, "standing in the fire is dying");
 }

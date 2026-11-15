@@ -7,9 +7,9 @@
 
 use defender_of_the_crown::campaign::game::{Difficulty, GameState, Tier, PLAYER};
 use defender_of_the_crown::engine::gfx::Framebuffer;
+use defender_of_the_crown::engine::scene::Scene;
 use defender_of_the_crown::minigames::dragon::Dragon;
 use defender_of_the_crown::minigames::framework::{pick as sport_pick, unlocked, SPORTS};
-use defender_of_the_crown::engine::scene::Scene;
 use defender_of_the_crown::ui::host::{MgHost, OutcomeCell, SportMode};
 use defender_of_the_crown::ui::{action_rects, castle_screen, Btn, CampaignUi, SceneEvent};
 use std::rc::Rc;
@@ -57,11 +57,22 @@ fn the_paying_heist_doubles_the_haul() {
         .play_dragon(PLAYER, 100, SPORTS[12].silver_at, SPORTS[12].gold_at)
         .expect("the offer standeth");
     assert_eq!(tier, Tier::Gold);
-    assert!(r.gold >= 160, "gold tier doubles to at least 160, saw {}", r.gold);
-    assert!(r.provisions >= 60, "provisions double too, saw {}", r.provisions);
+    assert!(
+        r.gold >= 160,
+        "gold tier doubles to at least 160, saw {}",
+        r.gold
+    );
+    assert!(
+        r.provisions >= 60,
+        "provisions double too, saw {}",
+        r.provisions
+    );
     assert_eq!(g.gold[PLAYER.index()], before + r.gold, "purse credited");
     assert!(!g.dragon_offer, "one heist per campaign");
-    assert!(g.log.iter().any(|l| l.contains("HOARD IS ROBBED")), "log narrates");
+    assert!(
+        g.log.iter().any(|l| l.contains("HOARD IS ROBBED")),
+        "log narrates"
+    );
     assert!(
         g.play_dragon(PLAYER, 100, 80, 100).is_err(),
         "the hoard granteth no second try"
@@ -76,7 +87,10 @@ fn a_burnt_offer_payeth_nothing() {
     g.forfeit_dragon();
     assert!(!g.dragon_offer, "the failed heist burneth the offer");
     assert_eq!(g.gold[PLAYER.index()], before, "nought credited to failure");
-    assert!(g.play_dragon(PLAYER, 100, 80, 100).is_err(), "offer is spent");
+    assert!(
+        g.play_dragon(PLAYER, 100, 80, 100).is_err(),
+        "offer is spent"
+    );
     g.forfeit_dragon(); // silence on an already-burnt offer
 }
 
@@ -116,19 +130,24 @@ fn the_hoard_row_appeareth_only_with_the_omen() {
         action_rects(own, hoard).iter().map(|b| b.id).collect()
     };
     assert!(!ids(true, false).contains(&"hoard"), "no omen, no row");
-    assert!(!ids(false, true).contains(&"hoard"), "an omen on anoither's castle openeth no row");
-    assert!(ids(true, true).contains(&"hoard"), "the omen openeth the row");
+    assert!(
+        !ids(false, true).contains(&"hoard"),
+        "an omen on anoither's castle openeth no row"
+    );
+    assert!(
+        ids(true, true).contains(&"hoard"),
+        "the omen openeth the row"
+    );
 }
 
 #[test]
 fn tapping_hoard_openeth_the_lair_free() {
     let mut ui = CampaignUi::new(7, Difficulty::Normal);
-    let s = ui
-        .g
-        .strongholds
-        .iter()
-        .find(|s| s.name == "Buckingham")
-        .expect("castle");
+    let s =
+        ui.g.strongholds
+            .iter()
+            .find(|s| s.name == "Buckingham")
+            .expect("castle");
     let (x, y) = castle_screen(s);
     ui.event(&SceneEvent::Tap { x, y }, true);
     assert_eq!(ui.sel.map(|i| ui.g.strongholds[i].name), Some("Buckingham"));
