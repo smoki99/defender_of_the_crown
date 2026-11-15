@@ -246,7 +246,7 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   menu entry, reset option; playwright verify persistence across reload.
 - [x] **T706 Unlock pacing integration**: 1–4 start / 5–9 t5 / 10–12 t10 /
   dragon rare; campaign tests + seasonal SPORTS button verified per era.
-- [ ] **T707 Champion triple-gold event flow**: 3 event-tournament golds →
+- [x] **T707 Champion triple-gold event flow**: 3 event-tournament golds →
   champion recruit modal → garrison bonus visible in panel; test+shot.
 
 ## Phase 8 — ALPHA 2 passes (T8xx) → ALPHA 2

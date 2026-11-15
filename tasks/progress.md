@@ -632,3 +632,30 @@ center, long labels overran the button edge. Baselines: fame/panel/report
 re-recorded (UPDATE=1 rewrote all twelve - restored the nine that still
 passed their interior compare, only genuine drift was committed); suite
 green (~39 targets, 0 fail) and clippy clean.
+
+## T707 Champion triple-gold flow - done 2026-11-15
+
+The triple crown now proclaims itself. The game-side recruit (third
+event-tourney GOLD pushes a Champion into the hosting garrison, or pays
++40 when the banner already carries three) landed with rewards_v2; T707
+is its voice: `champ_open` rides the omen-plate kit - LINEN field, NAVY
+plaque with a hand-set three-crown crest (gold bands, cream tips, one
+DARKRED jewel), "THE TRIPLE CROWN / A CHAMPION RIDETH TO / THY GARRISON
+- GLORY ALONE", same OK rect as the dawn omen - and the map is deaf
+until OK. The scene hook threads the flag straight out of the meet
+result tuple (`(msg, crowned)`), no new mailbox. Two findings worth the
+ink: (1) modal stacking is order-sensitive twice over - the champ gate
+had to move *above* the omen gate so tap precedence matches paint
+order, exactly the bug the crown-over-omen test caught; (2) the panel
+needed nothing - the unit rows are data-driven off ALL_KINDS, so
+CHAMP X1 rides in automatically (confirmed pixel-exact, row 3 under
+LEVY/BOW/KNIGHT, header counts 13 men). Harness reachability got a
+`?champ=1` boot hook (same builder shape as `?turn=`) that banks a
+champion and opens the proclamation, since winning three tourneys is
+not a fixture. `tools/champ-shot.mjs` verifies the whole flow in the
+real campaign - plate/crown/jewel pixels, deaf castle tap, OK clears,
+then the CHAMP X1 row matched glyph-for-glyph against the new generic
+`examples/labelgrid` oracle (same 8x8 MSB-first grid trick as the T706
+season labels; the jewel scans exactly (102,0,0) on a full-bright
+scanline). shots: champ-modal, champ-panel. Tests 3/3 in
+`tests/champion_flow.rs`; full suite 45 targets green, clippy 0.
