@@ -603,3 +603,32 @@ every CRT-darkened scanline sits at 2/3 intensity, so colour filters
 must accept both (170,170,0) and (255,255,0) for yellow; and
 `tab.screenshot({path})` from the harness writes nowhere - pull the
 base64 from `page.screenshot` inside `tab.run` and write the buffer.
+
+## T706 Unlock pacing integration - done 2026-11-15
+
+The seasonal meet now breathes with the campaign: `season_sport` (ui)
+draws the turn's sport from the same deterministic splitmix+Xor draw the
+launcher uses, and the castle-panel SPORTS button prints its label
+(DUEL on turn 3, CANOE on 7, MEMORY on 11) instead of the static word -
+the era pacing is legible before the 10-gold fee is spent. Hoard stays
+rare-event-only via its `unlock_turn == u32::MAX` sentinel, so the pool
+grows exactly 4 (turns 1-4) / 9 (5-9) / 12 (10-12) and NO MEET is
+unreachable in play. Two panel-button rects widened (sports 68->84px for
+TOURNAMENT-length labels, neighbour 68->54). Verification is two-layer:
+`tests/era_pacing.rs` pins the invariants on the real table (tier sizes,
+the 5-5-2 turn partition, every turn offers a meet, every drawn sport
+fits its era), and `tools/era-shots.mjs` boots the *actual* campaign at
+turn=3/7/11 (harness honors `turn=` in CROWN_QS via `with_turn`), taps
+Buckingham and compares the button's 8x8 glyph bitmap pixel-exact
+against a host-side oracle - `examples/sports.rs` now emits the exact
+rows `glyph()` paints, so the check can't be fooled by color or scaling
+drift. All three eras pass and shot the panel (`era-t3/7/11`). Traps:
+id vs label bit twice (SPORTS[0] is id joust with label TOURNAMENT; id
+sword draws label DUEL) and a driver sentinel made of `#` chars that ate
+its own grid rows - the oracle header is `@` now. Found and fixed a
+pre-existing bug on the way: panel labels centered with a 6px advance
+while the font is FONT_W=8 - every label sat 1px per glyph left of
+center, long labels overran the button edge. Baselines: fame/panel/report
+re-recorded (UPDATE=1 rewrote all twelve - restored the nine that still
+passed their interior compare, only genuine drift was committed); suite
+green (~39 targets, 0 fail) and clippy clean.
