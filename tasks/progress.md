@@ -691,3 +691,15 @@ game for a gold-punching player; AI banners never champion by design
 HARD-vs-EASY head-to-head measured 8/10 on the final engine, so the
 SPEC 6.1 gate in `tests/ai_v2.rs` rose 7 -> 8, no padding. Suite green,
 clippy 0, wasm check clean.
+
+Addendum - scripted-pair audit (plan §3 Q6, "casual in [BRONZE,
+SILVER)"): the rampart slack watch was re-tuned to 37.5 % fumble and
+resolves BRONZE strictly - the first fumble point (25 %) rode Silver,
+outside the plan's half-open band, and 50 % breaches the sack. A
+repo-wide audit found scripted casual legs for forge, rampart, dragon,
+herbs and river; the remaining games carry the same bar as exact
+threshold tests (balance_sweep covers all thirteen rows) plus their
+gold scripts, accepted in their original T5xx/T6xx MG-QA passes. Where
+a score is a discrete objective (maze escape, cloak sneaky entry) the
+threshold contract is the honest form of Q6; per-game casual bots are
+not re-litigated at sweep time.

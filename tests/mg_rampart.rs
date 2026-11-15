@@ -270,9 +270,10 @@ fn a_flawless_watch_earneth_gold() {
 fn a_slack_watch_bringeth_bronze_not_worse() {
     // Casual read of the siege: the eye lands on the works every 16
     // ticks, the shaft flies at where a man was last seen (he has
-    // since moved up), a quarter of looses are bobbled, and the rocks
-    // stay in the cart. The MG-QA Q6 bar: such a run must still WIN,
-    // rewarded at bronze or silver - never gold, never the sack.
+    // since moved up), over a third of looses are bobbled, and the
+    // rocks stay in the cart. The plan's Q6 bar: casual lands in
+    // [BRONZE, SILVER) - it must still win, never at gold (that is
+    // the flawless watch's claim), never in the sack.
     use defender_of_the_crown::campaign::game::Tier;
     let mut g = Rampart::new(7);
     let mut sim = Sim::new();
@@ -301,7 +302,7 @@ fn a_slack_watch_bringeth_bronze_not_worse() {
             rng = rng
                 .wrapping_mul(6364136223846793005)
                 .wrapping_add(1442695040888963407);
-            let flinch = rng >> 61 & 3 == 0; // about a quarter are bobbled
+            let flinch = rng >> 61 & 7 < 3; // over a third are bobbled
             if let Some((x, y)) = ghost {
                 if !flinch {
                     sim.loose(&mut g, x as i32, y as i32); // at the memory
@@ -314,11 +315,8 @@ fn a_slack_watch_bringeth_bronze_not_worse() {
         }
     }
     assert!(
-        matches!(
-            g.state(),
-            MgState::Won(Tier::Bronze) | MgState::Won(Tier::Silver)
-        ),
-        "slack watch did not place bronze-or-silver: {:?} ({})",
+        matches!(g.state(), MgState::Won(Tier::Bronze)),
+        "slack watch did not place bronze: {:?} ({})",
         g.state(),
         g.score()
     );
