@@ -232,8 +232,16 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
   green.
   **GOLD 2026-11-15:** 88 ms gold deep link, 24/24 sport baselines clean
   twice over, real-Chromium smoke green, 513 KB wasm (see progress log).
-- [ ] **T704 mg-dragon**: hoard sneak, loot-weight escape, cursed crown
+- [x] **T704 mg-dragon**: hoard sneak, loot-weight escape, cursed crown
   gamble; rare-event spawn (turn≥20 once) campaign test.
+  **2026-11-15:** scripted no-stand return = 90 loot + 10 door = 100 =
+  GOLD (gold line 78); silent perfect heist is geometrically impossible
+  (beam 14 px/t outruns 1.6-0.15w escape), the rule is never stand, never
+  retrace. Omen-gated HOARD row + hoard_taken lore, once per campaign at
+  turn>=20 (8 campaign tests).
+- [x] **T704 dragon host/baseline/ship**: factory alias + registry sync
+  test (13 sports boot by id), 13-sport PLAY/PLATE baselines x2 sweeps
+  52/52 + new dragon pair, Chromium live smoke, suite+clippy green.
 - [ ] **T705 HALL OF FAME screen**: per-game records (localStorage), title
   menu entry, reset option; playwright verify persistence across reload.
 - [ ] **T706 Unlock pacing integration**: 1–4 start / 5–9 t5 / 10–12 t10 /

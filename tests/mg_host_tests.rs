@@ -287,3 +287,20 @@ fn driver_enter_key_closes_results_plate() {
     host.draw(&mut fb);
     assert!(host.wants_leave(), "ENTER on the plate must close the host");
 }
+
+/// The SPORTS registry and the make_game factory must never drift: every
+/// listed sport - the dragon hoard included - boots by id, both tiers of
+/// the heist's twin gates notwithstanding.
+#[test]
+fn every_registered_sport_boots_by_id() {
+    use defender_of_the_crown::ui::host::make_game;
+    assert_eq!(SPORTS.len(), 13);
+    for spec in SPORTS {
+        assert!(
+            make_game(spec.id, 3).is_some(),
+            "sport {} has no factory entry",
+            spec.id
+        );
+    }
+    assert!(make_game("wyvern", 3).is_none(), "no phantom ides");
+}

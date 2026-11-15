@@ -526,3 +526,47 @@ herald's cry is public knowledge.
   frame nondeterministic (227044 px swings) - the 250 ms static-spawn
   contract exists for a reason; and a jsdom 320x256 target decoded at
   320x200 crops the HUD row and fakes a frozen room. (2026-11-15)
+
+## T704 mg-dragon THE HOARD - done 2026-11-15
+
+The thirteenth sport: creep past the sleeping wyrm in twelve 40 px
+columns, lift the three bags (6/8/16) and the cursed crown (10, jangles
+the beast awake) at 15 px a step, and carry the lot out west - every
+burden slows the boots (1.6 - 0.15 px per weight, heavy crown 1.15 flat)
+while the sleep/doze/gaze cycle (90/30/30 ticks) sweeps a 14 px/t beam
+that is faster than any loaded thief, so standing still or retracing a
+marked column is death. The doze adds a noise gate (two jingled drops
+wake him), the wake phase telegraphs 24 ticks of roar and then fires
+flame marks at every still target on a 45-tick volley, and escape
+through the west door banks 90 + 10 points per carried item plus a
+100-tick fame timer. Balance is arithmetic, not feel: at full weight the
+lag per volley is 16 x (1.6 - 6 x SLOW) and SLOW 0.15 puts 11.2 above
+the 9-point FLAME_W - a walking thief always outwalks the fire, a
+standing one always burns; at the pre-fix 0.18 that margin flipped
+(8.3 < 9) and the whole 100-point line went unreachable, so the constant
+carries the proof in its comment. A *silent* flawless heist is
+provably impossible - the beam overtakes any open-field return from
+bag2 and the 28x32 cover boxes cannot be crossed between gaze windows -
+so `the_perfect_heist` encodes the intended rule instead: east-first,
+crown last, never stand, never retrace, full-load escape, Won(Gold)
+alive. Thirteen scripted tests (banner gate, spawn in beam shadow,
+weight steps, crown awake-on-jingle, doze noise gate, volley stillness
+rule, door bank, fame timer) plus eight campaign tests: the hoard
+omen fires once per campaign at turn>=20 (never twice, never at 19),
+gates the HOARD panel row, and hoard_taken lore keeps it out forever
+after the run. Registry sync got a guard of its own: `every_registered_
+sport_boots_by_id` walks all 13 SPORTS through make_game so the table
+and the factory can never drift apart again. Host alias dragon (86 ms
+deep link, 100 GOLD), baselines for the new sport captured, then both
+full 13-sport PLAY/PLATE sweeps green 52/52 with zero FAILs; the live
+Chromium bundle (built fresh from this tree via docker build-web) booted
+straight into the hoard, took arrow input, banked an 18-point bag, and
+showed the open-eye HE WAKES volley with 0 console errors. Full cargo
+suite green (323 tests, +48), clippy 0 warnings, title-flow regression
+green. Three traps recorded: the jsdom harness overwrites
+globalThis.setTimeout at import, so a driver's own sleep() must use
+Bun.sleep or jsdom timer init recurses to a stack overflow (the crash
+looks like the harness, it is not); the idle animation pair for the
+smoke must be sampled before the scripted death plate (a static plate
+fakes a frozen scene); and weight/gaze tests must spawn x<42, inside
+the beam's shadow - mid-room spawns get swept mid-assert. (2026-11-15)
