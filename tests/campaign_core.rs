@@ -103,12 +103,14 @@ fn champions_cannot_be_bought() {
 
 #[test]
 fn event_weights_positive_and_danes_gated() {
-    assert_eq!(ALL_EVENTS.len(), 7);
+    assert_eq!(ALL_EVENTS.len(), 8);
     for &e in &ALL_EVENTS {
-        assert!(e.weight(12) > 0);
+        assert!(e.weight(30) > 0);
     }
     assert_eq!(EventKind::DanishRaiders.weight(11), 0);
     assert!(EventKind::DanishRaiders.weight(12) > 0);
+    assert_eq!(EventKind::DragonLair.weight(19), 0, "hoard sleepeth till 20");
+    assert!(EventKind::DragonLair.weight(20) > 0);
 }
 
 #[test]

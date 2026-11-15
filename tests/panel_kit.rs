@@ -38,7 +38,7 @@ fn select(ui: &mut CampaignUi, name: &str) {
 #[test]
 fn buttons_carry_three_tones_per_state() {
     let mut fb = Framebuffer::new();
-    let b = btn(&action_rects(true), "rec:0").clone();
+    let b = btn(&action_rects(true, false), "rec:0").clone();
     kit::button(&mut fb, &b, false, true);
     assert_eq!(fb.get(b.x as u32, b.y as u32), BLACK, "rim");
     assert_eq!(
@@ -77,7 +77,7 @@ fn panels_rim_and_bevel_like_amiga() {
 fn hover_over_a_button_paints_a_tooltip() {
     let mut ui = CampaignUi::new(7, Difficulty::Normal);
     select(&mut ui, "Buckingham");
-    let levy = btn(&action_rects(true), "rec:0").clone();
+    let levy = btn(&action_rects(true, false), "rec:0").clone();
     let (bx, by) = center(&levy);
     ui.event(&move_to(bx, by), true);
     assert_eq!(ui.hover, Some("rec:0"));
@@ -105,7 +105,7 @@ fn garrison_roll_scroll_when_it_overflows() {
     select(&mut ui, "Buckingham");
     ui.g.gold[PLAYER.index()] = 500;
     for id in ["rec:1", "rec:2", "rec:3"] {
-        let (x, y) = center(btn(&action_rects(true), id));
+        let (x, y) = center(btn(&action_rects(true, false), id));
         ui.event(&tap(x, y), true);
     }
     // four unit rows + walls row overflow the 4-row window
@@ -134,7 +134,7 @@ fn sports_gate_is_the_meet_and_the_fee() {
     let mut ui = CampaignUi::new(7, Difficulty::Normal);
     select(&mut ui, "Buckingham");
     ui.g.turn = 12;
-    let sports = btn(&action_rects(true), "sports").clone();
+    let sports = btn(&action_rects(true, false), "sports").clone();
     let (cx, cy) = center(&sports);
     let mut fb = Framebuffer::new();
     let held = sport_pick(ui.g.turn, ((ui.g.turn as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15).is_some();

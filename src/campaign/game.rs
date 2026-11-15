@@ -228,6 +228,11 @@ pub struct GameState {
     pub tournament: [Option<usize>; 3],
     /// Event-tourney GOLDs banked; three recruit a champion (SPEC 5.5).
     pub golds: [u32; 3],
+    /// The hoard offer (T704): live while the dragon's omen stands; the
+    /// player heists once, else it dies with the season.
+    pub dragon_offer: bool,
+    /// Once the hoard omen hath fired it ne'er returns this campaign.
+    pub dragon_seen: bool,
     /// Home keep per faction (Saxon=Buckingham, Norman=London, SPEC 5.6).
     pub homes: [usize; 3],
     /// Despair for a fallen home keep strikes once, not every turn.
@@ -301,6 +306,8 @@ impl GameState {
             plague: [0; 3],
             tournament: [None; 3],
             golds: [0; 3],
+            dragon_offer: false,
+            dragon_seen: false,
             difficulty: [Difficulty::default(); 3],
             homes,
             home_lost: [false; 3],
@@ -394,7 +401,10 @@ impl GameState {
             }
             self.push_log(format!("SPIES REPORT FROM {name}."));
             if self.rng.below(100) < 10 {
-                self.tip = Some(EventKind::roll(&mut self.event_rng, self.turn + 1));
+                let skip: &[EventKind] =
+                    if self.dragon_seen { &[EventKind::DragonLair] } else { &[] };
+                self.tip =
+                    Some(EventKind::roll_excluding(&mut self.event_rng, self.turn + 1, skip));
                 self.push_log("A SERVANT MURMURS OF TOMORROW.");
             }
             Ok(true)
@@ -899,10 +909,12 @@ impl GameState {
     /// One omen a turn over all England (SPEC 5.4); a spy's tip overrides
     /// the dice exactly once. Both factions suffer - and profit - equally.
     pub fn roll_events(&mut self) {
+        self.dragon_offer = false; // an offer unseen dies with the old season
+        let skip: &[EventKind] = if self.dragon_seen { &[EventKind::DragonLair] } else { &[] };
         let e = self
             .tip
             .take()
-            .unwrap_or_else(|| EventKind::roll(&mut self.event_rng, self.turn));
+            .unwrap_or_else(|| EventKind::roll_excluding(&mut self.event_rng, self.turn, skip));
         self.event = Some(e);
         self.push_log(format!("OMEN: {}.", e.title()));
         for f in [Faction::Saxon, Faction::Norman] {
@@ -988,6 +1000,15 @@ impl GameState {
                 }
             }
             EventKind::DanishRaiders => self.raiders_strike(f),
+            EventKind::DragonLair => {
+                if f == Faction::Saxon {
+                    self.dragon_offer = true;
+                    self.dragon_seen = true;
+                    self.push_log("THE EARTH TREMBLETH: A HOARD LIETH UNDER THE HILLS.");
+                } else {
+                    self.push_log("NORMAN VILLAGES EMPTY: MEN FLEE THE BREATHING HILLS.");
+                }
+            }
         }
     }
 
@@ -1157,6 +1178,46 @@ impl GameState {
             ));
         }
         Ok((tier, r))
+    }
+
+    /// THE DRAGON STIRS (T704, SPEC 5.5): the rare-event heist pays the
+    /// double tourney haul for the tier earned - and closes the offer,
+    /// win or lose; the hoard is attempted once per campaign.
+    pub fn play_dragon(
+        &mut self,
+        f: Faction,
+        score: u32,
+        silver_at: u32,
+        gold_at: u32,
+    ) -> Result<(Tier, Reward), String> {
+        if self.over.is_some() {
+            return Err("THE GAME IS OVER.".into());
+        }
+        if !self.dragon_offer {
+            return Err("NO DRAGON AWAITS THEE.".into());
+        }
+        self.dragon_offer = false;
+        let tier = Tier::of(score, silver_at, gold_at);
+        let mut r = self.reward_for(f, tier);
+        r.gold *= 2;
+        r.provisions *= 2;
+        let home = self.homes[f.index()];
+        self.credit(f, home, &r);
+        if tier == Tier::Gold {
+            self.push_log("THE HOARD IS ROBBED! THE CROWN GLEAMETH WITH DOUBLE SPOILS.");
+        } else {
+            self.push_log(format!("FROM THE HOARD: {tier:?} SPOILS, DOUBLE THE TOURNEY HAUL."));
+        }
+        Ok((tier, r))
+    }
+
+    /// The failed heist (T704): no laurel, no spoils - yet the one offer
+    /// is spent; the dragon forgiveth no second attempt.
+    pub fn forfeit_dragon(&mut self) {
+        if self.dragon_offer {
+            self.dragon_offer = false;
+            self.push_log("THE HOARD KEEPETH ITS SECRET; ONE TRY WAS THY LOT.");
+        }
     }
 }
 

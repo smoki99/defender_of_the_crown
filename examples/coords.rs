@@ -11,11 +11,11 @@ fn main() {
             .find(|s| s.name == "Buckingham")
             .expect("buckingham");
     let (bx, by) = castle_screen(s);
-    let levy = action_rects(true)
+    let levy = action_rects(true, false)
         .into_iter()
         .find(|b| b.id == "rec:0")
         .unwrap();
-    let sports = action_rects(true)
+    let sports = action_rects(true, false)
         .into_iter()
         .find(|b| b.id == "sports")
         .unwrap();

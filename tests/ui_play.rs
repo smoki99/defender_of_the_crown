@@ -28,7 +28,7 @@ fn tapping_a_keep_selecteth_it_and_its_buttons() {
     assert_eq!(ui.sel.map(|i| ui.g.strongholds[i].name), Some("Buckingham"));
     // own panel offers recruits; tapping the levy button buys when affordable
     ui.g.gold[PLAYER.index()] = 500;
-    let levy = action_rects(true)
+    let levy = action_rects(true, false)
         .into_iter()
         .find(|b| b.id == "rec:0")
         .unwrap();
@@ -45,7 +45,7 @@ fn broke_levies_are_denied() {
     let (x, y) = castle_at(&ui, "Buckingham");
     ui.event(&tap(x, y), true);
     ui.g.gold[PLAYER.index()] = 0;
-    let levy = action_rects(true)
+    let levy = action_rects(true, false)
         .into_iter()
         .find(|b| b.id == "rec:0")
         .unwrap();
@@ -97,7 +97,7 @@ fn the_spy_button_purchaseth_eyes() {
     let (ox, oy) = castle_at(&ui, "Buckingham");
     ui.event(&tap(ox, oy), true);
     // own keeps cannot be spied: no gold moves
-    let spy = action_rects(true)
+    let spy = action_rects(true, false)
         .into_iter()
         .find(|b| b.id == "spy")
         .unwrap();

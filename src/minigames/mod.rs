@@ -1,11 +1,12 @@
 //! Minigames (SPEC 6): 13 sports, one module each. The framework is pure;
 //! sport modules land as they ship (T502: joust, T503: catapult, T504: sword,
 //! T601: archery, T602: rampart, T603: maze, T604: river, T605: cloak,
-//! T606: forge, T701: herbs, T702: falcon, T703: tavern).
+//! T606: forge, T701: herbs, T702: falcon, T703: tavern, T704: dragon).
 
 pub mod archery;
 pub mod catapult;
 pub mod cloak;
+pub mod dragon;
 pub mod falcon;
 pub mod forge;
 pub mod framework;

@@ -138,11 +138,11 @@ fn lancing_early_misses_nothing_and_costs_nothing() {
 }
 
 #[test]
-fn factory_arms_joust_and_nothing_else() {
+fn factory_arms_joust_and_friends() {
     use defender_of_the_crown::minigames::framework::SPORTS;
     use defender_of_the_crown::ui::host::{game_exists, make_game};
     assert!(make_game("joust", 1).is_some(), "joust shipped");
-    assert!(make_game("dragon", 1).is_none(), "dragon has not");
+    assert!(make_game("dragon", 1).is_some(), "dragon shipped");
     assert!(game_exists());
     let other = SPORTS.iter().filter(|s| s.id != "joust").count();
     assert_eq!(other, 12);

@@ -236,5 +236,7 @@ fn full_battery_and_ship_hits_sail_into_gold() {
 fn factory_arms_catapult_too() {
     use defender_of_the_crown::ui::host::make_game;
     assert!(make_game("catapult", 1).is_some(), "catapult shipped");
-    assert!(make_game("dragon", 1).is_none(), "dragon has not");
+    assert!(make_game("dragon", 1).is_some(), "dragon shipped");
+    assert!(make_game("dragon", 7).is_some(), "dragon seedeth by sport no");
+    assert!(make_game("wyvern", 1).is_none(), "unshipped ides stay void");
 }

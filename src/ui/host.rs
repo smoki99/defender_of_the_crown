@@ -26,6 +26,8 @@ use std::rc::Rc;
 pub enum SportMode {
     Sports { sid: usize },
     Herald { sid: usize },
+    /// T704 rare event: the dragon's hoard heist, no castle attached.
+    Hoard,
 }
 
 /// Shared mailbox: the host writes the outcome, the campaign reads+clears.
@@ -263,6 +265,7 @@ pub fn make_game(id: &str, seed: u64) -> Option<Box<dyn Minigame>> {
         "herbs" => Some(Box::new(crate::minigames::herbs::Herbs::new(seed))),
         "falcon" => Some(Box::new(crate::minigames::falcon::Falcon::new(seed))),
         "tavern" => Some(Box::new(crate::minigames::tavern::Tavern::new(seed))),
+        "dragon" => Some(Box::new(crate::minigames::dragon::Dragon::new(seed))),
         _ => None,
     }
 }

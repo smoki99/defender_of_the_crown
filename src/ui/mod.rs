@@ -8,7 +8,7 @@ pub mod host;
 
 pub use host::{MgHost, OutcomeCell, SportMode};
 
-use crate::minigames::framework::{SportSpec, pick as sport_pick};
+use crate::minigames::framework::{SportSpec, pick as sport_pick, SPORTS};
 use std::rc::Rc;
 
 use crate::campaign::events::EventKind;
@@ -17,7 +17,8 @@ use crate::campaign::game::{
 };
 use crate::campaign::units::UnitKind;
 use crate::engine::gfx::{
-    BLACK, BLOOD, CREAM, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, GOLD, GRASS, GRAY, GREEN, LINEN,
+    BLACK, BLOOD, CREAM, DARKGRAY, DARKGREEN, DARKRED, DEEPWATER, EMBER, GOLD, GRASS, GRAY,
+    GREEN, LINEN,
     NAVY, NORMAN_RED, SAXON_BLUE, SILVER, SKY, STONE, TEAL, W, WHITE, YELLOW,
 };
 pub use crate::engine::scene::SceneEvent;
@@ -41,10 +42,11 @@ impl Btn {
     }
 }
 
-/// Castle action buttons for a selected stronghold (SPEC 7).
-pub fn action_rects(sel_own: bool) -> Vec<Btn> {
+/// Castle action buttons for a selected stronghold (SPEC 7). `hoard` adds
+/// the T704 rare-event row while the dragon's omen stands.
+pub fn action_rects(sel_own: bool, hoard: bool) -> Vec<Btn> {
     if sel_own {
-        vec![
+        let mut v = vec![
             Btn {
                 id: "rec:0",
                 x: 6,
@@ -94,7 +96,17 @@ pub fn action_rects(sel_own: bool) -> Vec<Btn> {
                 w: 68,
                 h: 14,
             },
-        ]
+        ];
+        if hoard {
+            v.push(Btn {
+                id: "hoard",
+                x: 222,
+                y: 158,
+                w: 68,
+                h: 14,
+            });
+        }
+        v
     } else {
         vec![
             Btn {
@@ -146,6 +158,7 @@ fn btn_label(id: &str) -> String {
         "spy" => format!("SPY {SPY_COST}"),
         "close" => "CLOSE".to_string(),
         "sports" => "SPORTS".to_string(),
+        "hoard" => "HOARD".to_string(),
         "end" => "END TURN".to_string(),
         other => other.to_string(),
     }
@@ -230,6 +243,7 @@ fn tip(id: &str) -> &'static str {
         "spy" => "SPY: 7 IN 10 REVEAL A GARRISON",
         "close" => "CLOSE THIS ROLL",
         "sports" => "FEAT OF ARMS, FEE TEN GOLD",
+        "hoard" => "ROB THE DRAGON - ONCE IN ALL THE GAME",
         "end" => "SUMMON THE NEXT SEASON",
         "scr:up" | "scr:dn" => "SCROLL THE GARRISON ROLL",
         _ => "",
@@ -435,7 +449,10 @@ impl CampaignUi {
             return;
         }
         if let Some(sel) = self.sel {
-            for b in action_rects(self.g.strongholds[sel].owner == PLAYER) {
+            for b in action_rects(
+                self.g.strongholds[sel].owner == PLAYER,
+                self.g.dragon_offer,
+            ) {
                 if b.hits(x, y) {
                     self.act(b.id, sel);
                     return;
@@ -529,7 +546,7 @@ impl CampaignUi {
                 }
             }
             if h.is_none() {
-                h = action_rects(own)
+                h = action_rects(own, self.g.dragon_offer)
                     .into_iter()
                     .find(|b| b.hits(x, y))
                     .map(|b| b.id);
@@ -572,6 +589,10 @@ impl CampaignUi {
                 Ok(()) => format!("{} JOIN THE GARRISON", kind_tag(kind)),
                 Err(e) => e,
             }
+        } else if id == "hoard" {
+            // T704: the omen standeth - one heist, one shot at the hoard.
+            self.launch_req = Some((&SPORTS[12], SportMode::Hoard));
+            return;
         } else if id == "sports" {
             // The meet is a season-wide pick (same seed as `btn_enabled`);
             // entry and purse differ when our own herald flies here.
@@ -824,7 +845,7 @@ impl CampaignUi {
                 scr.draw(fb, self.hover);
             }
         }
-        for b in action_rects(own) {
+        for b in action_rects(own, self.g.dragon_offer) {
             let enabled = btn_enabled(&self.g, b.id);
             kit::button(fb, &b, self.hover == Some(b.id), enabled);
             let label = btn_label(b.id);
@@ -940,6 +961,7 @@ fn event_body(e: EventKind) -> (&'static str, &'static str) {
         EventKind::KingsLevy => ("THE KING'S LEVY COMETH", "TO THE CAPITAL"),
         EventKind::Deserters => ("FEET SLINK AWAY FROM", "THY LARGEST HOST"),
         EventKind::DanishRaiders => ("HEATHEN SHIPS AT SEA;", "A COAST KEEP MAY FALL"),
+        EventKind::DragonLair => ("THE DRAGON STIRRETH:", "A HOARD FOR ONE THIEF"),
     }
 }
 
@@ -1003,6 +1025,14 @@ fn draw_event_icon(fb: &mut crate::engine::gfx::Framebuffer, e: EventKind, x: i3
             fb.vline(x + 8, y + 3, y + 11, BLACK);
             fb.fill_rect(x + 9, y + 4, 4, 4, WHITE);
             fb.fill_rect(x + 10, y + 5, 2, 2, BLOOD);
+        }
+        EventKind::DragonLair => {
+            // gold mound under a watching ember eye
+            fb.fill_rect(x + 2, y + 11, 12, 3, GOLD);
+            fb.fill_rect(x + 5, y + 9, 6, 2, YELLOW);
+            fb.fill_rect(x + 5, y + 3, 7, 5, DARKGREEN);
+            fb.fill_rect(x + 7, y + 4, 2, 2, EMBER);
+            fb.fill_rect(x + 11, y + 5, 2, 2, GREEN);
         }
     }
 }
@@ -1141,6 +1171,7 @@ impl PlayScene {
                     SportMode::Sports { sid } | SportMode::Herald { sid } => {
                         (sid as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
                     }
+                        SportMode::Hoard => 0x4452_414E_5354_4952,
                 };
             if let Some(game) = host::make_game(spec.id, seed) {
                 self.ui.sport_ctx = Some((mode, spec));
@@ -1154,9 +1185,16 @@ impl PlayScene {
         if let Some(o) = done {
             if let Some((mode, spec)) = self.ui.sport_ctx.take() {
                 if o.tier.is_none() {
-                    // no laurel: the meet is void - no fee was taken, the
-                    // herald (if any) still waits.
-                    self.ui.say("THOU FAILED THE MEET - NO FEE, NO PURSE");
+                    if matches!(mode, SportMode::Hoard) {
+                        // the dragon forgiveth no second attempt: the
+                        // failed heist still burneth the one offer.
+                        self.ui.g.forfeit_dragon();
+                        self.ui.say("THE HOARD KEEPETH ITS SECRET - ONE TRY ALONE");
+                    } else {
+                        // no laurel: the meet is void - no fee was taken, the
+                        // herald (if any) still waits.
+                        self.ui.say("THOU FAILED THE MEET - NO FEE, NO PURSE");
+                    }
                     return;
                 }
                 let res = match mode {
@@ -1168,6 +1206,12 @@ impl PlayScene {
                         spec.gold_at,
                     ),
                     SportMode::Herald { .. } => self.ui.g.play_tournament(
+                        PLAYER,
+                        o.score,
+                        spec.silver_at,
+                        spec.gold_at,
+                    ),
+                    SportMode::Hoard => self.ui.g.play_dragon(
                         PLAYER,
                         o.score,
                         spec.silver_at,
