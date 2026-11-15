@@ -294,6 +294,8 @@ pub struct CampaignUi {
     pub ai_anim: u32,
     pub report_pending: bool,
     pending_event: Option<EventKind>,
+    /// Triple-crown champion modal open (T707).
+    pub champ_open: bool,
     pub sting_armed: bool,
     /// T501: SPORTS launch request (spec, mode), consumed by the scene layer.
     pub launch_req: Option<(&'static SportSpec, SportMode)>,
@@ -333,6 +335,7 @@ impl CampaignUi {
             ai_anim: 0,
             report_pending: false,
             pending_event: None,
+            champ_open: false,
             sting_armed: false,
             launch_req: None,
             sport_out: Rc::default(),
@@ -426,6 +429,14 @@ impl CampaignUi {
                 self.report_shown = self.report.len();
             } else {
                 self.report_open = false;
+            }
+            return;
+        }
+        if self.champ_open {
+            // triple crown: the map is deaf; only OK dismisses (T707),
+            // and it outranks any omen plate beneath it.
+            if event_ok_rect().hits(x, y) {
+                self.champ_open = false;
             }
             return;
         }
@@ -675,6 +686,12 @@ impl CampaignUi {
         }
     }
 
+    /// The scene announces a triple-crown champion here; the modal then
+    /// holds the map until OK.
+    pub fn announce_champion(&mut self) {
+        self.champ_open = true;
+    }
+
     fn say(&mut self, m: &str) {
         self.msg = m.to_string();
         self.msg_ticks = 240;
@@ -798,6 +815,7 @@ impl CampaignUi {
         }
         self.draw_report(fb);
         self.draw_event_modal(fb);
+        self.draw_champion_modal(fb);
     }
 
     fn draw_hud(&mut self, fb: &mut crate::engine::gfx::Framebuffer) {
@@ -949,6 +967,31 @@ impl CampaignUi {
         let (l1, l2) = event_body(e);
         draw_text_shadow(fb, 104, 86, l1, BLACK, LINEN);
         draw_text_shadow(fb, 80, 102, l2, BLACK, LINEN);
+        kit::button(fb, &event_ok_rect(), false, true);
+        draw_text_shadow(fb, 155, 124, "OK", CREAM, BLACK);
+    }
+
+    /// THE TRIPLE CROWN (T707): the third event-tourney gold recruits a
+    /// champion - the feat is announced on the omen plate, with three
+    /// crowns for a crest, and the map stays deaf until OK.
+    fn draw_champion_modal(&self, fb: &mut crate::engine::gfx::Framebuffer) {
+        if !self.champ_open {
+            return;
+        }
+        use crate::engine::fonts::draw_text_shadow;
+        kit::panel(fb, 70, 64, 180, 74);
+        fb.fill_rect(72, 66, 176, 70, LINEN);
+        fb.fill_rect(80, 72, 16, 16, NAVY);
+        // three gold crowns with cream tips on a NAVY plaque
+        for (cx, peak) in [(83i32, 4i32), (87, 3), (91, 4)] {
+            fb.fill_rect(cx, 72 + peak, 2, 8, GOLD);
+            fb.fill_rect(cx, 72 + peak, 2, 1, CREAM);
+        }
+        fb.fill_rect(83, 79, 10, 3, GOLD);
+        fb.set(87, 80, DARKRED);
+        draw_text_shadow(fb, 104, 72, "THE TRIPLE CROWN", NAVY, LINEN);
+        draw_text_shadow(fb, 104, 86, "A CHAMPION RIDETH TO", BLACK, LINEN);
+        draw_text_shadow(fb, 80, 102, "THY GARRISON - GLORY ALONE", BLACK, LINEN);
         kit::button(fb, &event_ok_rect(), false, true);
         draw_text_shadow(fb, 155, 124, "OK", CREAM, BLACK);
     }
@@ -1168,6 +1211,19 @@ impl PlayScene {
         self
     }
 
+    /// Harness hook (T707): bank a champion into the starting garrison
+    /// and proclaim the triple crown at boot (?champ=1), so the modal and
+    /// the panel row are reachable without winning three tourneys.
+    pub fn with_champion(mut self, on: bool) -> Self {
+        if on {
+            self.ui.g.strongholds[0]
+                .garrison
+                .push(crate::campaign::units::Unit::new(UnitKind::Champion));
+            self.ui.announce_champion();
+        }
+        self
+    }
+
     /// Layer/collect the minigame host around the campaign screen (T501).
     fn sports_flow(&mut self, app: &mut dyn crate::engine::scene::AppCtx) {
         if let Some((spec, mode)) = self.ui.launch_req.take() {
@@ -1223,7 +1279,7 @@ impl PlayScene {
                         spec.gold_at,
                     ),
                 };
-                let msg = match res {
+                let (msg, crowned) = match res {
                     Ok((tier, r)) => {
                         let mut m = match tier {
                             crate::campaign::game::Tier::Gold => {
@@ -1239,10 +1295,14 @@ impl PlayScene {
                         if r.champion {
                             m.push_str(" AND A CHAMPION");
                         }
-                        m
+                        (m, r.champion)
                     }
-                    Err(e) => e,
+                    Err(e) => (e, false),
                 };
+                if crowned {
+                    // the triple crown is worth a proclamation (T707)
+                    self.ui.announce_champion();
+                }
                 self.ui.say(&msg);
             }
         }

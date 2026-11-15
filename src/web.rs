@@ -1386,7 +1386,8 @@ pub fn main() -> Result<(), JsValue> {
         Box::new(
             PlayScene::new(play_seed, play_diff)
                 .with_autoplay(query_has("autoplay=1"))
-                .with_turn(query_get("turn").and_then(|v| v.parse().ok()).unwrap_or(0)),
+                .with_turn(query_get("turn").and_then(|v| v.parse().ok()).unwrap_or(0))
+                .with_champion(query_has("champ=1")),
         )
     } else if let Some((sid, game)) = mg_sport {
         Box::new(crate::ui::host::MgHost::new(
