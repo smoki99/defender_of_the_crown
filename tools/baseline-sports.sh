@@ -6,7 +6,7 @@
 #   UPDATE=1 ./tools/baseline-sports.sh     # recapture
 set -e
 cd "$(dirname "$0")/.."
-for g in sword joust catapult archery rampart maze river cloak forge herbs; do
+for g in sword joust catapult archery rampart maze river cloak forge herbs falcon; do
   STATE=sport-play-$g TOL=3000 SETTLE=250 \
     CROWN_QS="scene=mg&mg=$g" bun tools/sports-baseline-one.mjs
   STATE=sport-plate-$g SETTLE=800 \

@@ -463,3 +463,37 @@ herald's cry is public knowledge.
   sport baselines diff-clean twice over (PLAY 0 px, plates in blink
   tol), clippy 0 warnings, wasm32 release rebuilt (514 KB bundle);
   title regression 1014 frames green. (2026-11-15)
+- **T702 mg-falcon — THE FALCON'S CAST (GOLD).** Tenth sport (`id 9`),
+  inertia-flight intercept defending the corn ricks. The hawk is pointer
+  steered but glides inertially: each tick vx += (mx-x)*0.14 (capped 7),
+  x += vx*0.55 + 0.75 with mirrored clamps — a pointer warp yields a
+  straight glide, not a teleport. Six crows spawn every 150 ticks (rng
+  x 20..300, first locked to x=20 for scripted play), descend at 0.9/tick
+  pulling toward the nearest standing ear (16..268), and once at EAR_Y
+  strafe the field stealing ears left-to-right with a 15-tick peck each —
+  a missed crow keeps costing until the clock ends. A crow within 14 of
+  the hawk is intercepted (+15, 40-tick cheer); an ear stolen costs -10
+  and flips the field marker; both score channels clamp at >=0. Timer
+  900 ticks (45 s), banner 90. Score maps 0/30/60/90 = none/bronze/silver/
+  gold so the best achievable run (6x15 - 2x10 = 88) is exactly GOLD;
+  purse 35/70/110/160. Field: dusk sky, grass, ten standing/fallen corn
+  ear sprites, kite hawk with tan wingtips + ground shadow, black crows.
+  Twelve scripted tests (banner gate, inertial glide + pointer warp,
+  crow reaches field and steals, full intercept chain, strafe sweep,
+  all-crows GOLD 88 + purse, missed-crow silver 50 with cheer, score
+  floor, seed variance + determinism, gutter no-crash). Host: MG_FALCON
+  id 9, registry tenth, SPORTS tenth with `falcon` alias; ?scene=mg&mg=
+  falcon deep link resolves through SPORTS. jsdom baselines
+  PLAY s0/s15 (33020 px change, banner->live flight + timer drain) and
+  PLATE s48 (63 px, blink-only) recorded twice byte-identical; live
+  Chromium smoke via deep link shows FALCONER band + banner, the hawk
+  glides to a real mouse pointer with visible inertia over the field
+  (shadow, descending crow, ten ears), and the autoplay run posts the
+  navy laurel panel — 0 console errors. Full cargo suite green (268
+  tests, +12), all 22/22 sport baselines diff-clean twice over, clippy
+  0 warnings, wasm32 release rebuilt; title-flow regression 1022 frames
+  green. Stale-bundle trap recorded: first falcon captures ran against a
+  pre-falcon web/pkg (no such sport -> driver fell back to the title/
+  campaign and the "plate" frame was a boot strip); the harness serves
+  whatever web/pkg was built last — always rebuild before capturing.
+  (2026-11-15)
