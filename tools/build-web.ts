@@ -1,6 +1,6 @@
 // tools/build-web.ts — build the wasm bundle + JS glue into web/pkg.
-// Rust compiles inside the crown-rs:1 docker image (see test.sh); the
-// wasm-bindgen CLI is a static musl binary staged into the source volume.
+// Default: Rust compiles inside the crown-rs:1 docker image (see test.sh).
+// CROWN_LOCAL=1 (CI): host cargo + host wasm-bindgen, no docker.
 import { existsSync, renameSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
@@ -19,19 +19,39 @@ if (!existsSync(CLI)) {
   await Bun.$`chmod +x ${CLI}`;
 }
 
+// binaryen wasm-opt -Oz, vendored beside wasm-bindgen (both gitignored).
+const OPT = "tools/bin/wasm-opt";
+if (!existsSync(OPT)) {
+  const BV = "version_122"; // matches the crown-rs:1 image
+  console.log("downloading binaryen", BV);
+  const r = await fetch(`https://github.com/WebAssembly/binaryen/releases/download/${BV}/binaryen-${BV}-x86_64-linux.tar.gz`);
+  if (!r.ok) throw new Error(`binaryen download ${r.status}`);
+  await Bun.write("/tmp/binaryen.tar.gz", r);
+  await Bun.$`mkdir -p tools/bin`;
+  await Bun.$`tar xzf /tmp/binaryen.tar.gz -C tools/bin --strip-components=2 binaryen-${BV}/bin/wasm-opt`;
+  await Bun.$`chmod +x ${OPT}`;
+}
+
 async function run(...args: string[]) {
   const p = Bun.spawn(args, { stdout: "inherit", stderr: "inherit" });
   if ((await p.exited) !== 0) throw new Error(`failed: ${args.join(" ")}`);
 }
 
-await run("./test.sh", "wasm-build");
-await run("./test.sh", "bindgen");
+const LOCAL = process.env.CROWN_LOCAL === "1";
 await Bun.write("web/pkg/.keep", "");
-await run("./test.sh", "pull-pkg");
+if (LOCAL) {
+  await run("cargo", "build", "--release", "--target", "wasm32-unknown-unknown");
+  await run(CLI, "--target", "web", "--out-dir", "web/pkg",
+    "target/wasm32-unknown-unknown/release/defender_of_the_crown.wasm");
+} else {
+  await run("./test.sh", "wasm-build");
+  await run("./test.sh", "bindgen");
+  await run("./test.sh", "pull-pkg");
+}
 
 // T804: wasm-opt -Oz (-40 % here); keep the CLI in sync with test.sh's image.
 const WASM = "web/pkg/defender_of_the_crown_bg.wasm";
-await run("tools/bin/wasm-opt", "-Oz", "--enable-mutable-globals", WASM, "-o", "web/pkg/.opt.wasm");
+await run(OPT, "-Oz", "--enable-mutable-globals", WASM, "-o", "web/pkg/.opt.wasm");
 renameSync("web/pkg/.opt.wasm", WASM);
 
 // T804 payload budget: wasm + glue + embedded MODs must stay <= 2 MB.

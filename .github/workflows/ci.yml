@@ -1,0 +1,60 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Native tests (release, as shipped)
+        run: cargo test --release --locked
+      - name: Clippy -D warnings
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Install jsdom tooling
+        run: bun install
+      - name: Wasm bundle + 2 MB payload budget (T906)
+        run: CROWN_LOCAL=1 bun run build
+      - name: Headless play gate (jsdom, no console errors)
+        run: |
+          bun tools/serve.ts &
+          for i in $(seq 30); do curl -sf http://127.0.0.1:8123/index.html >/dev/null && break; sleep 1; done
+          bun tools/headless-check.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-bundle
+          path: web/
+          if-no-files-found: error
+
+  pages:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-bundle
+          path: web
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

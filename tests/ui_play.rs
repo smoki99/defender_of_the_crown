@@ -195,3 +195,43 @@ fn keep_icon_edge_taps_hit_the_visible_keep() {
         &ui.g.log[ui.g.log.len().saturating_sub(3)..]
     );
 }
+
+#[test]
+fn keyboard_only_reigneth() {
+    use defender_of_the_crown::engine::input::{KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT};
+    let key = |code: u32| SceneEvent::Key { code, pressed: true };
+    let mut ui = CampaignUi::new(7, Difficulty::Normal);
+    // Enter on a bare map lights the home capital
+    ui.event(&key(KEY_ENTER), true);
+    assert_eq!(ui.sel.map(|i| ui.g.strongholds[i].name), Some("Buckingham"));
+    // Enter again acts on it: the action panel opens
+    ui.event(&key(KEY_ENTER), true);
+    assert!(ui.panel_open, "Enter did not open the panel");
+    // Left/Right cycle the buttons with the hover bevel as visible focus
+    let own = action_rects(true, false);
+    ui.g.gold[PLAYER.index()] = 500;
+    ui.event(&key(KEY_RIGHT), true);
+    assert_eq!(ui.kbd_btn, 1);
+    assert_eq!(ui.hover, Some(own[1].id), "no visible keyboard focus");
+    ui.event(&key(KEY_LEFT), true);
+    assert_eq!(ui.hover, Some(own[0].id));
+    // Enter presses the cycled button - here the levy recruit
+    assert_eq!(own[0].id, "rec:0");
+    let before = ui.g.strongholds[ui.sel.unwrap()].garrison.len();
+    ui.event(&key(KEY_ENTER), true);
+    assert_eq!(
+        ui.g.strongholds[ui.sel.unwrap()].garrison.len(),
+        before + 1,
+        "keyboard levy failed: msg {:?}",
+        ui.msg
+    );
+    // Esc backs out of the panel; then arrows roam England
+    ui.event(&key(KEY_ESC), true);
+    assert!(!ui.panel_open, "Esc must close the panel");
+    ui.event(&key(defender_of_the_crown::engine::input::KEY_DOWN), true);
+    assert_ne!(ui.sel, Some(0), "south arrow stayed put");
+    // E ends the turn - the whole war is playable without a mouse
+    let turn0 = ui.g.turn;
+    ui.event(&key(b'e' as u32), true);
+    assert_eq!(ui.g.turn, turn0 + 1, "E must end the round");
+}

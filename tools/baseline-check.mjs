@@ -43,7 +43,7 @@ async function cap(name) {
   frames[name] = snap();
 }
 
-await Bun.sleep(700); // boot: herald unfurl completes ~0.6 s after load
+await Bun.sleep(900); // boot: herald unfurl + CTA blink are both lit by t=0.9 s
 await cap("boot");
 
 key("Enter"); // audio unlock + herald rolls up -> menu

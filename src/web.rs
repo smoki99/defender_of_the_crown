@@ -16,8 +16,9 @@ extern "C" {
 use crate::engine::audio::{Mod, Music, Player, Sfx};
 use crate::engine::fonts::{draw_text, draw_text_shadow};
 use crate::engine::gfx::{
-    Framebuffer, BLACK, BLOOD, BROWN, DARKGRAY, DARKGREEN, EMBER, GOLD, GRASS, GRAY, GREEN, H,
-    LIGHTBLUE, LINEN, NAVY, OLIVE, ORANGE, SAXON_BLUE, SILVER, SKY, STONE, TAN, W, WHITE, YELLOW,
+    Framebuffer, BLACK, BLOOD, BROWN, DARKGRAY, DARKGREEN, EMBER, GOLD, GRASS, GRAY, GRAY3,
+    GREEN, H, LIGHTBLUE, LINEN, NAVY, OLIVE, ORANGE, SAXON_BLUE, SILVER, SKY, STONE, TAN, W,
+    WHITE, YELLOW,
 };
 use crate::engine::input::{
     Gesture, Input, Raw, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP,
@@ -940,7 +941,7 @@ impl TitleScene {
     fn draw_fame(&self, fb: &mut Framebuffer) {
         fb.fill_rect(16, 60, 288, 150, BLACK);
         fb.rect(16, 60, 288, 150, GOLD);
-        draw_text_shadow(fb, 100, 66, "HALL OF FAME", GOLD, BLACK);
+        draw_text_shadow(fb, 112, 66, "HALL OF FAME", GOLD, BLACK);
         for (i, spec) in crate::minigames::framework::SPORTS.iter().enumerate() {
             let col = i / 7; // 7 left, rest right
             let x = 26 + col as i32 * 146;
@@ -980,7 +981,7 @@ impl TitleScene {
                 }
             }
             _ => {
-                draw_text_shadow(fb, 26, 162, "NO FEATS RECORDED - WIN A WAR", GRAY, BLACK);
+                draw_text_shadow(fb, 26, 162, "NO FEATS RECORDED - WIN A WAR", GRAY3, BLACK);
             }
         }
         let msg = if self.reset_armed {
@@ -1001,7 +1002,7 @@ impl TitleScene {
             r.0 + 6,
             r.1 + 3,
             msg,
-            if self.reset_armed { BLOOD } else { GRAY },
+            if self.reset_armed { BLOOD } else { GRAY3 },
             BLACK,
         );
         self.draw_back(fb);
@@ -1028,7 +1029,7 @@ impl TitleScene {
             crate::ui::kit::centered(fb, 178 + i as i32 * 13, l, WHITE, BLACK);
         }
         let pg = format!("{}/{}", self.crawl + 1, CRAWL.len());
-        crate::ui::kit::centered(fb, 204, &pg, GRAY, BLACK);
+        crate::ui::kit::centered(fb, 204, &pg, GRAY3, BLACK);
         if self.crawl + 1 == CRAWL.len() {
             draw_text_shadow(fb, 88, 214, "ENTER MARCHES TO WAR", GOLD, BLACK);
         }
@@ -1036,7 +1037,7 @@ impl TitleScene {
     }
     /// Screen 1: a shire ablaze under the Norman banner.
     fn crawl_fire(&self, fb: &mut Framebuffer) {
-        fb.fill_rect_dither(20, 112, 276, 46, BLACK, BLOOD, 20);
+        fb.fill_rect_dither(20, 112, 276, 46, BLACK, BLOOD, 2);
         fb.fill_rect(20, 158, 276, 8, BLACK);
         for (hx, hw) in [(56i32, 30i32), (100, 22)] {
             fb.fill_rect(hx, 142, hw as u32, 16, BROWN);
@@ -1047,7 +1048,7 @@ impl TitleScene {
             fb.fill_rect(hx + hw / 2 - 3, 148, 6, 10, DARKGRAY);
         }
         // flame flicker riding the rooftops
-        for k in 0..14i32 {
+        for k in 0..12i32 {
             let fx = 54 + k * 6 + ((self.ticks as i32 / 3 + k) % 3 - 1);
             let fy = 128 - (self.ticks as i32 + k * 7) % 6;
             fb.fill_rect(
@@ -1073,7 +1074,7 @@ impl TitleScene {
     }
     /// Screen 2: axe and sword crossed over the forgotten crown.
     fn crawl_arms(&self, fb: &mut Framebuffer) {
-        fb.fill_rect_dither(20, 112, 276, 56, NAVY, BLACK, 40);
+        fb.fill_rect_dither(20, 112, 276, 56, NAVY, BLACK, 8);
         // axe: upright haft, silver crescent head left
         fb.fill_rect(158, 114, 4, 52, BROWN);
         fb.tri([(158, 116), (158, 134), (140, 125)], SILVER);
@@ -1320,7 +1321,7 @@ impl Scene for TitleScene {
         fb.fill_rect(159, 32 + bob, 3, 3, SAXON_BLUE);
         fb.fill_rect(168, 32 + bob, 3, 3, BLOOD);
         draw_caps3(fb, 24, 44, "THE CROWN ENDURES", GOLD, BLACK, YELLOW, 2);
-        draw_text_shadow(fb, 63, 66, "A SAXON LIBERATION", WHITE, DARKGRAY);
+        draw_text_shadow(fb, 88, 66, "A SAXON LIBERATION", WHITE, DARKGRAY);
         match self.stage {
             Stage::Menu => {
                 fb.fill_rect(96, 112, 128, 84, NAVY);
@@ -1328,7 +1329,7 @@ impl Scene for TitleScene {
                     let r = menu_rect(i);
                     let hi = self.item == i;
                     fb.fill_rect(r.0, r.1, r.2, r.3, if hi { BLOOD } else { NAVY });
-                    fb.rect(r.0, r.1, r.2, r.3, if hi { GOLD } else { GRAY });
+                    fb.rect(r.0, r.1, r.2, r.3, if hi { GOLD } else { GRAY3 });
                     let t = MENU[i];
                     draw_text_shadow(
                         fb,
@@ -1371,7 +1372,7 @@ impl Scene for TitleScene {
                     crate::ui::kit::centered(fb, 146 + i as i32 * 12, l, WHITE, BLACK);
                 }
                 let pg = format!("{}/{}", self.page + 1, HOWTO.len());
-                draw_text_shadow(fb, 292 - pg.len() as i32 * 8, 204, &pg, GRAY, BLACK);
+                draw_text_shadow(fb, 292 - pg.len() as i32 * 8, 204, &pg, GRAY3, BLACK);
                 self.draw_nav(fb);
             }
             Stage::Crawl => self.draw_crawl(fb),
@@ -1379,11 +1380,11 @@ impl Scene for TitleScene {
             Stage::Options => {
                 let t = format!("SOUND: {}", if self.sound { "ON" } else { "OFF" });
                 fb.fill_rect(100, 118, 120, 14, if self.item == 0 { BLOOD } else { NAVY });
-                fb.rect(100, 118, 120, 14, GOLD);
+                fb.rect(100, 118, 120, 14, if self.item == 0 { GOLD } else { GRAY3 });
                 crate::ui::kit::centered(fb, 121, &t, WHITE, BLACK);
                 let c = format!("CRT FILTER: {}", if self.crt { "ON" } else { "OFF" });
                 fb.fill_rect(100, 138, 120, 14, if self.item == 1 { BLOOD } else { NAVY });
-                fb.rect(100, 138, 120, 14, GOLD);
+                fb.rect(100, 138, 120, 14, if self.item == 1 { GOLD } else { GRAY3 });
                 crate::ui::kit::centered(fb, 141, &c, WHITE, BLACK);
                 crate::ui::kit::centered(fb, 166, "M TOGGLES SOUND", SILVER, BLACK);
                 self.draw_back(fb);

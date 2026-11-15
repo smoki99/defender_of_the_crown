@@ -321,6 +321,9 @@ pub struct CampaignUi {
     /// T901: pre-painted terrain layer (Sachs-style relief, see
     /// `build_terrain`); blitted as the map background every frame.
     terrain: Vec<u8>,
+    /// T904: which action button the keyboard has cycled to (visible via
+    /// `hover`), so Enter can press it without a pointer.
+    pub kbd_btn: usize,
 }
 
 impl CampaignUi {
@@ -358,6 +361,7 @@ impl CampaignUi {
             sport_ctx: None,
             autoplay_player: false,
             terrain: build_terrain(),
+            kbd_btn: 0,
         }
     }
 
@@ -436,6 +440,13 @@ impl CampaignUi {
             self.update_hover(x, y);
             return;
         }
+        // T904: the keyboard is a full citizen - every action below is
+        // reached by synthesizing the very tap a finger would send, so
+        // the rules behind mouse and keys cannot drift apart.
+        if let SceneEvent::Key { code, pressed: true } = *ev {
+            self.key_press(code);
+            return;
+        }
         let SceneEvent::Tap { x, y } = ev else { return };
         let (x, y) = (*x, *y);
         if self.ai_anim > 0 {
@@ -501,6 +512,7 @@ impl CampaignUi {
                 if self.g.strongholds[id].owner == PLAYER {
                     self.sel = Some(id);
                     self.panel_open = true;
+                    self.kbd_btn = 0;
                     self.list_top = 0;
                     // Tell the player what this host can do right now -
                     // the old silent select read as "attack is broken".
@@ -545,6 +557,147 @@ impl CampaignUi {
                 self.msg_ticks = 0;
             }
         }
+    }
+
+    /// T904: the keyboard twin of the finger. Semantics first: actions
+    /// ride synthetic taps into the very same dispatch the mouse uses, so
+    /// every rule (info lines, march, report, restart) applies equally.
+    /// Arrows walk castles spatially; Left/Right cycles panel buttons
+    /// (focus drawn with the hover bevel); E ends the turn; Esc backs out.
+    fn key_press(&mut self, code: u32) {
+        use crate::engine::input::{
+            KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_SPACE, KEY_UP,
+        };
+        let ack = matches!(code, KEY_ENTER | KEY_SPACE);
+        if self.ai_anim > 0 {
+            return; // the dawn march deafens the map to all input
+        }
+        if self.report_open {
+            if ack {
+                self.tap_at(160, 128);
+            }
+            return;
+        }
+        if self.champ_open || self.event_open {
+            if ack || code == KEY_ESC {
+                let r = event_ok_rect();
+                self.tap_at(r.x + r.w as i32 / 2, r.y + r.h as i32 / 2);
+            }
+            return;
+        }
+        if self.g.over.is_some() {
+            if ack {
+                self.tap_at(2, 2); // any touch reignites the war
+            }
+            return;
+        }
+        if code == b'e' as u32 || code == b'E' as u32 {
+            let r = end_turn_rect();
+            self.tap_at(r.x + r.w as i32 / 2, r.y + r.h as i32 / 2);
+            return;
+        }
+        if let Some(sel) = self.sel.filter(|_| self.panel_open) {
+            let own = self.g.strongholds[sel].owner == PLAYER;
+            let rects = action_rects(own, self.g.dragon_offer);
+            if rects.is_empty() {
+                return;
+            }
+            match code {
+                KEY_LEFT => self.kbd_btn = (self.kbd_btn + rects.len() - 1) % rects.len(),
+                KEY_RIGHT => self.kbd_btn = (self.kbd_btn + 1) % rects.len(),
+                KEY_ENTER | KEY_SPACE => {
+                    let b = &rects[self.kbd_btn % rects.len()];
+                    self.tap_at(b.x + b.w as i32 / 2, b.y + b.h as i32 / 2);
+                    return;
+                }
+                KEY_ESC => {
+                    self.panel_open = false;
+                    self.hover = None;
+                    return;
+                }
+                KEY_UP | KEY_DOWN if own => {
+                    let max =
+                        garrison_rows(&self.g, sel).len().saturating_sub(LIST_ROWS) as i32;
+                    let d = if code == KEY_UP { -1 } else { 1 };
+                    self.list_top = (self.list_top as i32 + d).clamp(0, max) as usize;
+                    return;
+                }
+                _ => return,
+            }
+            // visible focus: the hover bevel doubles as the caret
+            self.hover = Some(rects[self.kbd_btn % rects.len()].id);
+            return;
+        }
+        // map level: arrows roam England; Enter acts on the keep as a click would
+        let dir = match code {
+            KEY_LEFT => Some((-1, 0)),
+            KEY_RIGHT => Some((1, 0)),
+            KEY_UP => Some((0, -1)),
+            KEY_DOWN => Some((0, 1)),
+            _ => None,
+        };
+        if let Some((dx, dy)) = dir {
+            if let Some(id) = self.keep_in_dir(self.sel.or_else(|| self.capital()), dx, dy) {
+                self.sel = Some(id);
+                self.panel_open = false;
+                self.list_top = 0;
+                self.hover = None;
+                self.msg.clear();
+                self.msg_ticks = 0;
+            }
+            return;
+        }
+        if ack {
+            match self.sel {
+                Some(id) => {
+                    let (cx, cy) = castle_screen(&self.g.strongholds[id]);
+                    self.tap_at(cx, cy - 4); // centre of the keep hitbox
+                }
+                None => self.sel = self.capital(),
+            }
+        } else if code == KEY_ESC {
+            self.tap_at(2, 2); // a miss clears selection and message
+        }
+    }
+
+    /// A finger that never left the keys: send the tap the mouse would.
+    fn tap_at(&mut self, x: i32, y: i32) {
+        self.event(&SceneEvent::Tap { x, y }, true);
+    }
+
+    /// Home keep: the player's capital, failing that any held castle.
+    fn capital(&self) -> Option<usize> {
+        self.g
+            .strongholds
+            .iter()
+            .find(|s| s.owner == PLAYER && s.capital)
+            .or_else(|| self.g.strongholds.iter().find(|s| s.owner == PLAYER))
+            .or_else(|| self.g.strongholds.first())
+            .map(|s| s.id)
+    }
+
+    /// Nearest stronghold that lies in the pressed direction; forward
+    /// distance plus a triple-weighted sideways detour prefers straight.
+    fn keep_in_dir(&self, from: Option<usize>, dx: i32, dy: i32) -> Option<usize> {
+        let (ax, ay) = match from {
+            Some(i) => castle_screen(&self.g.strongholds[i]),
+            None => (W as i32 / 2, MAP_BOTTOM / 2),
+        };
+        let mut best: Option<(i64, usize)> = None;
+        for s in &self.g.strongholds {
+            let (sx, sy) = castle_screen(s);
+            let (ox, oy) = ((sx - ax) as i64, (sy - ay) as i64);
+            let fwd = ox * dx as i64 + oy * dy as i64;
+            if fwd < 12 {
+                continue; // not yonder in that direction
+            }
+            let perp = (ox * dy as i64 - oy * dx as i64).abs();
+            let cost = fwd + perp * 3;
+            if best.is_none_or(|(b, _)| cost < b) {
+                best = Some((cost, s.id));
+            }
+        }
+        best.map(|(_, id)| id)
     }
 
     /// Any battle log lines spawned by the action that began at log index
@@ -904,7 +1057,7 @@ impl CampaignUi {
         draw_text_shadow(fb, 4, 204, &format!("GOLD {me}"), GOLD, BLACK);
         let tgt = Self::bar_targets_of(&self.g);
         let disp = self.bars_disp;
-        bar(fb, 4, 214, "WEALTH", disp[0], tgt[0], GOLD);
+        bar(fb, 4, 214, "RICH", disp[0], tgt[0], GOLD);
         bar(fb, 84, 214, "FOOD", disp[1], tgt[1], GREEN);
         bar(fb, 4, 224, "LOYAL", disp[2], tgt[2], SAXON_BLUE);
         bar(fb, 84, 224, "MOOD", disp[3], tgt[3], YELLOW);
@@ -924,7 +1077,7 @@ impl CampaignUi {
         } else {
             self.g.log.last().cloned().unwrap_or_default()
         };
-        let line: String = line.chars().take(44).collect();
+        let line: String = line.chars().take(39).collect();
         draw_text_shadow(fb, 4, 246, &line.to_uppercase(), CREAM, BLACK);
     }
 
@@ -1011,7 +1164,7 @@ impl CampaignUi {
             return;
         }
         use crate::engine::fonts::draw_text_shadow;
-        const CHARS: usize = 22; // inner plate width fits 22 chars at 8 px
+        const CHARS: usize = 27; // inner plate width fits 27 chars at 8 px
                                  // Wrap every log line to the plate, uppercase (period-correct).
                                  // The plate is sized to the whole wrapped report (it never jumps
                                  // mid-scroll); lines appear in place, capped at 9 rows.
@@ -1025,19 +1178,28 @@ impl CampaignUi {
             } else {
                 BLACK
             };
-            let chars: Vec<char> = up.chars().collect();
-            if chars.is_empty() {
-                rows.push((String::new(), c));
+            // word-boundary wrap: the plate may end a line between words,
+            // never mid-word ("BOWME / N." was unreadable - QA pass).
+            let mut row: Vec<char> = Vec::new();
+            for word in up.split(' ') {
+                let wc = word.chars().count();
+                if !row.is_empty() && row.len() + 1 + wc > CHARS {
+                    rows.push((row.iter().collect(), c));
+                    row.clear();
+                } else if !row.is_empty() {
+                    row.push(' ');
+                }
+                row.extend(word.chars());
             }
-            for chunk in chars.chunks(CHARS) {
-                rows.push((chunk.iter().collect(), c));
+            if !row.is_empty() || rows.is_empty() {
+                rows.push((row.iter().collect(), c));
             }
         }
-        let n = rows.len().clamp(1, 9);
-        let (bx, by) = (60i32, 82i32);
-        fb.fill_rect(bx - 2, by - 2, 204, 20 + (n as u32) * 10, BLACK);
-        kit::panel(fb, bx, by, 200, 16 + (n as u32) * 10);
-        fb.fill_rect(bx + 2, by + 2, 196, 12 + (n as u32) * 10, LINEN);
+        let n = rows.len().clamp(1, 13); // wide plate: a full march fits
+        let (bx, by) = (50i32, 82i32);
+        fb.fill_rect(bx - 2, by - 2, 224, 20 + (n as u32) * 10, BLACK);
+        kit::panel(fb, bx, by, 220, 16 + (n as u32) * 10);
+        fb.fill_rect(bx + 2, by + 2, 216, 12 + (n as u32) * 10, LINEN);
         draw_text_shadow(fb, bx + 8, by + 4, "BATTLE REPORT", NAVY, LINEN);
         for (i, (row, c)) in rows.iter().take(n).enumerate() {
             if i < self.report_revealed {
@@ -1359,12 +1521,12 @@ fn bar(
 ) {
     use crate::engine::fonts::draw_text_shadow;
     draw_text_shadow(fb, x, y, label, CREAM, BLACK);
-    fb.rect(x + 34, y, 42, 6, GRAY);
-    let w = (v.min(BAR_MAX) as i32 * 40) / BAR_MAX as i32;
-    fb.fill_rect(x + 35, y + 1, w.max(0) as u32, 4, c);
+    fb.rect(x + 42, y, 30, 6, GRAY);
+    let w = (v.min(BAR_MAX) as i32 * 28) / BAR_MAX as i32;
+    fb.fill_rect(x + 43, y + 1, w.max(0) as u32, 4, c);
     if tgt != v {
         // White tick where the still-gliding fill has to arrive (T303).
-        let mx = x + 35 + (tgt.min(BAR_MAX) as i32 * 40) / BAR_MAX as i32;
+        let mx = x + 43 + (tgt.min(BAR_MAX) as i32 * 28) / BAR_MAX as i32;
         fb.fill_rect(mx, y, 1, 6, WHITE);
     }
 }
