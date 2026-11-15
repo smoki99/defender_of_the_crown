@@ -439,3 +439,27 @@ herald's cry is public knowledge.
   tol 1300) across two consecutive runs. A4 - audio RMS audible in headless
   (title loop 0.433-0.438, fanfare window 0.432-0.464, pre-gesture silent).
   A5 - progress.md complete T0xx-T6xx. Tag `alpha1` cut on this commit.
+
+- T701 - mg-herbs (commit 701a252): MEMORY in the herb garden - a 4x4
+  salve grid of eight herb kinds: one tile stays revealed until its
+  partner lands (+10, blanked and locked) or any other tile is chosen;
+  the mismatch shows both, shakes in blood-red and re-hides after 90
+  ticks - seen stays seen. The cauldron liquid climbs olive -> gold ->
+  blood over 40 s (BOWL 2400) and the boil-over ends the brew with pairs
+  alone; a clean fast match banks up to +20 speed, so the flawless
+  fastest brew is exactly 100 and gold 90 needs all eight inside 20 s.
+  Silver 70 (seven pairs or a late full match), bronze 40 (four pairs).
+  Layout is a seed-true pair-bag shuffle - no other randomness. Nine
+  scripted tests (banner gate, mismatch shake + re-hide + memory, match
+  lock, gold >=90, dawdle->silver, boil-over loss, partial->bronze 40,
+  pair-bag + seed variance, gutter/hover never flip). Closed-meet gate
+  tests (mg_host_tests, panel_kit) now SCAN for a turn whose posted meet
+  stays unshipped instead of pinning turn 11 - the meet pool shifts as
+  sports land, and herbs landing exposed the pin. Real Chromium smoke
+  via ?scene=mg&mg=herbs: THE HERB SALVE banner, live grid (pouch tiles,
+  climbing pot, MEMORY HUD), trusted mouse flips a real mismatch pair
+  through show and re-hide, autoplay plate GOLD LAUREL MEMORY SCORE 90
+  PURSE, 0 console errors. Full cargo suite green (258 tests), all 20/20
+  sport baselines diff-clean twice over (PLAY 0 px, plates in blink
+  tol), clippy 0 warnings, wasm32 release rebuilt (514 KB bundle);
+  title regression 1014 frames green. (2026-11-15)

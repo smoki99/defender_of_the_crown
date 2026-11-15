@@ -219,7 +219,9 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 7 — Minigames 10–13 + meta (T7xx)
 
-- [ ] **T701 mg-herbs**: memory brew w/ boil timer.
+- [x] **T701 mg-herbs**: memory brew w/ boil timer.
+  **2026-11-15:** GOLD scripted (8 pairs + speed bonus >=90; live mouse
+  mismatch smoke). See progress.md.
 - [ ] **T702 mg-falcon**: inertia flight intercept, corn-raid counter.
 - [ ] **T703 mg-tavern**: 3 waves, grab/throw, barrels, barmaid rule.
 - [ ] **T704 mg-dragon**: hoard sneak, loot-weight escape, cursed crown
