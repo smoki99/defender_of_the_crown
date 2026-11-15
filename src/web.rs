@@ -77,6 +77,10 @@ struct App {
     shot_done: bool,
     perf_acc: f64,
     perf_n: u32,
+    /// T803: ?perf=1 keeps a rolling window of per-frame times and
+    /// publishes {mean,p95,max,frames} on window.__perf once a second.
+    perf_on: bool,
+    perf_hist: std::collections::VecDeque<f64>,
     crt: Rc<Cell<bool>>,
 }
 
@@ -1429,6 +1433,8 @@ pub fn main() -> Result<(), JsValue> {
         shot_done: false,
         perf_acc: 0.0,
         perf_n: 0,
+        perf_on: query_has("perf=1"),
+        perf_hist: std::collections::VecDeque::new(),
         crt: crt.clone(),
     };
     let state = Rc::new(RefCell::new(app));
@@ -1555,8 +1561,15 @@ pub fn main() -> Result<(), JsValue> {
             if let Ok(img) = web_sys::ImageData::new_with_u8_clamped_array(Clamped(&st.rgba), W) {
                 let _ = st.ctx2d.put_image_data(&img, 0.0, 0.0);
             }
-            st.perf_acc += js_sys::Date::now() - t0;
+            let dt = js_sys::Date::now() - t0;
+            st.perf_acc += dt;
             st.perf_n += 1;
+            if st.perf_on {
+                st.perf_hist.push_back(dt);
+                if st.perf_hist.len() > 300 {
+                    st.perf_hist.pop_front();
+                }
+            }
             if now - st.fps_at >= 1000.0 {
                 st.fps_at = now;
                 let fps = st.fps_seen;
@@ -1574,6 +1587,31 @@ pub fn main() -> Result<(), JsValue> {
                         &w().into(),
                         &JsValue::from_str("__ms"),
                         &JsValue::from(ms),
+                    );
+                }
+                if st.perf_on && !st.perf_hist.is_empty() {
+                    let mut h: Vec<f64> = st.perf_hist.iter().copied().collect();
+                    h.sort_unstable_by(|a, b| a.total_cmp(b));
+                    let mean = h.iter().sum::<f64>() / h.len() as f64;
+                    let pct = |q: f64| h[((h.len() as f64 * q) as usize).min(h.len() - 1)];
+                    let round2 = |v: f64| (v * 100.0).round() / 100.0;
+                    let o = js_sys::Object::new();
+                    for (k, v) in [
+                        ("mean", round2(mean)),
+                        ("p95", round2(pct(0.95))),
+                        ("max", round2(pct(1.0))),
+                        ("frames", h.len() as f64),
+                    ] {
+                        let _ = js_sys::Reflect::set(
+                            &o,
+                            &JsValue::from_str(k),
+                            &JsValue::from_f64(v),
+                        );
+                    }
+                    let _ = js_sys::Reflect::set(
+                        &w().into(),
+                        &JsValue::from_str("__perf"),
+                        &o,
                     );
                 }
             }

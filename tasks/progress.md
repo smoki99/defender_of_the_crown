@@ -703,3 +703,13 @@ gold scripts, accepted in their original T5xx/T6xx MG-QA passes. Where
 a score is a discrete objective (maze escape, cloak sneaky entry) the
 threshold contract is the honest form of Q6; per-game casual bots are
 not re-litigated at sweep time.
+
+T803 - perf pass (plan §3: p95 <= 12 ms, 320x256). The ?perf=1 probe
+in the wasm host now keeps a 300-frame rolling window and publishes
+{mean,p95,max,frames} on window.__perf every second (plain mean only
+existed before). tools/perf-pass.mjs boots every scene (title, demo,
+play t1/t40/champion) and all 13 SPORTS deep-linked
+(?scene=mg&mg=<id>&autoplay=1) in headless Chromium and reads the
+probe. Measured (SwiftShader headless, the pessimistic case): worst
+row play t40 mean 2.91 / p95 6 / max 8 ms - every row under half the
+bar. Committed PASS line: p95 <= 12 ms holds with ~2x margin.
