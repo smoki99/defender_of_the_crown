@@ -251,18 +251,18 @@ Run order = file order. Protocol references: `tasks/plan.md` §3 (MG-QA), §5
 
 ## Phase 8 — ALPHA 2 passes (T8xx) → ALPHA 2
 
-- [ ] **T801 Soak**: 500 AI-vs-AI games 0 panics; 100 % terminate ≤100 (X+ tie-break);
+- [x] **T801 Soak**: 500 AI-vs-AI games 0 panics; 100 % terminate ≤100 (X+ tie-break);
   invariants clean; reward-economy cap test (minigames can't break income).
 - [x] **T802 Balance sweep**: every game Q6 thresholds on final scores;
   champion pacing sane; HARD≥EASY 8/10 re-run.
-- [ ] **T803 Perf pass**: `?perf=1` all scenes+games ≤12 ms p95; fix hot
+- [x] **T803 Perf pass**: `?perf=1` all scenes+games ≤12 ms p95; fix hot
   spots (dirty-rect/back buffer if needed).
-- [ ] **T804 Payload**: wasm-opt -Oz; total ≤2 MB; per-track size table in
+- [x] **T804 Payload**: wasm-opt -Oz; total ≤2 MB; per-track size table in
   progress.md.
-- [ ] **T805 All-13 autoplay batch**: every game Q4 re-run on final engine,
+- [x] **T805 All-13 autoplay batch**: every game Q4 re-run on final engine,
   screenshots diffed; console-error gate 0.
-- [ ] **Checkpoint ALPHA 2** — commit tag `alpha2`, push.
-  - [ ] all T6xx–T8xx logged; suite+clippy green; payload & perf in budget.
+- [x] **Checkpoint ALPHA 2** — commit tag `alpha2`, push.
+  - [x] all T6xx–T8xx logged; suite+clippy green; payload & perf in budget.
 
 ## Phase 9 — BETA polish (T9xx)
 

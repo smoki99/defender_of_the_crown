@@ -713,3 +713,33 @@ play t1/t40/champion) and all 13 SPORTS deep-linked
 probe. Measured (SwiftShader headless, the pessimistic case): worst
 row play t40 mean 2.91 / p95 6 / max 8 ms - every row under half the
 bar. Committed PASS line: p95 <= 12 ms holds with ~2x margin.
+
+T801 - 500-game soak on the final engine: five_hundred_councils_wage_
+ended_wars (seeds 1..=500, every game terminates by turn 100, bar/
+garrison invariants clean, 0 panics) and farmed_meets_never_break_the_
+purse (spam SPORTS meets keep gold under the 2500 reward-table
+ceiling) both pass under ./test.sh test --test soak.
+
+T804 - payload. wasm-opt version_122 -Oz is now a build-web.ts step
+(CLI vendored at tools/bin/wasm-opt, downloaded once from the binaryen
+release): wasm 547,203 -> 325,653 B. build-web.ts prints the per-track
+size table each build; embedded MODs: title 17180, saxon 16956,
+battle 17052, minigame 17212, victory 17052, defeat 16956 B (plus the
+one-shot norman sting 16700 B embedded for the AI banner). Shipped
+payload (6 beds + wasm + glue): 325653 + 30953 + 102408 = 459,014 B,
+wasm alone gzips to 145,698 B - 22 % of the 2 MB budget even before
+compression.
+
+T805 - all-13 autoplay batch on the final (wasm-opt'd) engine:
+tools/baseline-sports.sh, 26 captures (PLAY frame + autoplay result
+PLATE per sport). 26/26 rows within tolerance (324 px summed diff -
+the blinking gold ring), assertsFailed=0 and problems=0 on every
+run: Q4 holds on the shipped binary and the console-error gate is
+clean. perf-pass re-run on the -Oz wasm: still every scene p95 <= 6
+ms against the 12 ms bar.
+
+Checkpoint ALPHA 2: T801-T805 above; full native suite (34 targets,
+0 failures) + clippy -D warnings green (fixed one long-standing
+manual_range_contains in tavern's barrel bounds - NaN semantics
+unchanged for finite positions). Payload 459,014 B and worst-case
+p95 6 ms: both budgets hold on the shipped -Oz binary. Tag alpha2.

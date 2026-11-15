@@ -1,7 +1,8 @@
 // tools/build-web.ts — build the wasm bundle + JS glue into web/pkg.
 // Rust compiles inside the crown-rs:1 docker image (see test.sh); the
 // wasm-bindgen CLI is a static musl binary staged into the source volume.
-import { existsSync } from "node:fs";
+import { existsSync, renameSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 
 const CRATE_VER = "0.2.130"; // keep in sync with Cargo.toml pin
 const CLI = "tools/bin/wasm-bindgen";
@@ -27,6 +28,27 @@ await run("./test.sh", "wasm-build");
 await run("./test.sh", "bindgen");
 await Bun.write("web/pkg/.keep", "");
 await run("./test.sh", "pull-pkg");
+
+// T804: wasm-opt -Oz (-40 % here); keep the CLI in sync with test.sh's image.
+const WASM = "web/pkg/defender_of_the_crown_bg.wasm";
+await run("tools/bin/wasm-opt", "-Oz", "--enable-mutable-globals", WASM, "-o", "web/pkg/.opt.wasm");
+renameSync("web/pkg/.opt.wasm", WASM);
+
+// T804 payload budget: wasm + glue + embedded MODs must stay <= 2 MB.
+const EMBEDDED = ["title", "saxon", "battle", "minigame", "victory", "defeat"];
+let mods = 0;
+for (const t of EMBEDDED) {
+  const s = Bun.file(`assets/music/${t}.mod`).size;
+  mods += s;
+  console.log(`track ${t.padEnd(9)} ${String(s).padStart(7)} B`);
+}
+const wasmS = Bun.file(WASM).size;
+const jsS = Bun.file("web/pkg/defender_of_the_crown.js").size;
+const total = wasmS + jsS + mods;
+const gz = gzipSync(await Bun.file(WASM).bytes()).length;
+console.log(`payload wasm ${wasmS} + js ${jsS} + mods ${mods} = ${total} B (wasm gz ${gz})`);
+if (total > 2 * 1024 * 1024) throw new Error(`payload ${total} B over 2 MB budget`);
+
 const files = Array.from(
   new Bun.Glob("web/pkg/*").scanSync(),
 ).map((f) => f.split("/").pop());

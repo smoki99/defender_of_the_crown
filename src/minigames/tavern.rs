@@ -426,7 +426,7 @@ impl Tavern {
             if self.maid.floor && !self.maid.gone && (self.maid.x - bx).abs() < 8.0 {
                 self.foul();
             }
-            if bx < 8.0 || bx > 312.0 {
+            if !(8.0..=312.0).contains(&bx) {
                 self.barrels[bi].x = -1.0; // spent
             }
         }

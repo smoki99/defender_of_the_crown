@@ -3,8 +3,10 @@
 // rolling {mean,p95,max,frames} of rAF frame times on window.__perf
 // once a second. Bar (plan §3/T803): p95 <= 12 ms at 320x256.
 //   bun tools/perf-pass.mjs          # starts its own static host
-// CHROME_EXE overrides; default is the LD_LIBRARY_PATH-wrapped puppeteer
-// chrome (the bare headless-shell lacks the Debian libs).
+// playwright-core is resolved at runtime (PW_CORE may name any path), so a
+// static import is impossible. CHROME_EXE names the browser binary; the
+// default is the LD_LIBRARY_PATH-wrapped puppeteer chrome (the bare
+// headless-shell lacks the Debian libs).
 let chromium;
 try {
   ({ chromium } = await import("playwright-core"));
